@@ -1,4 +1,4 @@
-# Muscle Counter Application
+# Muscle Counter Capstone Project
 
 ## Stack
 

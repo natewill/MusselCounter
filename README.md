@@ -3,7 +3,7 @@
 ## Setup
 
 ### Prerequisites
-- Node.js (v18+)
+- Node.js (v18+), if you don't have node install in mac by running `brew install node`
 - Python (3.8+)
 
 ### Backend Setup

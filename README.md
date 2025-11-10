@@ -1,5 +1,45 @@
 # Muscle Counter Application
 
+## Setup
+
+### Prerequisites
+- Node.js (v18+)
+- Python (3.8+)
+
+### Backend Setup
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install fastapi uvicorn aiosqlite
+```
+
+### Frontend Setup
+```bash
+cd frontend
+npm install
+```
+
+## Running
+
+**Terminal 1 - Backend:**
+```bash
+cd backend
+source venv/bin/activate
+uvicorn main:app --reload
+```
+
+**Terminal 2 - Frontend:**
+```bash
+cd frontend
+npm run dev
+```
+
+- Backend: http://127.0.0.1:8000
+- Frontend: http://localhost:3000
+
+---
+
 ## Stack
 
 ### [Next.js](https://nextjs.org/)

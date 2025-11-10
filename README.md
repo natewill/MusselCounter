@@ -1,44 +1,48 @@
-# Muscle Counter Capstone Project
+# Muscle Counter Application
 
 ## Stack
 
 ### [Next.js](https://nextjs.org/)
-Used for hosting the frontend and API routing.  
-Provides a **React-based UI** for users to interact with the application.
+For hosting frontend, used for serving the front end and API routing. With a React UI.  
+Next.js is specially designed for React, and handles routing while Node.js needs to use Express. Also much more minimal and efficient than Node.  
+Next.js is essentially Node.js + specially made for React + built-in routing + more.
 
 ### [Python FastAPI](https://fastapi.tiangolo.com/#sponsors) + [Uvicorn](https://uvicorn.dev/)
-Since our model is built using Python libraries, we need to use a Python-based API to run it.  
-- **FastAPI** is the Python backend framework used to create APIs that connect to our Next.js frontend.  
-- **Uvicorn** is used to run these APIs on a local server.
+Since our model is built using Python libraries, we need to use Python-based APIs to run it.  
+FastAPI is a Python backend used to make APIs that will connect to our Next.js frontend.  
+Runs in Python, used to connect our model’s inference to our frontend.  
+Uvicorn is used to run these APIs on a server.  
+ASGI (Asynchronous Server Gateway Interface) runs up a server to host the APIs while being able to handle async requests.  
+Handles Sockets, HTTP, etc. for the API.
 
 ### [SQLite](https://sqlite.org/)
-Used for storing batch, image, and inference data.
+For storing data.
 
 ### [PyInstaller](https://pyinstaller.org/)
-Used to bundle the application into a **single `.exe` file** that automatically opens the browser and runs the application locally.
+Used to bundle the application into an `.exe` file that opens the browser and runs the application.  
+All Athan needs to do is download the `.exe`, and open the app — nothing else.
 
 ---
 
 ## Pages
 
 ### Dashboard
-- Upload an image, multiple images, or a folder of images.
+Upload an image, multiple images, or a folder of images.
 
 ### Results Page `/batches/[batchId]`
-- Runs inference on image(s) and lists all images with the model’s polygon predictions.  
-- Displays live muscle count.  
-- Allows changing the **score threshold** for classifying dead or alive muscles.  
-- Ability to **add more images** to the batch and **run more inference**.
+Runs inference on image(s), and lists all images with the model’s polygon predictions on each image, with a live muscle count.  
+Able to change the score threshold for classifying dead or alive.  
+Add more images to the batch and run more inference.
 
-### Batch History / Library `/batches`
-- Lists all previous batches.  
-- Allows opening a batch and navigating to its `batchId`.  
-- Search functionality to find batches.
+### Batch History or Library `/batches`
+Lists all previous batches.  
+Able to open batches and go to their `batchId`.  
+Able to search for batches.
 
 ### Images `/images/[imageId]`
-- View model stats of a certain image.  
-- Change threshold for the image.  
-- (Future) Possibly relabel or correct model predictions.
+See model stats of a certain image.  
+Change threshold for image.  
+Maybe be able to relabel images but idk maybe later.
 
 ---
 
@@ -48,13 +52,13 @@ Used to bundle the application into a **single `.exe` file** that automatically 
 Get all batches information.
 
 ### `GET /api/batches/[batchId]`
-Get all information about a specific batch.
+Get all information about a certain batch.
 
 ### `POST /api/batches/[batchId]/add-images`
-Add more files to an existing batch.
+Add more files to existing batch.
 
 ### `POST /api/batches/[batchId]/run`
-Run inference on a batch.
+Run inference on batch.
 
 ### `GET /api/images/[imageId]`
-Get image information from inference results.
+Get image information from inference.

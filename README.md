@@ -128,17 +128,42 @@ View detailed model stats for a specific image.
 
 ## APIs
 
-### `GET /api/batches`
+### Batch Endpoints
+
+#### `GET /api/batches`
 Get all batches information.
 
-### `GET /api/batches/[batchId]`
+#### `POST /api/batches`
+Create a new batch.
+- Request body: `{ name?: string, description?: string }`
+- Returns: `{ batch_id: number }`
+
+#### `GET /api/batches/[batchId]`
 Get all information about a certain batch.
+- Returns: `{ batch: {...}, images: [...], latest_run: {...} }`
 
-### `POST /api/batches/[batchId]/add-images`
-Add more files to existing batch.
+#### `POST /api/batches/[batchId]/upload-images`
+Upload image files to a batch (multipart/form-data).
+- Request: `files: File[]`
+- Returns: `{ batch_id: number, image_ids: number[], count: number }`
 
-### `POST /api/batches/[batchId]/run`
-Run inference on batch.
+#### `POST /api/batches/[batchId]/run`
+Start an inference run on a batch.
+- Request body: `{ model_id: number, threshold: number }`
+- Returns: `{ run_id: number, ... }` (to be implemented)
 
-### `GET /api/images/[imageId]`
+### Model Endpoints
+
+#### `GET /api/models`
+Get all available models.
+- Returns: `[{ model_id, name, type, weights_path, description, ... }]`
+
+#### `GET /api/models/[modelId]`
+Get model information.
+- Returns: `{ model_id, name, type, weights_path, description, ... }`
+
+### Image Endpoints
+
+#### `GET /api/images/[imageId]`
 Get image information from inference.
+- Returns: `{ image_id, filename, stored_path, live_mussel_count, dead_mussel_count, ... }`

@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS batch (
   created_at    TEXT NOT NULL,             -- SQLite uses TEXT for dates (ISO format)
   updated_at    TEXT NOT NULL,
   image_count   INTEGER DEFAULT 0,         -- Calculated field, not a foreign key
-  live_mussel_count INTEGER DEFAULT 0    -- Calculated field, not a foreign key
+  live_mussel_count INTEGER DEFAULT 0    -- From latest run
 );
 
 -- IMAGE: unique images (global, not tied to a specific batch)
@@ -47,7 +47,6 @@ CREATE TABLE IF NOT EXISTS model (
   weights_path  TEXT NOT NULL,             -- local path to .pt or .pth file
   description   TEXT,
   created_at    TEXT NOT NULL,            -- SQLite uses TEXT for dates (ISO format)
-  updated_at    TEXT NOT NULL
 );
 
 -- RUN: each inference run on a batch (can use different models)
@@ -57,9 +56,11 @@ CREATE TABLE IF NOT EXISTS run (
   model_id      INTEGER NOT NULL,         -- Model used for this run
   started_at    TEXT NOT NULL,            -- SQLite uses TEXT for dates (ISO format)
   finished_at   TEXT,                     -- NULL if still running, set when done
+  status        TEXT DEFAULT 'pending',   -- 'pending', 'running', 'completed', 'failed'
   error_msg     TEXT,                      -- error if failed
   threshold     REAL NOT NULL,   -- threshold score used for this run
   total_images  INTEGER DEFAULT 0,        -- number of images processed
+  live_mussel_count INTEGER DEFAULT 0,    -- total live mussels detected in this run
   FOREIGN KEY (batch_id) REFERENCES batch(batch_id),
   FOREIGN KEY (model_id) REFERENCES model(model_id)
 );

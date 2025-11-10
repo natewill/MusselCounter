@@ -6,30 +6,38 @@ CREATE TABLE IF NOT EXISTS batch (
   folder_path   TEXT,                      -- where the folder containing the images is stored
   created_at    TEXT NOT NULL,             -- SQLite uses TEXT for dates (ISO format)
   updated_at    TEXT NOT NULL,
-  model_id      INTEGER,                      -- Reference to which model was used
-  threshold     REAL NOT NULL DEFAULT 50.00,  -- 50.00, UI slider 
   image_count   INTEGER DEFAULT 0,         -- Calculated field, not a foreign key
-  current_run_id INTEGER,                      -- Reference to the current run's mussel_count
-  FOREIGN KEY (model_id) REFERENCES model(model_id),
-  FOREIGN KEY (current_run_id) REFERENCES run(run_id)
+  live_mussel_count INTEGER DEFAULT 0    -- Calculated field, not a foreign key
 );
 
--- IMAGE: one per file in a batch
+-- IMAGE: unique images (global, not tied to a specific batch)
 CREATE TABLE IF NOT EXISTS image (
   image_id    INTEGER PRIMARY KEY AUTOINCREMENT,        
-  batch_id    INTEGER NOT NULL,
   filename    TEXT NOT NULL,             -- original filename
   stored_path TEXT NOT NULL,             -- where the file is stored
   stored_polygon_path TEXT,             -- where the polygon file is stored
-  status      TEXT NOT NULL,             -- 'pending' | 'processing' | 'done' | 'failed'
+  file_hash   TEXT UNIQUE,               -- MD5 hash for deduplication (UNIQUE ensures no duplicates)
   width       INTEGER,
   height      INTEGER,
-  error_msg   TEXT,                      -- if status = 'failed'
-  created_at  TEXT NOT NULL,              -- SQLite uses TEXT for dates (ISO format)
+  error_msg   TEXT,                      -- if processing failed
+  created_at  TEXT NOT NULL,             -- SQLite uses TEXT for dates (ISO format)
   updated_at  TEXT NOT NULL,
-  mussel_count INTEGER,
-  FOREIGN KEY (batch_id) REFERENCES batch(batch_id)
+  live_mussel_count INTEGER,
+  dead_mussel_count INTEGER
 );
+
+-- BATCH_IMAGE: junction table linking batches to images (many-to-many)
+CREATE TABLE IF NOT EXISTS batch_image (
+  batch_id    INTEGER NOT NULL,
+  image_id    INTEGER NOT NULL,
+  added_at    TEXT NOT NULL,            -- When this image was added to this batch
+  PRIMARY KEY (batch_id, image_id),
+  FOREIGN KEY (batch_id) REFERENCES batch(batch_id),
+  FOREIGN KEY (image_id) REFERENCES image(image_id)
+);
+
+-- Index for faster hash lookups
+CREATE INDEX IF NOT EXISTS idx_image_hash ON image(file_hash);
 
 -- MODEL: one per trained model file, incase we want to use different models in the future
 CREATE TABLE IF NOT EXISTS model (
@@ -42,18 +50,16 @@ CREATE TABLE IF NOT EXISTS model (
   updated_at    TEXT NOT NULL
 );
 
--- RUN: each inference run on a batch using a specific model
+-- RUN: each inference run on a batch (can use different models)
 CREATE TABLE IF NOT EXISTS run (
   run_id        INTEGER PRIMARY KEY AUTOINCREMENT,
   batch_id      INTEGER NOT NULL,
-  model_id      INTEGER NOT NULL,
+  model_id      INTEGER NOT NULL,         -- Model used for this run
   started_at    TEXT NOT NULL,            -- SQLite uses TEXT for dates (ISO format)
-  finished_at   TEXT,                     -- NULL if still running
-  status        TEXT NOT NULL,             -- "pending" | "running" | "done" | "failed"
+  finished_at   TEXT,                     -- NULL if still running, set when done
   error_msg     TEXT,                      -- error if failed
   threshold     REAL NOT NULL,   -- threshold score used for this run
   total_images  INTEGER DEFAULT 0,        -- number of images processed
-  mussel_count  INTEGER DEFAULT 0,         -- mussels detected at this threshold
   FOREIGN KEY (batch_id) REFERENCES batch(batch_id),
   FOREIGN KEY (model_id) REFERENCES model(model_id)
 );

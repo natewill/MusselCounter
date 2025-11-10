@@ -9,8 +9,9 @@ CREATE TABLE IF NOT EXISTS batch (
   model_id      TEXT,                      -- Reference to which model was used
   threshold     REAL NOT NULL DEFAULT 50.00,  -- 50.00, UI slider 
   image_count   INTEGER DEFAULT 0,         -- Calculated field, not a foreign key
-  mussel_count  INTEGER DEFAULT 0,         -- Calculated field, not a foreign key
-  FOREIGN KEY (model_id) REFERENCES model(model_id)
+  current_run_id TEXT,                      -- Reference to the current run's mussel_count
+  FOREIGN KEY (model_id) REFERENCES model(model_id),
+  FOREIGN KEY (current_run_id) REFERENCES run(run_id)
 );
 
 -- IMAGE: one per file in a batch

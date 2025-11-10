@@ -1,23 +1,23 @@
 -- BATCH: one per analysis group
 CREATE TABLE IF NOT EXISTS batch (
-  batch_id      TEXT PRIMARY KEY,          -- UUID (Unique Identifier) string
+  batch_id      INTEGER PRIMARY KEY AUTOINCREMENT,
   name          TEXT,
   description   TEXT,
   folder_path   TEXT,                      -- where the folder containing the images is stored
   created_at    TEXT NOT NULL,             -- SQLite uses TEXT for dates (ISO format)
   updated_at    TEXT NOT NULL,
-  model_id      TEXT,                      -- Reference to which model was used
+  model_id      INTEGER,                      -- Reference to which model was used
   threshold     REAL NOT NULL DEFAULT 50.00,  -- 50.00, UI slider 
   image_count   INTEGER DEFAULT 0,         -- Calculated field, not a foreign key
-  current_run_id TEXT,                      -- Reference to the current run's mussel_count
+  current_run_id INTEGER,                      -- Reference to the current run's mussel_count
   FOREIGN KEY (model_id) REFERENCES model(model_id),
   FOREIGN KEY (current_run_id) REFERENCES run(run_id)
 );
 
 -- IMAGE: one per file in a batch
 CREATE TABLE IF NOT EXISTS image (
-  image_id    TEXT PRIMARY KEY,           -- UUID
-  batch_id    TEXT NOT NULL,
+  image_id    INTEGER PRIMARY KEY AUTOINCREMENT,        
+  batch_id    INTEGER NOT NULL,
   filename    TEXT NOT NULL,             -- original filename
   stored_path TEXT NOT NULL,             -- where the file is stored
   stored_polygon_path TEXT,             -- where the polygon file is stored
@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS image (
 
 -- MODEL: one per trained model file, incase we want to use different models in the future
 CREATE TABLE IF NOT EXISTS model (
-  model_id      TEXT PRIMARY KEY,          -- UUID 
+  model_id      INTEGER PRIMARY KEY AUTOINCREMENT, 
   name          TEXT NOT NULL,             -- "CNN v2 - 2025-11 blah blah"
   type          TEXT NOT NULL,             -- CNN, YOLO, etc.
   weights_path  TEXT NOT NULL,             -- local path to .pt or .pth file
@@ -44,9 +44,9 @@ CREATE TABLE IF NOT EXISTS model (
 
 -- RUN: each inference run on a batch using a specific model
 CREATE TABLE IF NOT EXISTS run (
-  run_id        TEXT PRIMARY KEY,          -- UUID
-  batch_id      TEXT NOT NULL,
-  model_id      TEXT NOT NULL,
+  run_id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  batch_id      INTEGER NOT NULL,
+  model_id      INTEGER NOT NULL,
   started_at    TEXT NOT NULL,            -- SQLite uses TEXT for dates (ISO format)
   finished_at   TEXT,                     -- NULL if still running
   status        TEXT NOT NULL,             -- "pending" | "running" | "done" | "failed"

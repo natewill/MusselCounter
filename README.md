@@ -7,7 +7,7 @@ For hosting frontend, used for serving the front end and API routing. With a Rea
 Next.js is specially designed for React, and handles routing while Node.js needs to use Express. Also much more minimal and efficient than Node.  
 Next.js is essentially Node.js + specially made for React + built-in routing + more.
 
-### [Python FastAPI](https://fastapi.tiangolo.com/#sponsors) + [Uvicorn](https://uvicorn.dev/)
+### [Python FastAPI](https://fastapi.tiangolo.com/) + [Uvicorn](https://uvicorn.dev/)
 Since our model is built using Python libraries, we need to use Python-based APIs to run it.  
 FastAPI is a Python backend used to make APIs that will connect to our Next.js frontend.  
 Runs in Python, used to connect our model’s inference to our frontend.  
@@ -20,7 +20,7 @@ For storing data.
 
 ### [PyInstaller](https://pyinstaller.org/)
 Used to bundle the application into an `.exe` file that opens the browser and runs the application.  
-All Athan needs to do is download the `.exe`, and open the app — nothing else.
+All Athan needs to do is download the `.exe`, and open the app.
 
 ---
 

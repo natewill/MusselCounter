@@ -26,7 +26,7 @@ All Athan needs to do is download the `.exe`, and open the app.
 
 ## Pages
 
-### Dashboard
+### Dashboard `/home`
 Upload an image, multiple images, or a folder of images.
 
 ### Results Page `/batches/[batchId]`

@@ -7,13 +7,14 @@ CREATE TABLE IF NOT EXISTS batch (
   created_at    DATETIME NOT NULL,
   updated_at    DATETIME NOT NULL,
   model_type    TEXT,                      -- CNN, YOLO, etc.
-  threshold DECIMAL(10, 2) NOT NULL          -- 0..1, UI slider default
+  model_name    TEXT,
+  threshold DECIMAL(10, 2) NOT NULL          -- 50.00, UI slider 
   image_count INTEGER,
   muscle_count INTEGER,
   FOREIGN KEY (model_type) REFERENCES model(model_type)
-  FOREIGN KEY (threshold) REFERENCES model(threshold)
   FOREIGN KEY (image_count) REFERENCES image(image_count)
   FOREIGN KEY (muscle_count) REFERENCES muscle(muscle_count)
+  FOREIGN KEY (model_name) REFERENCES model(model_name)
 );
 
 -- IMAGE: one per file in a batch

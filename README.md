@@ -66,23 +66,63 @@ All Athan needs to do is download the `.exe`, and open the app.
 
 ## Pages
 
-### Dashboard `/home`
-Upload an image, multiple images, or a folder of images.
+### Dashboard `/home` or `/`
+Two modes for processing images:
 
-### Results Page `/batches/[batchId]`
-Runs inference on image(s), and lists all images with the model’s polygon predictions on each image, with a live muscle count.  
-Able to change the score threshold for classifying dead or alive.  
-Add more images to the batch and run more inference.
+**Quick Process Mode:**
+- Upload image(s) or folder
+- Automatically creates batch with default name (timestamp-based) on first upload
+- All subsequent uploads in the same session are added to the same batch
+- Automatically adds images to batch
+- Automatically starts inference run
+- Navigates to `/run/[runId]` to show progress/results
+- Batch exists but is invisible to user (can rename later if needed)
+- New session or explicit batch creation starts a fresh batch
 
-### Batch History or Library `/batches`
+**Create Batch Mode:**
+- Optional: Enter batch name and description
+- Create batch explicitly
+- Upload/add images to batch
+- Navigate to `/batches/[batchId]` where user can start a run manually
+- Useful for organizing and labeling related images
+
+### Batch History `/batches`
 Lists all previous batches.  
-Able to open batches and go to their `batchId`.  
-Able to search for batches.
+- View all batches with basic info (name, description, image count, live mussel count)
+- Search/filter batches
+- Click to navigate to `/batches/[batchId]`
 
-### Images `/images/[imageId]`
-See model stats of a certain image.  
-Change threshold for image.  
-Maybe be able to relabel images but idk maybe later.
+### Batch View `/batches/[batchId]`
+View batch information and latest run results (read-only).  
+- Display batch details (name, description, image count, live mussel count)
+- Show latest run results (if exists)
+- Display all images in batch with their polygon predictions and counts
+- "Start New Run" button → navigates to `/run/[runId]` (creates new run)
+- Link to edit page for batch management
+
+### Batch Edit `/batches/[batchId]/edit`
+Edit batch and manage images.  
+- Add more images to the batch
+- Update batch name/description
+- View/manage images in batch
+
+### Run Results `/run/[runId]`
+Run inference and display results for a specific run.  
+- Shows run status (pending, running, completed, failed)
+- Displays progress during inference
+- Lists all images processed in this run
+- Shows polygon predictions on each image
+- Displays live and dead mussel counts per image
+- Shows total counts for the run
+- Can change threshold and re-run (creates new run)
+
+### Image Detail `/images/[imageId]`
+View detailed model stats for a specific image.  
+- Display image with polygon overlays
+- Show live and dead mussel counts
+- Change threshold for this image (creates new run)
+- View image metadata (filename, dimensions, etc.)
+- Maybe relabel images (future feature)
 
 ---
 

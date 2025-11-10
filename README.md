@@ -1,4 +1,4 @@
-# Muscle Counter Application
+# Mussel Counter Application
 
 ## Setup
 

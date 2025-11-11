@@ -1,1 +1,40 @@
-backend/data/models
+# Model weights (large files)
+backend/data/models/
+*.pth
+*.pt
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Runtime data
+backend/data/uploads/
+backend/data/polygons/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Node
+node_modules/
+.next/
+out/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

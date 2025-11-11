@@ -11,8 +11,28 @@
 cd backend
 python3 -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
-pip install fastapi uvicorn aiosqlite
+pip install fastapi uvicorn aiosqlite torch torchvision pillow numpy
 ```
+
+### Add Model to Database
+After setting up the backend, you need to add your model to the database so it appears in the model picker:
+
+```bash
+cd backend
+source venv/bin/activate  # Make sure venv is activated
+python add_model.py
+```
+
+This will add the model at `data/models/fast_rcnn_weights.pth` to the database. If you have a different model file, edit `add_model.py` to update the path and model information.
+
+**Supported Model Types:**
+The application supports 4 object detection model types (all must output bounding boxes/polygons):
+- **R-CNN / Faster R-CNN**: Object detection with bounding boxes
+- **YOLO**: YOLO object detection (YOLOv5, YOLOv8, etc.)
+- **SSD**: Single Shot Detector object detection
+- **CNN**: CNN-based object detection (not classification)
+
+All models must be object detection models that output bounding boxes/polygons for mussel detection.
 
 ### Frontend Setup
 ```bash
@@ -149,8 +169,9 @@ Upload image files to a batch (multipart/form-data).
 
 #### `POST /api/batches/[batchId]/run`
 Start an inference run on a batch.
-- Request body: `{ model_id: number, threshold: number }`
+- Request body: `{ model_id: number, threshold?: number }` (threshold defaults to 0.5 if not provided)
 - Returns: `{ run_id: number, ... }` (to be implemented)
+- Note: Threshold can be adjusted after seeing results, so it's optional on initial run
 
 ### Model Endpoints
 

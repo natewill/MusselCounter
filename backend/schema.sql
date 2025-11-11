@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS model (
   weights_path  TEXT NOT NULL,             -- local path to .pt or .pth file
   description   TEXT,
   created_at    TEXT NOT NULL,            -- SQLite uses TEXT for dates (ISO format)
+  updated_at    TEXT NOT NULL
 );
 
 -- RUN: each inference run on a batch (can use different models)

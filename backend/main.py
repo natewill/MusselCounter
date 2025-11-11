@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, BackgroundTasks
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from pydantic import BaseModel
 from typing import Optional, List
@@ -8,6 +9,7 @@ from db import init_db, get_db
 from utils.batch_utils import create_batch, get_batch, get_all_batches, get_batch_images, get_latest_run, get_all_runs
 from utils.image_utils import add_multiple_images
 from utils.model_utils import get_all_models, get_model
+from utils.run_utils import create_run, process_batch_run
 
 
 @asynccontextmanager
@@ -19,6 +21,15 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")
@@ -34,7 +45,7 @@ class CreateBatchRequest(BaseModel):
 
 class StartRunRequest(BaseModel):
     model_id: int
-    threshold: float
+    threshold: Optional[float] = 0.5  # Default threshold, can be adjusted after seeing results
 
 
 # Configuration
@@ -151,7 +162,11 @@ async def get_model_endpoint(model_id: int):
 
 # Run Endpoints
 @app.post("/api/batches/{batch_id}/run")
-async def start_run_endpoint(batch_id: int, request: StartRunRequest):
+async def start_run_endpoint(
+    batch_id: int, 
+    request: StartRunRequest,
+    background_tasks: BackgroundTasks
+):
     """Start an inference run on a batch"""
     async with get_db() as db:
         # Verify batch exists
@@ -164,12 +179,24 @@ async def start_run_endpoint(batch_id: int, request: StartRunRequest):
         if not model:
             raise HTTPException(status_code=404, detail="Model not found")
         
-        # TODO: Create run record and start inference
-        # This will be implemented in run_utils.py
-        # For now, return placeholder
+        # Use default threshold of 0.5 if not provided
+        threshold = request.threshold if request.threshold is not None else 0.5
+        
+        # Create run record
+        run_id = await create_run(db, batch_id, request.model_id, threshold)
+        
+        # Start background task to process the run
+        # Note: BackgroundTasks will handle the async function
+        async def run_inference_task():
+            async with get_db() as db_task:
+                await process_batch_run(db_task, run_id)
+        
+        background_tasks.add_task(run_inference_task)
+        
         return {
-            "message": "Run endpoint - to be implemented",
+            "run_id": run_id,
             "batch_id": batch_id,
             "model_id": request.model_id,
-            "threshold": request.threshold
+            "threshold": threshold,
+            "status": "pending"
         }

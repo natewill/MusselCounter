@@ -19,6 +19,14 @@ async def get_db():
 
 async def init_db():
     """Initialize the database by creating all tables from schema.sql"""
+    # Check if database exists and has old schema
+    import os
+    if os.path.exists(DB_PATH):
+        # For development: delete old database to recreate with new schema
+        # In production, you'd want proper migrations instead
+        print(f"Existing database found at {DB_PATH}. Deleting to recreate with new schema...")
+        os.remove(DB_PATH)
+    
     # Read the schema file
     with open(SCHEMA_PATH, "r") as f:
         schema = f.read()

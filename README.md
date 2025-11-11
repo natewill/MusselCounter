@@ -16,7 +16,7 @@ pip install fastapi uvicorn aiosqlite torch torchvision pillow numpy
 
 ### Add Model to Database
 After setting up the backend, you need to add your model to the database so it appears in the model picker:
-
+You first need to add `fast_rnn_weights.pth` to `backend/data/models`
 ```bash
 cd backend
 source venv/bin/activate  # Make sure venv is activated

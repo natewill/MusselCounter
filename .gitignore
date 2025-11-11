@@ -1,5 +1,6 @@
 # Model weights (large files)
-backend/data/models/
+backend/data/models/*
+!backend/data/models/.gitkeep
 *.pth
 *.pt
 
@@ -9,8 +10,10 @@ backend/data/models/
 *.sqlite3
 
 # Runtime data
-backend/data/uploads/
-backend/data/polygons/
+backend/data/uploads/*
+!backend/data/uploads/.gitkeep
+backend/data/polygons/*
+!backend/data/polygons/.gitkeep
 
 # Python
 __pycache__/

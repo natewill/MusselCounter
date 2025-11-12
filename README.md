@@ -50,7 +50,8 @@ cp faster_rcnn_resnet50.pth backend/data/models/
 
 # Start the backend - models are auto-loaded
 cd backend
-python dev_server.py
+source venv/bin/activate
+uvicorn main:app --reload
 ```
 
 ### Frontend Setup
@@ -65,10 +66,8 @@ npm install
 ```bash
 cd backend
 source venv/bin/activate  # Windows: venv\Scripts\activate
-python dev_server.py
+uvicorn main:app --reload
 ```
-
-> **Note:** `dev_server.py` runs uvicorn with reload enabled but excludes `venv/*` and `site-packages` from watch patterns. This prevents unnecessary server restarts when PyTorch or other large packages make internal changes.
 
 **Terminal 2 - Frontend:**
 ```bash

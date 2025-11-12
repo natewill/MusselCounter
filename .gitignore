@@ -25,12 +25,10 @@ backend/logs/
 backend/data/uploads/
 backend/data/polygons/
 
-# Model weights generated locally (keep committed weights in data/models)
+# Model weights (too large for git - use Git LFS or external storage)
 backend/data/models/*.ckpt
 backend/data/models/*.pth
 backend/data/models/*.pt
-!backend/data/models/fast_rcnn_weights.pth
-!backend/data/models/yolov8n.pt
 
 # Node / Next.js
 node_modules/

@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import { getDbVersion } from '@/lib/api';
-import localforage from 'localforage';
+import { safeGetItem, safeSetItem, safeClear } from '@/utils/storage';
 
 const DB_VERSION_KEY = 'db_version';
 
@@ -12,6 +12,11 @@ const DB_VERSION_KEY = 'db_version';
  */
 export default function DatabaseVersionChecker() {
   useEffect(() => {
+    // Only run in browser
+    if (typeof window === 'undefined') {
+      return;
+    }
+    
     const checkDbVersion = async () => {
       try {
         // Get current database version from backend
@@ -21,25 +26,25 @@ export default function DatabaseVersionChecker() {
           // If no version returned, database might be in an inconsistent state
           // Clear localStorage to be safe
           console.warn('No database version returned, clearing localStorage');
-          await localforage.clear();
+          await safeClear();
           return;
         }
         
         // Get stored version from localStorage
-        const storedVersion = await localforage.getItem(DB_VERSION_KEY);
+        const storedVersion = await safeGetItem(DB_VERSION_KEY);
         
         if (storedVersion !== db_version) {
           // Database was reset or is different - clear all localStorage
           console.log('Database version mismatch detected, clearing localStorage');
           console.log(`Stored version: ${storedVersion}, Current version: ${db_version}`);
           
-          await localforage.clear();
+          await safeClear();
           
           // Store the new version
-          await localforage.setItem(DB_VERSION_KEY, db_version);
+          await safeSetItem(DB_VERSION_KEY, db_version);
         } else {
           // Versions match, ensure we have the version stored
-          await localforage.setItem(DB_VERSION_KEY, db_version);
+          await safeSetItem(DB_VERSION_KEY, db_version);
         }
       } catch (error) {
         // If we can't reach the backend, don't clear localStorage

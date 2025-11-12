@@ -3,21 +3,45 @@
  */
 import localforage from 'localforage';
 
-// Configure localforage
-localforage.config({
-  name: 'MusselCounter',
-  storeName: 'musselCounterStorage',
-  description: 'MusselCounter application storage',
-  driver: [localforage.INDEXEDDB, localforage.WEBSQL, localforage.LOCALSTORAGE],
-  size: 4980736, // ~5MB
-  version: 1.0,
-});
+// Check if we're in a browser environment
+const isBrowser = typeof window !== 'undefined';
+
+// Lazy configuration flag
+let isConfigured = false;
+
+/**
+ * Configure localforage (only in browser)
+ */
+function configureLocalforage() {
+  if (!isBrowser || isConfigured) {
+    return;
+  }
+  
+  try {
+    localforage.config({
+      name: 'MusselCounter',
+      storeName: 'musselCounterStorage',
+      description: 'MusselCounter application storage',
+      driver: [localforage.INDEXEDDB, localforage.WEBSQL, localforage.LOCALSTORAGE],
+      size: 4980736, // ~5MB
+      version: 1.0,
+    });
+    isConfigured = true;
+  } catch (error) {
+    console.warn('Failed to configure localforage:', error);
+  }
+}
 
 /**
  * Safely get an item from storage
  */
 export async function safeGetItem(key) {
+  if (!isBrowser) {
+    return null;
+  }
+  
   try {
+    configureLocalforage();
     return await localforage.getItem(key);
   } catch (error) {
     console.warn(`Failed to get storage item "${key}":`, error);
@@ -29,7 +53,12 @@ export async function safeGetItem(key) {
  * Safely set an item in storage
  */
 export async function safeSetItem(key, value) {
+  if (!isBrowser) {
+    return false;
+  }
+  
   try {
+    configureLocalforage();
     await localforage.setItem(key, value);
     return true;
   } catch (error) {
@@ -42,7 +71,12 @@ export async function safeSetItem(key, value) {
  * Safely remove an item from storage
  */
 export async function safeRemoveItem(key) {
+  if (!isBrowser) {
+    return true;
+  }
+  
   try {
+    configureLocalforage();
     await localforage.removeItem(key);
     return true;
   } catch (error) {
@@ -55,7 +89,12 @@ export async function safeRemoveItem(key) {
  * Safely get and parse JSON from storage
  */
 export async function safeGetJSON(key) {
+  if (!isBrowser) {
+    return null;
+  }
+  
   try {
+    configureLocalforage();
     const value = await localforage.getItem(key);
     if (value === null) {
       return null;
@@ -75,7 +114,12 @@ export async function safeGetJSON(key) {
  * Safely set JSON in storage
  */
 export async function safeSetJSON(key, value) {
+  if (!isBrowser) {
+    return false;
+  }
+  
   try {
+    configureLocalforage();
     await localforage.setItem(key, value);
     return true;
   } catch (error) {
@@ -88,7 +132,12 @@ export async function safeSetJSON(key, value) {
  * Safely get a number from storage
  */
 export async function safeGetNumber(key) {
+  if (!isBrowser) {
+    return null;
+  }
+  
   try {
+    configureLocalforage();
     const value = await localforage.getItem(key);
     if (value === null || value === undefined) {
       return null;
@@ -104,5 +153,23 @@ export async function safeGetNumber(key) {
   } catch (error) {
     console.warn(`Failed to get number from storage item "${key}":`, error);
     return null;
+  }
+}
+
+/**
+ * Safely clear all storage
+ */
+export async function safeClear() {
+  if (!isBrowser) {
+    return false;
+  }
+  
+  try {
+    configureLocalforage();
+    await localforage.clear();
+    return true;
+  } catch (error) {
+    console.warn('Failed to clear storage:', error);
+    return false;
   }
 }

@@ -10,6 +10,7 @@ This module sets up the FastAPI application with:
 The application uses SQLite for data storage and processes images through ML models
 (R-CNN or YOLO) to count live and dead mussels in images.
 """
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -26,6 +27,44 @@ from utils.logger import logger
 from utils.resource_detector import pick_threads
 
 
+def _configure_ssl_certificates():
+    """
+    Configure SSL certificates for macOS compatibility.
+    
+    On macOS, Python may not have access to system certificates, causing
+    SSL verification errors when PyTorch tries to download model weights.
+    This function configures SSL to use certifi certificates if available,
+    or provides a helpful error message if not.
+    """
+    try:
+        # Try to use certifi certificates (commonly installed with requests)
+        import certifi
+        os.environ['SSL_CERT_FILE'] = certifi.where()
+        os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+        logger.info("SSL certificates configured using certifi")
+    except ImportError:
+        # If certifi is not available, try to use system certificates
+        # On macOS, these are typically at:
+        cert_paths = [
+            '/etc/ssl/cert.pem',  # Common Linux/macOS path
+            '/usr/local/etc/openssl/cert.pem',  # Homebrew OpenSSL
+            '/opt/homebrew/etc/openssl/cert.pem',  # Homebrew on Apple Silicon
+        ]
+        
+        for cert_path in cert_paths:
+            if os.path.exists(cert_path):
+                os.environ['SSL_CERT_FILE'] = cert_path
+                os.environ['REQUESTS_CA_BUNDLE'] = cert_path
+                logger.info(f"SSL certificates configured using system certificates: {cert_path}")
+                return
+        
+        # If no certificates found, log a warning but don't fail
+        logger.warning(
+            "SSL certificates not found. If you encounter SSL errors when loading models, "
+            "install certifi: pip install certifi"
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -40,6 +79,9 @@ async def lifespan(app: FastAPI):
     """
     # Startup: Initialize database schema and tables
     logger.info("Starting Mussel Counter backend...")
+    
+    # Configure SSL certificates (fixes macOS SSL certificate issues)
+    _configure_ssl_certificates()
     
     # Optimize CPU threading for PyTorch (only affects CPU mode, not GPU/MPS)
     threads = pick_threads()

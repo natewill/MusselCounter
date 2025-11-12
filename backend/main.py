@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from db import init_db
 from config import CORS_ORIGINS, UPLOAD_DIR
-from api.routers import collections, models, runs, system
+from api.routers import collections, models, runs, system, images
 from api.error_handlers import (
     validation_exception_handler,
     general_exception_handler
@@ -83,6 +83,7 @@ app.include_router(system.router)  # Health check, DB version
 app.include_router(collections.router)  # Collection management and image uploads
 app.include_router(models.router)  # Model information
 app.include_router(runs.router)  # Inference run management
+app.include_router(images.router)  # Image detail and results
 
 # Mount static files to serve uploaded images
 # This allows frontend to access images via /uploads/{filename}

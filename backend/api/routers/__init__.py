@@ -1,6 +1,6 @@
 """
 API routers package
 """
-from . import collections, models, runs, system
+from . import collections, models, runs, system, images
 
-__all__ = ["collections", "models", "runs", "system"]
+__all__ = ["collections", "models", "runs", "system", "images"]

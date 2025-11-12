@@ -214,12 +214,20 @@ Display results for a collection with seamless image addition.
 - Model selector to switch between available models
 
 ### Image Detail `/images/[imageId]`
-View detailed model stats for a specific image.  
-- Display image with polygon overlays
-- Show live and dead mussel counts
-- Change threshold for this image (creates new run)
-- View image metadata (filename, dimensions, etc.)
-- Maybe relabel images (future feature)
+View detailed inference results for a specific image.  
+- **Full-size image display** with polygon/bounding box overlays
+- **Detection visualization**: Each mussel outlined with label (live/dead) and confidence score
+- **Statistics panel**:
+  - Live and dead mussel counts
+  - Total count and percentages (e.g., "83% alive")
+  - Model used (name and type)
+  - Confidence threshold applied
+  - Processing timestamp
+- **Comparison view**: See results from other models/thresholds run on the same image
+- **Collection context**: Breadcrumb navigation back to collection
+- **Image metadata**: Filename, dimensions, file hash, upload date
+- View raw polygon coordinates and confidence scores
+- Future: Relabel detections, adjust individual polygons
 
 ---
 
@@ -267,9 +275,40 @@ Get model information.
 
 ### Image Endpoints
 
-#### `GET /api/images/[imageId]`
-Get image information from inference.
-- Returns: `{ image_id, filename, stored_path, live_mussel_count, dead_mussel_count, ... }`
+#### `GET /api/images/{image_id}/results/{run_id}`
+Get detailed inference results for a specific image from a specific run.
+- Returns comprehensive image data including:
+  - **Image metadata**: filename, dimensions, file hash, upload date
+  - **Results**: live/dead counts, total count, percentages
+  - **Polygon data**: Full array of bounding boxes with coordinates, labels, and confidence scores
+  - **Model info**: model name, type, and threshold used
+  - **Collection context**: collection ID and name for navigation
+  - **Comparison data**: Other runs that processed this image (up to 10 most recent)
+- Example response:
+```json
+{
+  "image_id": 123,
+  "filename": "mussel_sample.jpg",
+  "width": 1920,
+  "height": 1080,
+  "live_mussel_count": 15,
+  "dead_mussel_count": 3,
+  "total_mussel_count": 18,
+  "live_percentage": 83.3,
+  "dead_percentage": 16.7,
+  "model_name": "YOLOv8n",
+  "threshold": 0.5,
+  "polygons": [
+    {
+      "label": "live",
+      "confidence": 0.95,
+      "coordinates": [[100,100], [200,100], [200,200], [100,200]]
+    }
+  ],
+  "detection_count": 18,
+  "other_runs": [...]
+}
+```
 
 ### Run Endpoints
 

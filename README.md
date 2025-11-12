@@ -83,6 +83,108 @@ npm run dev
 
 ---
 
+## File Structure
+
+### Backend (`backend/`)
+
+```
+backend/
+├── main.py                      # FastAPI app entry point - starts the server
+├── config.py                    # Configuration settings (file paths, limits, etc.)
+├── db.py                        # Database connection and initialization
+├── schema.sql                   # Database table definitions (SQL)
+├── requirements.txt             # Python dependencies
+│
+├── api/                         # API Layer - HTTP endpoints
+│   ├── routers/                 # Endpoint definitions grouped by resource
+│   │   ├── collections.py       # Collection CRUD and image uploads
+│   │   ├── models.py            # Model information endpoints
+│   │   ├── runs.py              # Start/stop inference runs
+│   │   ├── images.py            # Image detail with polygon data
+│   │   └── system.py            # Health check, DB version
+│   ├── schemas.py               # Pydantic models (request/response validation)
+│   └── error_handlers.py        # Error response formatting
+│
+├── utils/                       # Business Logic & Utilities
+│   ├── model_utils/             # ML Model Operations
+│   │   ├── loader.py            # Load models from disk (R-CNN, YOLO)
+│   │   ├── inference.py         # Run models on images, get detections
+│   │   └── db.py                # Model database operations
+│   │
+│   ├── run_utils/               # Inference Run Orchestration
+│   │   ├── collection_processor.py  # Main coordinator - handles entire run
+│   │   ├── image_processor.py       # Process individual images
+│   │   └── db.py                    # Run database operations
+│   │
+│   ├── collection_utils.py      # Collection database operations
+│   ├── image_utils.py            # Image database ops & deduplication
+│   ├── file_processing.py        # File validation & saving
+│   ├── resource_detector.py      # CPU/batch size optimization
+│   ├── validation.py             # Input validation (IDs, sizes, etc.)
+│   ├── security.py               # Security checks (path validation, etc.)
+│   └── logger.py                 # Logging configuration
+│
+├── data/                        # Persistent Data
+│   ├── models/                  # ML model weight files (.pt, .pth)
+│   ├── uploads/                 # Uploaded image files
+│   └── polygons/                # Detection results (JSON files)
+│
+├── BACKEND_GUIDE.md             # Comprehensive backend explanation
+├── COLLECTION_PROCESSOR_EXPLAINED.md  # Deep dive on inference runs
+└── RESOURCE_DETECTION.md        # CPU optimization & batch sizing details
+```
+
+**Key Principles**:
+- **Separation of Concerns**: API layer (HTTP) separate from business logic (utils)
+- **Modular Design**: Each utility handles one responsibility (models, images, runs)
+- **Database Abstraction**: All database operations in dedicated files
+- **Documentation**: Complex parts have dedicated explanation docs
+
+### Frontend (`frontend/`)
+
+```
+frontend/
+├── app/                         # Next.js App Router - Pages & Routing
+│   ├── page.tsx                 # Home page (/)
+│   ├── run/[runId]/page.tsx     # Run results page (/run/123)
+│   └── layout.tsx               # Root layout with global styles
+│
+├── components/                  # React Components
+│   ├── run/                     # Run results page components
+│   │   ├── ImageList.jsx        # Grid of image cards with thumbnails
+│   │   ├── RunStatus.jsx        # Run progress & status display
+│   │   ├── BatchTotals.jsx      # Live/dead count summary
+│   │   ├── ThresholdControl.jsx # Threshold slider
+│   │   └── ...                  # Other run page components
+│   └── home/                    # Home page components
+│       └── UploadArea.jsx       # Drag & drop image upload
+│
+├── hooks/                       # Custom React Hooks (reusable logic)
+│   ├── useBatchData.ts          # Fetch & poll collection/run data
+│   ├── useRunState.ts           # Manage run state (flashing, green hues)
+│   ├── useImageUpload.ts        # Handle image upload logic
+│   ├── useStartRun.ts           # Start inference run
+│   ├── useStopRun.ts            # Stop/cancel run
+│   └── ...                      # Other hooks
+│
+├── lib/                         # Utilities & API Client
+│   └── api.ts                   # Axios client for backend API calls
+│
+├── utils/                       # Helper Functions
+│   ├── run/                     # Run-related utilities
+│   ├── home/                    # Home page utilities
+│   └── validation.ts            # Input validation
+│
+└── public/                      # Static Assets
+    └── ...                      # Images, fonts, etc.
+```
+
+**Key Principles**:
+- **Component Isolation**: Each component handles one UI piece
+- **Custom Hooks**: Business logic separate from UI rendering
+- **API Abstraction**: All backend calls through `lib/api.ts`
+- **Type Safety**: TypeScript for catching errors early
+
 ## Stack
 
 ### [Next.js](https://nextjs.org/)

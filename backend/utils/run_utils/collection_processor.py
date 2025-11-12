@@ -1,20 +1,66 @@
 """
 Collection processing orchestrator for inference runs.
 
-This module orchestrates the complete inference run process:
-1. Loads the ML model (R-CNN or YOLO)
-2. Retrieves images from the collection
-3. Implements smart caching (reuses results from previous runs with same model/threshold)
-4. Processes images in batches for efficiency (R-CNN/YOLO) or individually (other models)
-5. Writes results incrementally to database for real-time updates
-6. Aggregates final counts and updates run status
+THIS IS THE BRAIN OF THE SYSTEM - This file coordinates the entire inference process.
 
-Key features:
-- Real-time updates: Results are written to database as each batch completes
-- Smart caching: Reuses results from previous runs when model/threshold match
-- Batch processing: Processes multiple images at once for R-CNN/YOLO (much faster)
-- Parallel execution: Multiple batches can run concurrently (with concurrency limits)
-- Progress tracking: Updates processed_count as images complete
+=== What This File Does ===
+
+When a user clicks "Start Run" in the frontend, this is what happens:
+
+1. **Setup Phase**
+   - Loads the ML model from disk (e.g., yolov8n.pt)
+   - Gets all images in the collection from database
+   - Checks which images have already been processed (smart caching)
+   - Calculates optimal batch size based on model size
+
+2. **Processing Phase**
+   - Splits images into batches (e.g., 4 images per batch)
+   - For each batch:
+     * Load images from disk
+     * Run model inference (detect mussels)
+     * Get bounding boxes with live/dead labels
+     * Save results to database immediately (real-time updates!)
+     * Update progress counter
+   - Batches can run concurrently (controlled by semaphore)
+
+3. **Completion Phase**
+   - Sum up all live/dead counts across all images
+   - Update run status to 'completed'
+   - Frontend polls and sees the final results
+
+=== Why Batch Processing? ===
+
+Without batching:
+- Process 1 image → takes 2 seconds
+- Process 100 images → takes 200 seconds (3+ minutes!)
+
+With batching (batch_size=4):
+- Process 4 images at once → takes 3 seconds
+- Process 100 images → takes 75 seconds (1.25 minutes)
+- **2.7x faster!**
+
+=== Key Features ===
+
+**Smart Run Reuse**:
+- Run = (collection_id, model_id, threshold)
+- Same combination? Reuse the run, only process new images
+- Changed threshold or model? Create new run
+
+**Real-time Updates**:
+- Results written to database after each batch
+- Frontend polls and sees progress in real-time
+- Green flash animation shows which images just finished
+
+**Error Handling**:
+- Model fails to load? Mark run as failed
+- Image file missing? Skip it, log error, continue
+- Out of memory? Caught and logged, run fails gracefully
+
+**Cancellation Support**:
+- User clicks "Stop Run"
+- Status changes to 'cancelled'
+- Processing loop checks status and exits early
+- Partial results are saved
 """
 import asyncio
 import json

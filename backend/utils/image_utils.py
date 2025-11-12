@@ -1,191 +1,154 @@
-import hashlib
-from pathlib import Path
-from datetime import datetime
-import aiosqlite
+"""
+Image utils: hashing, dedup, and collection ops (SQLite, aiosqlite).
+- Uses streaming MD5 (compatible with existing rows) to avoid loading whole files in RAM.
+- Dedup via UNIQUE(file_hash) and UNIQUE(collection_id, image_id) + INSERT OR IGNORE.
+"""
 
-# We use a MD5 hash to make sure we don't add the same image twice 
-# The MD5 hash is a string that is unique to the file content.
-def get_file_hash(file_path: str) -> str:
-    """
-    Generate MD5 hash of file content for deduplication.
-    
-    Args:
-        file_path: Path to the image file
-        
-    Returns:
-        MD5 hash as hexadecimal string
-        
-    Raises:
-        FileNotFoundError: If file doesn't exist
-    """
-    file_path = Path(file_path)
-    
-    if not file_path.exists():
-        raise FileNotFoundError(f"File not found: {file_path}")
-    
-    with open(file_path, "rb") as f:
-        file_data = f.read()
-    
-    return hashlib.md5(file_data).hexdigest()
+from __future__ import annotations
+import hashlib
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import List, Optional, Tuple
+
+import aiosqlite
+import aiofiles
+
+_CHUNK = 1 << 20  # 1 MiB
+
+
+async def get_file_hash(file_path: str) -> str:
+    """Async streaming MD5 for dedup (keeps compatibility with existing data)."""
+    p = Path(file_path)
+    if not p.exists():
+        raise FileNotFoundError(f"File not found: {p}")
+    h = hashlib.md5()
+    async with aiofiles.open(p, "rb") as f:
+        while chunk := await f.read(_CHUNK):
+            h.update(chunk)
+    return h.hexdigest()
 
 
 async def find_image_by_hash(db: aiosqlite.Connection, file_hash: str):
-    """
-    Check if an image with this hash already exists in database (globally).
-    
-    Args:
-        db: Database connection
-        file_hash: MD5 hash to search for
-        
-    Returns:
-        Row with image data if found, None otherwise
-    """
-    cursor = await db.execute(
-        """SELECT image_id, stored_path, 
-                  live_mussel_count, dead_mussel_count, stored_polygon_path 
-           FROM image 
-           WHERE file_hash = ? 
-           LIMIT 1""",
-        (file_hash,)
-    )
-    return await cursor.fetchone()
+    """Return a row (tuple) if found, else None."""
+    async with db.execute(
+        "SELECT image_id, stored_path, live_mussel_count, dead_mussel_count, stored_polygon_path "
+        "FROM image WHERE file_hash = ? LIMIT 1",
+        (file_hash,),
+    ) as cur:
+        return await cur.fetchone()
 
 
-async def add_image_to_batch(
+async def add_image_to_collection(
     db: aiosqlite.Connection,
-    batch_id: int,
+    collection_id: int,
     image_path: str,
-    filename: str = None
+    filename: Optional[str] = None,
 ) -> int:
     """
-    Add an image to a batch with hash-based deduplication.
-    
-    Args:
-        db: Database connection
-        batch_id: Batch ID to add image to
-        image_path: Path to the image file
-        filename: Optional filename (defaults to image_path.name)
-        
-    Returns:
-        Image ID (new or existing)
-            
-    Raises:
-        FileNotFoundError: If image file doesn't exist
+    Upsert the image (by hash) and link it to the collection.
+    Requires:
+      - image(file_hash) UNIQUE
+      - collection_image UNIQUE(collection_id, image_id)
+    Returns image_id (existing or newly inserted).
     """
-    # Validate file exists
-    image_path = Path(image_path)
-    if not image_path.exists():
-        raise FileNotFoundError(f"Image file not found: {image_path}")
-    
-    # Generate hash
-    file_hash = get_file_hash(str(image_path))
-    
-    # Check if image with this hash exists globally (anywhere)
-    existing_image = await find_image_by_hash(db, file_hash)
-    
-    if existing_image:
-        image_id = existing_image['image_id']
-        
-        # Check if this image is already linked to this batch
-        cursor = await db.execute(
-            "SELECT * FROM batch_image WHERE batch_id = ? AND image_id = ?",
-            (batch_id, image_id)
-        )
-        already_linked = await cursor.fetchone()
-        
-        if already_linked:
-            # Image already in this batch
-            return image_id
-        
-        # Image exists globally but not in this batch - link it
-        now = datetime.now().isoformat()
-        await db.execute(
-            "INSERT INTO batch_image (batch_id, image_id, added_at) VALUES (?, ?, ?)",
-            (batch_id, image_id, now)
-        )
-        await db.commit()
-        
-        return image_id
-    
-    # New image - create it and link to batch
-    now = datetime.now().isoformat()
-    cursor = await db.execute(
-        """INSERT INTO image 
-           (filename, stored_path, file_hash, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?)""",
-        (
-            filename or image_path.name,
-            str(image_path),
-            file_hash,
-            now,
-            now
-        )
-    )
-    image_id = cursor.lastrowid
-    
-    # Link image to batch
-    await db.execute(
-        "INSERT INTO batch_image (batch_id, image_id, added_at) VALUES (?, ?, ?)",
-        (batch_id, image_id, now)
-    )
-    await db.commit()
-    
-    return image_id
+    p = Path(image_path)
+    if not p.exists():
+        raise FileNotFoundError(f"Image file not found: {p}")
 
+    file_hash = get_file_hash(str(p))
+    now = datetime.now(timezone.utc).isoformat()
 
-async def add_multiple_images(
-    db: aiosqlite.Connection,
-    batch_id: int,
-    image_paths: list[str]
-) -> list[int]:
-    """
-    Add multiple images to a batch.
-    
-    Args:
-        db: Database connection
-        batch_id: Batch ID to add images to
-        image_paths: List of image file paths
-        
-    Returns:
-        List of image IDs (new and duplicates)
-    """
-    image_ids = []
-    
-    for image_path in image_paths:
-        image_id = await add_image_to_batch(db, batch_id, image_path)
-        image_ids.append(image_id)
-    
-    return image_ids
-
-
-async def validate_image_path(image_path: str) -> tuple[bool, str]:
-    """
-    Validate that an image file exists and is accessible.
-    
-    Args:
-        image_path: Path to image file
-        
-    Returns:
-        Tuple of (is_valid, error_message)
-        is_valid is True if file exists, False otherwise
-        error_message is empty if valid, contains error if not
-    """
-    path = Path(image_path)
-    
-    if not path.exists():
-        return False, f"File not found: {image_path}"
-    
-    if not path.is_file():
-        return False, f"Path is not a file: {image_path}"
-    
-    # Check if it's readable
+    await db.execute("BEGIN")
     try:
-        with open(path, 'rb') as f:
-            f.read(1)  # Try to read at least 1 byte
-    except PermissionError:
-        return False, f"Permission denied: {image_path}"
-    except Exception as e:
-        return False, f"Error reading file: {str(e)}"
-    
-    return True, ""
+        # Insert image if new; ignore if exists.
+        await db.execute(
+            "INSERT OR IGNORE INTO image (filename, stored_path, file_hash, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (filename or p.name, str(p), file_hash, now, now),
+        )
 
+        # Retrieve its id
+        async with db.execute(
+            "SELECT image_id FROM image WHERE file_hash = ? LIMIT 1", (file_hash,)
+        ) as cur:
+            row = await cur.fetchone()
+        image_id = row[0]
+
+        # Link to collection (ignored if already linked)
+        await db.execute(
+            "INSERT OR IGNORE INTO collection_image (collection_id, image_id, added_at) VALUES (?, ?, ?)",
+            (collection_id, image_id, now),
+        )
+
+        await db.commit()
+        return image_id
+    except Exception:
+        await db.rollback()
+        raise
+
+
+async def add_multiple_images_optimized(
+    db: aiosqlite.Connection,
+    collection_id: int,
+    image_data: List[
+        Tuple[str, str, str]
+    ],  # (file_path, filename, file_hash) — hashes precomputed
+) -> Tuple[List[int], int, int, List[int]]:
+    """
+    Bulk add with minimal queries.
+    Returns: (image_ids (in input order), added_count, duplicate_count_in_collection, duplicate_image_ids)
+      - duplicate_count counts images already linked to this collection *before* this call.
+    """
+    if not image_data:
+        return ([], 0, 0, [])
+
+    now = datetime.now(timezone.utc).isoformat()
+    hashes = [h for _, _, h in image_data]
+
+    await db.execute("BEGIN")
+    try:
+        # 1) Ensure all images exist (dedupe via UNIQUE(file_hash))
+        to_insert = [
+            (fn or Path(fp).name, fp, h, now, now) for (fp, fn, h) in image_data
+        ]
+        await db.executemany(
+            "INSERT OR IGNORE INTO image (filename, stored_path, file_hash, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            to_insert,
+        )
+
+        # 2) Map file_hash -> image_id
+        ph = ",".join("?" * len(hashes))
+        async with db.execute(
+            f"SELECT image_id, file_hash FROM image WHERE file_hash IN ({ph})", hashes
+        ) as cur:
+            rows = await cur.fetchall()
+        hash_to_id = {r[1]: r[0] for r in rows}
+        image_ids = [hash_to_id[h] for h in hashes]
+
+        # 3) Link to collection, but only once per unique image_id
+        unique_ids = sorted(set(image_ids))
+        ph2 = ",".join("?" * len(unique_ids))
+        async with db.execute(
+            f"SELECT image_id FROM collection_image WHERE collection_id = ? AND image_id IN ({ph2})",
+            (collection_id, *unique_ids),
+        ) as cur:
+            already_linked = {r[0] for r in await cur.fetchall()}
+
+        # those already in collection (pre-existing duplicates)
+        duplicate_image_ids = sorted(already_linked)
+        duplicate_count = sum(1 for i in image_ids if i in already_linked)
+
+        to_link = [(collection_id, i, now) for i in unique_ids if i not in already_linked]
+        if to_link:
+            await db.executemany(
+                "INSERT OR IGNORE INTO collection_image (collection_id, image_id, added_at) VALUES (?, ?, ?)",
+                to_link,
+            )
+        added_count = len(to_link)
+
+        await db.commit()
+        return (image_ids, added_count, duplicate_count, duplicate_image_ids)
+    except Exception:
+        await db.rollback()
+        raise

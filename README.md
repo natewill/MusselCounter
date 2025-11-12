@@ -96,6 +96,8 @@ Two modes for processing images:
 - Automatically adds images to batch
 - Automatically starts inference run
 - Navigates to `/run/[runId]` to show progress/results
+- On run results page: can add more images → auto-starts new run → sees updated totals
+- Batch totals represent cumulative count from all images (from latest run)
 - Batch exists but is invisible to user (can rename later if needed)
 - New session or explicit batch creation starts a fresh batch
 
@@ -127,13 +129,15 @@ Edit batch and manage images.
 - View/manage images in batch
 
 ### Run Results `/run/[runId]`
-Run inference and display results for a specific run.  
-- Shows run status (pending, running, completed, failed)
-- Displays progress during inference
-- Lists all images processed in this run
+Display results for a batch with seamless image addition.  
+- Shows **batch totals** (live_mussel_count, dead_mussel_count) - represents total across ALL images in batch
+- Displays current run status (pending, running, completed, failed) with progress
+- Lists **all images in the batch** with their individual live/dead counts
 - Shows polygon predictions on each image
-- Displays live and dead mussel counts per image
-- Shows total counts for the run
+- **"Add More Images" button** - upload more images, automatically starts new run
+- When new run completes, totals update in place (no page navigation)
+- Each run processes ALL images in the batch (not just new ones)
+- Run history section (collapsible) showing previous runs
 - Can change threshold and re-run (creates new run)
 
 ### Image Detail `/images/[imageId]`
@@ -161,6 +165,10 @@ Create a new batch.
 #### `GET /api/batches/[batchId]`
 Get all information about a certain batch.
 - Returns: `{ batch: {...}, images: [...], latest_run: {...} }`
+- `batch.live_mussel_count` and `batch.dead_mussel_count` represent totals from latest run (all images)
+- `images[]` contains all images in batch with their individual counts
+- `latest_run` shows current run status (pending, running, completed, failed)
+- Used for polling on run results page to get real-time updates
 
 #### `POST /api/batches/[batchId]/upload-images`
 Upload image files to a batch (multipart/form-data).
@@ -170,7 +178,10 @@ Upload image files to a batch (multipart/form-data).
 #### `POST /api/batches/[batchId]/run`
 Start an inference run on a batch.
 - Request body: `{ model_id: number, threshold?: number }` (threshold defaults to 0.5 if not provided)
-- Returns: `{ run_id: number, ... }` (to be implemented)
+- Returns: `{ run_id: number, batch_id: number, model_id: number, threshold: number, status: "pending" }`
+- **Important:** Each run processes ALL images in the batch (not just new ones)
+- Runs in background - API returns immediately with run_id
+- Batch totals are updated when run completes
 - Note: Threshold can be adjusted after seeing results, so it's optional on initial run
 
 ### Model Endpoints
@@ -188,3 +199,10 @@ Get model information.
 #### `GET /api/images/[imageId]`
 Get image information from inference.
 - Returns: `{ image_id, filename, stored_path, live_mussel_count, dead_mussel_count, ... }`
+
+### Run Endpoints
+
+#### `GET /api/runs/[runId]` (optional)
+Get specific run information.
+- Returns: `{ run_id, batch_id, model_id, status, live_mussel_count, dead_mussel_count, total_images, started_at, finished_at, ... }`
+- Note: Can also get run info from `GET /api/batches/[batchId]` which includes `latest_run`

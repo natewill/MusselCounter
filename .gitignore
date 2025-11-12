@@ -1,43 +1,56 @@
-# Model weights (large files)
-backend/data/models/*
-!backend/data/models/.gitkeep
-*.pth
-*.pt
-
-# Database files
-*.db
-*.sqlite
-*.sqlite3
-
-# Runtime data
-backend/data/uploads/*
-!backend/data/uploads/.gitkeep
-backend/data/polygons/*
-!backend/data/polygons/.gitkeep
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
 
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
-*.so
-.Python
 venv/
-env/
-ENV/
+.env
+.env.local
+.env.*.local
+.mypy_cache/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.log
 
-# Node
+# SQLite databases
+backend/*.db
+backend/mussel_counter*.db
+backend/logs/
+backend/data/uploads/
+backend/data/polygons/
+
+# Model weights generated locally (keep committed weights in data/models)
+backend/data/models/*.ckpt
+backend/data/models/*.pth
+backend/data/models/*.pt
+!backend/data/models/fast_rcnn_weights.pth
+!backend/data/models/yolov8n.pt
+
+# Node / Next.js
 node_modules/
 .next/
 out/
-*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+pnpm-lock.yaml
 
-# IDE
-.vscode/
+# IDE / Editor
 .idea/
-*.swp
-*.swo
-*~
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
 
-# OS
-.DS_Store
-Thumbs.db
+# Build artifacts
+frontend/.turbo/
+frontend/.next/
+frontend/out/

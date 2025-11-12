@@ -15,7 +15,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from db import get_db
 from utils.collection_utils import get_collection
 from utils.model_utils import get_model
-from utils.run_utils import get_or_create_run, process_collection_run, get_run
+from utils.run_utils import get_or_create_run, process_collection_run, get_run, update_run_status
 from utils.validation import validate_threshold
 from api.schemas import StartRunRequest, RunResponse
 from utils.security import validate_integer_id
@@ -102,3 +102,42 @@ async def start_run_endpoint(
 
         # Return the run response with all fields from database
         return RunResponse.model_validate(dict(run_record))
+
+
+@router.post("/runs/{run_id}/stop", response_model=RunResponse)
+async def stop_run_endpoint(run_id: int) -> RunResponse:
+    """
+    Stop/cancel a running inference run.
+    
+    This endpoint marks a run as 'cancelled'. The actual processing may continue
+    for a short time until it checks the status, but no further results will be saved.
+    
+    Only runs with status 'pending' or 'running' can be stopped.
+    Completed or failed runs cannot be stopped.
+    
+    Returns the updated run information with status 'cancelled'.
+    """
+    run_id = validate_integer_id(run_id)
+    
+    async with get_db() as db:
+        # Get the run to check its current status
+        run = await get_run(db, run_id)
+        if not run:
+            raise HTTPException(status_code=404, detail="Run not found")
+        
+        # Check if the run can be stopped
+        if run['status'] not in ('pending', 'running'):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot stop run with status '{run['status']}'. Only pending or running runs can be stopped."
+            )
+        
+        # Update the run status to 'cancelled'
+        await update_run_status(db, run_id, 'cancelled', 'Run cancelled by user')
+        
+        # Fetch updated run record
+        updated_run = await get_run(db, run_id)
+        if not updated_run:
+            raise HTTPException(status_code=500, detail="Failed to update run")
+        
+        return RunResponse.model_validate(dict(updated_run))

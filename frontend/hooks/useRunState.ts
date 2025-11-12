@@ -146,8 +146,8 @@ export function useRunState(
       });
     }
     
-    // When run completes, trigger final flash and remove green hue
-    if (currentStatus === 'completed' && previousRunStatus && (previousRunStatus === 'running' || previousRunStatus === 'pending')) {
+    // When run completes or is cancelled, trigger final flash and remove green hue
+    if ((currentStatus === 'completed' || currentStatus === 'cancelled') && previousRunStatus && (previousRunStatus === 'running' || previousRunStatus === 'pending')) {
       // Get ALL images that were processed in this run
       const processedInRun = getProcessedImageIds(batchData.images);
       
@@ -166,8 +166,8 @@ export function useRunState(
     if (currentStatus) {
       startTransition(() => {
         setPreviousRunStatus(currentStatus);
-        // Update previous model and threshold when run completes
-        if (currentStatus === 'completed' && latestModelId !== null && latestThreshold !== null) {
+        // Update previous model and threshold when run completes or is cancelled
+        if ((currentStatus === 'completed' || currentStatus === 'cancelled') && latestModelId !== null && latestThreshold !== null) {
           setPreviousRunModelId(latestModelId);
           setPreviousRunThreshold(latestThreshold);
         }

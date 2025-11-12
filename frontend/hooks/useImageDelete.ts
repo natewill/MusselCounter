@@ -1,35 +1,35 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { deleteImageFromBatch } from '@/lib/api';
-import { invalidateBatchQuery } from '@/utils/queryUtils';
+import { deleteImageFromCollection } from '@/lib/api';
+import { invalidateCollectionQuery } from '@/utils/queryUtils';
 
 export function useImageDelete(
-  batchId: number | null,
+  collectionId: number | null,
   setError: (error: string | null) => void
 ) {
   const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
   const deleteImageMutation = useMutation({
-    mutationFn: ({ batchId, imageId }: { batchId: number; imageId: number }) =>
-      deleteImageFromBatch(batchId, imageId),
+    mutationFn: ({ collectionId, imageId }: { collectionId: number; imageId: number }) =>
+      deleteImageFromCollection(collectionId, imageId),
     onSuccess: () => {
-      invalidateBatchQuery(queryClient, batchId);
+      invalidateCollectionQuery(queryClient, collectionId);
       setDeletingImageId(null);
     },
     onError: (err: Error) => {
       console.error('Failed to delete image:', err);
-      setError(err.message || 'Failed to remove image from batch.');
+      setError(err.message || 'Failed to remove image from collection.');
       setDeletingImageId(null);
     },
   });
 
   const handleDeleteImage = async (imageId: number) => {
-    if (!batchId) return;
+    if (!collectionId) return;
     
     setDeletingImageId(imageId);
     setError(null);
-    deleteImageMutation.mutate({ batchId, imageId });
+    deleteImageMutation.mutate({ collectionId, imageId });
   };
 
   return { deletingImageId, handleDeleteImage };

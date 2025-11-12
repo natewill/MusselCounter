@@ -1,4 +1,4 @@
-export default function RunStatus({ latestRun, isRunning, images }) {
+export default function RunStatus({ latestRun, isRunning, images, onStopRun, stopping }) {
   // Calculate values first for logging and use later
   // Use processed_count from run table for accurate real-time progress (updated as batches complete)
   // Fall back to counting images with counts if processed_count not available
@@ -127,9 +127,26 @@ export default function RunStatus({ latestRun, isRunning, images }) {
           </div>
         )}
 
+        {/* Stop button for running runs */}
+        {(latestRun.status === 'running' || latestRun.status === 'pending') && onStopRun && (
+          <button
+            onClick={() => onStopRun(latestRun.run_id)}
+            disabled={stopping}
+            className="w-full mt-2 px-4 py-2 bg-zinc-600 hover:bg-zinc-700 disabled:bg-zinc-400 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-white rounded-lg transition-colors text-sm font-medium"
+          >
+            {stopping ? 'Stopping...' : 'Stop Run'}
+          </button>
+        )}
+
         {latestRun.status === 'completed' && totalImages > 0 && (
           <div className="text-sm text-green-600 dark:text-green-400">
             ✓ Completed: {processedImages} / {totalImages} images processed
+          </div>
+        )}
+        
+        {latestRun.status === 'cancelled' && (
+          <div className="text-sm text-yellow-600 dark:text-yellow-400">
+            ⚠ Run was cancelled
           </div>
         )}
 

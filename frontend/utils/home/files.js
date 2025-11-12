@@ -1,7 +1,7 @@
 /**
  * File handling utilities for home page
  */
-import { uploadImagesToBatch } from '@/lib/api';
+import { uploadImagesToCollection } from '@/lib/api';
 import { safeSetItem, safeRemoveItem } from '@/utils/storage';
 import { validateImageFiles } from '@/utils/validation';
 
@@ -52,12 +52,12 @@ export async function handleDroppedItems(dataTransferItems) {
 
 export async function handleFileSelect(
   files,
-  activeBatchId,
-  setActiveBatchId,
+  activeCollectionId,
+  setActiveCollectionId,
   selectedModelId,
   setLoading,
   setError,
-  createQuickProcessBatch,
+  createQuickProcessCollection,
   router
 ) {
   const { validFiles: imageFiles, errors: validationErrors } = validateImageFiles(files);
@@ -80,46 +80,46 @@ export async function handleFileSelect(
   setError(null);
 
   try {
-    let batchId = activeBatchId;
+    let collectionId = activeCollectionId;
 
-    // Create batch if needed
-    if (!batchId) {
+    // Create collection if needed
+    if (!collectionId) {
       try {
-        batchId = await createQuickProcessBatch(setActiveBatchId);
+        collectionId = await createQuickProcessCollection(setActiveCollectionId);
       } catch (err) {
-        console.error('Failed to create batch:', err);
-        throw new Error('Failed to create batch. Is the backend running?');
+        console.error('Failed to create collection:', err);
+        throw new Error('Failed to create collection. Is the backend running?');
       }
     }
 
     // Upload files
     let uploadResult;
     try {
-      uploadResult = await uploadImagesToBatch(batchId, imageFiles);
+      uploadResult = await uploadImagesToCollection(collectionId, imageFiles);
       console.log('Files uploaded successfully');
     } catch (err) {
       const errorMsg = err.message || '';
-      // If batch not found (404), clear stale batch_id and create new batch
-      if (errorMsg.includes('404') || errorMsg.includes('Batch not found') || errorMsg.includes('HTTP 404')) {
-        console.warn('Batch not found, clearing stale batch_id and creating new batch');
-        setActiveBatchId(null);
-        await safeRemoveItem('quickProcessBatchId');
+      // If collection not found (404), clear stale collection_id and create new collection
+      if (errorMsg.includes('404') || errorMsg.includes('Collection not found') || errorMsg.includes('HTTP 404')) {
+        console.warn('Collection not found, clearing stale collection_id and creating new collection');
+        setActiveCollectionId(null);
+        await safeRemoveItem('quickProcessCollectionId');
         
-        // Create new batch and retry upload
+        // Create new collection and retry upload
         try {
-          batchId = await createQuickProcessBatch(setActiveBatchId);
-          uploadResult = await uploadImagesToBatch(batchId, imageFiles);
-          console.log('Files uploaded successfully to new batch');
+          collectionId = await createQuickProcessCollection(setActiveCollectionId);
+          uploadResult = await uploadImagesToCollection(collectionId, imageFiles);
+          console.log('Files uploaded successfully to new collection');
         } catch (retryErr) {
-          throw new Error('Failed to create new batch and upload. ' + (retryErr.message || ''));
+          throw new Error('Failed to create new collection and upload. ' + (retryErr.message || ''));
         }
       } else {
         throw new Error('Failed to upload files. ' + errorMsg);
       }
     }
 
-    // Store batch_id in localStorage for run page
-    await safeSetItem('currentBatchId', batchId.toString());
+    // Store collection_id in localStorage for run page
+    await safeSetItem('currentCollectionId', collectionId.toString());
     
     // Store upload counts in localStorage to show success message
     const addedCount = uploadResult?.added_count || 0;
@@ -135,9 +135,9 @@ export async function handleFileSelect(
     await safeSetItem('duplicateImageCount', duplicateCount.toString());
     await safeSetItem('recentlyUploadedImageIds', nonDuplicateIds);
     
-    // Navigate to run page with batch_id (don't start run yet)
+    // Navigate to run page with collection_id (don't start run yet)
     // The run page will show "X images added!" and a button to start the run
-    router.push(`/run/${batchId}`);
+    router.push(`/run/${collectionId}`);
     
     // Don't set loading to false - let the run page handle its own loading state
   } catch (err) {

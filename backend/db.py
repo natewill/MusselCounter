@@ -9,28 +9,27 @@ This module provides:
 
 import aiosqlite
 from contextlib import asynccontextmanager
-from config import DB_PATH, SCHEMA_PATH
+from config import DB_PATH, SCHEMA_PATH, RESET_DB_ON_STARTUP, MODELS_DIR
 from utils.logger import logger
-from pathlib import Path
 from datetime import datetime
 
 
 async def _initialize_models(db: aiosqlite.Connection):
     """
     Initialize database with default models from models/ directory.
-    Detects optimal batch size for each model during startup.
+    
+    Note: Batch size detection is now done on-demand when models are loaded,
+    not during initialization. This makes startup faster.
     """
-    models_dir = Path("models")
+    models_dir = MODELS_DIR
     if not models_dir.exists():
-        logger.info("No models/ directory found. Skipping model initialization.")
+        logger.info("No models directory found at %s. Skipping model initialization.", models_dir)
         return
     
     model_files = list(models_dir.glob("*.pt")) + list(models_dir.glob("*.pth"))
     if not model_files:
-        logger.info("No model files found in models/ directory")
+        logger.info("No model files found in %s", models_dir)
         return
-    
-    from utils.model_utils import load_model
     
     for model_file in model_files:
         # Infer model type from filename
@@ -50,15 +49,8 @@ async def _initialize_models(db: aiosqlite.Connection):
         existing = await cursor.fetchone()
         
         if not existing:
-            # Load model and detect optimal batch size (one-time during startup)
+            # Add model to database (batch size will be detected on first load)
             logger.info(f"Adding model: {model_file.name} ({model_type})")
-            optimal_bs = 8  # Default fallback
-            try:
-                _, _, optimal_bs = load_model(str(model_file), model_type, detect_batch_size=True)
-                logger.info(f"✓ {model_file.name} - optimal batch size: {optimal_bs}")
-            except Exception as e:
-                logger.warning(f"Failed to detect batch size for {model_file.name}, using default {optimal_bs}: {e}")
-            
             now = datetime.now().isoformat()
             await db.execute(
                 """INSERT INTO model (name, type, weights_path, description, optimal_batch_size, created_at, updated_at)
@@ -68,7 +60,7 @@ async def _initialize_models(db: aiosqlite.Connection):
                     model_type,
                     str(model_file),
                     f"Auto-detected {model_type} model",
-                    optimal_bs,
+                    8,  # Default value (will be detected and cached on first load)
                     now,
                     now
                 )
@@ -115,10 +107,13 @@ async def init_db() -> None:
     from datetime import datetime
     import os
 
-    # Check if database exists and has old schema
-    # For development: delete old database to recreate with new schema
-    # In production, you'd want proper migrations instead
-    if os.path.exists(DB_PATH):
+    # Skip re-initialization if database already exists and reset flag is not set
+    if os.path.exists(DB_PATH) and not RESET_DB_ON_STARTUP:
+        logger.info("Database already initialized. Skipping init_db()")
+        return
+
+    # Delete existing database when reset flag is enabled
+    if os.path.exists(DB_PATH) and RESET_DB_ON_STARTUP:
         logger.info(
             f"Existing database found at {DB_PATH}. Deleting to recreate with new schema..."
         )

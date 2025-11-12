@@ -1,11 +1,11 @@
 import { useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { startRun } from '@/lib/api';
-import { invalidateBatchQuery } from '@/utils/queryUtils';
+import { invalidateCollectionQuery } from '@/utils/queryUtils';
 import { getThresholdValidationError } from '@/utils/validation';
 
 export function useStartRun(
-  batchId: number | null,
+  collectionId: number | null,
   selectedModelId: number | null,
   threshold: number,
   loading: boolean,
@@ -23,8 +23,8 @@ export function useStartRun(
   }, []);
 
   const handleStartNewRun = async () => {
-    if (!batchId) {
-      setError('No batch available to start a run.');
+    if (!collectionId) {
+      setError('No collection available to start a run.');
       return;
     }
     
@@ -48,12 +48,12 @@ export function useStartRun(
     setLoading(true);
     setError(null);
     try {
-      const runResponse = await startRun(batchId, selectedModelId, threshold);
+      const runResponse = await startRun(collectionId, selectedModelId, threshold);
       
       window.history.replaceState(null, '', `/run/${runResponse.run_id}`);
       
       // Invalidate and refetch batch data to show the new run
-      invalidateBatchQuery(queryClient, batchId);
+      invalidateCollectionQuery(queryClient, collectionId);
       
       // Reset loading after run starts (the run will be processed in background)
       setLoading(false);

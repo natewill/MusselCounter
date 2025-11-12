@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { uploadImagesToBatch } from '@/lib/api';
+import { uploadImagesToCollection } from '@/lib/api';
 import { validateImageFiles } from '@/utils/validation';
 import { safeSetItem } from '@/utils/storage';
 import { filterNonDuplicateIds } from '@/utils/imageUtils';
-import { invalidateBatchQuery } from '@/utils/queryUtils';
+import { invalidateCollectionQuery } from '@/utils/queryUtils';
 
 export function useImageUpload(
-  batchId: number | null,
+  collectionId: number | null,
   setError: (error: string | null) => void,
   setLoading: (loading: boolean) => void,
   setRecentlyUploadedImageIds: (ids: Set<number> | ((prev: Set<number>) => Set<number>)) => void
@@ -16,8 +16,8 @@ export function useImageUpload(
   const queryClient = useQueryClient();
 
   const uploadMutation = useMutation({
-    mutationFn: ({ batchId, files }: { batchId: number; files: File[] }) =>
-      uploadImagesToBatch(batchId, files),
+    mutationFn: ({ collectionId, files }: { collectionId: number; files: File[] }) =>
+      uploadImagesToCollection(collectionId, files),
     onSuccess: async (result) => {
       const addedCount = result.added_count || 0;
       const duplicateCount = result.duplicate_count || 0;
@@ -33,7 +33,7 @@ export function useImageUpload(
       await safeSetItem('duplicateImageCount', duplicateCount.toString());
       
       // Invalidate and refetch batch data
-      invalidateBatchQuery(queryClient, batchId);
+      invalidateCollectionQuery(queryClient, collectionId);
       
       setLoading(false);
     },
@@ -63,8 +63,8 @@ export function useImageUpload(
       console.warn('Some files were skipped:', validationErrors);
     }
 
-    if (!batchId) {
-      setError('No batch available. Please refresh the page.');
+    if (!collectionId) {
+      setError('No collection available. Please refresh the page.');
       return;
     }
 
@@ -72,7 +72,7 @@ export function useImageUpload(
     setError(null);
 
     uploadMutation.mutate(
-      { batchId, files: imageFiles },
+      { collectionId, files: imageFiles },
       {
         onSettled: () => {
           setUploading(false);

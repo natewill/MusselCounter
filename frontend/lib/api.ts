@@ -77,7 +77,7 @@ function getUserFriendlyError(error: AxiosError, status?: number): string {
   // HTTP status errors
   if (status === 404) {
     const url = error.config?.url || '';
-    if (url.includes('batch')) return 'Batch not found. It may have been deleted.';
+    if (url.includes('collection') || url.includes('batch')) return 'Collection not found. It may have been deleted.';
     if (url.includes('model')) return 'Model not found. Please select a different model.';
     if (url.includes('run')) return 'Run not found.';
     return 'The requested resource was not found.';
@@ -107,13 +107,13 @@ function getUserFriendlyError(error: AxiosError, status?: number): string {
 /**
  * Validate batch ID
  */
-function validateBatchId(batchId: unknown): number {
-  if (batchId === null || batchId === undefined) {
-    throw new Error('Batch ID is required');
+function validateCollectionId(collectionId: unknown): number {
+  if (collectionId === null || collectionId === undefined) {
+    throw new Error('Collection ID is required');
   }
-  const id = Number(batchId);
+  const id = Number(collectionId);
   if (isNaN(id) || id <= 0 || !Number.isInteger(id)) {
-    throw new Error('Invalid batch ID');
+    throw new Error('Invalid collection ID');
   }
   return id;
 }
@@ -152,10 +152,10 @@ export async function pingBackend() {
 }
 
 /**
- * Create a new batch
+ * Create a new collection
  */
-export async function createBatch(name?: string, description?: string) {
-  const response = await apiClient.post('/api/batches', {
+export async function createCollection(name?: string, description?: string) {
+  const response = await apiClient.post('/api/collections', {
       name: name || null,
       description: description || null,
   });
@@ -163,10 +163,10 @@ export async function createBatch(name?: string, description?: string) {
 }
 
 /**
- * Upload image files to a batch
+ * Upload image files to a collection
  */
-export async function uploadImagesToBatch(batchId: number, files: File[]) {
-  const validatedBatchId = validateBatchId(batchId);
+export async function uploadImagesToCollection(collectionId: number, files: File[]) {
+  const validatedCollectionId = validateCollectionId(collectionId);
   
   if (!files || !Array.isArray(files) || files.length === 0) {
     throw new Error('No files provided');
@@ -178,7 +178,7 @@ export async function uploadImagesToBatch(batchId: number, files: File[]) {
   }
   
   const response = await apiClient.post(
-    `/api/batches/${validatedBatchId}/upload-images`,
+    `/api/collections/${validatedCollectionId}/upload-images`,
     formData,
     {
       headers: {
@@ -191,15 +191,15 @@ export async function uploadImagesToBatch(batchId: number, files: File[]) {
 }
 
 /**
- * Start an inference run on a batch
+ * Start an inference run on a collection
  */
-export async function startRun(batchId: number, modelId: number, threshold?: number) {
-  const validatedBatchId = validateBatchId(batchId);
+export async function startRun(collectionId: number, modelId: number, threshold?: number) {
+  const validatedCollectionId = validateCollectionId(collectionId);
   const validatedModelId = validateModelId(modelId);
   const validatedThreshold = validateThreshold(threshold);
   
   const response = await apiClient.post(
-    `/api/batches/${validatedBatchId}/run`,
+    `/api/collections/${validatedCollectionId}/run`,
     {
       model_id: validatedModelId,
       threshold: validatedThreshold,
@@ -218,11 +218,11 @@ export async function getModels() {
 }
 
 /**
- * Get batch details including images and latest run
+ * Get collection details including images and latest run
  */
-export async function getBatch(batchId: number) {
-  const validatedBatchId = validateBatchId(batchId);
-  const response = await apiClient.get(`/api/batches/${validatedBatchId}`);
+export async function getCollection(collectionId: number) {
+  const validatedCollectionId = validateCollectionId(collectionId);
+  const response = await apiClient.get(`/api/collections/${validatedCollectionId}`);
   return response.data;
 }
 
@@ -251,10 +251,26 @@ export async function getRun(runId: number) {
 }
 
 /**
- * Remove an image from a batch
+ * Stop/cancel a running inference run
  */
-export async function deleteImageFromBatch(batchId: number, imageId: number) {
-  const validatedBatchId = validateBatchId(batchId);
+export async function stopRun(runId: number) {
+  if (runId === null || runId === undefined) {
+    throw new Error('Run ID is required');
+  }
+  const id = Number(runId);
+  if (isNaN(id) || id <= 0 || !Number.isInteger(id)) {
+    throw new Error('Invalid run ID');
+  }
+  
+  const response = await apiClient.post(`/api/runs/${id}/stop`, {});
+  return response.data;
+}
+
+/**
+ * Remove an image from a collection
+ */
+export async function deleteImageFromCollection(collectionId: number, imageId: number) {
+  const validatedCollectionId = validateCollectionId(collectionId);
   
   if (imageId === null || imageId === undefined) {
     throw new Error('Image ID is required');
@@ -265,7 +281,7 @@ export async function deleteImageFromBatch(batchId: number, imageId: number) {
   }
   
   const response = await apiClient.delete(
-    `/api/batches/${validatedBatchId}/images/${id}`
+    `/api/collections/${validatedCollectionId}/images/${id}`
   );
   
   return response.data;

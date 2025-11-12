@@ -1,13 +1,13 @@
 import { QueryClient } from '@tanstack/react-query';
 
 /**
- * Invalidate batch query to trigger refetch
+ * Invalidate collection query to trigger refetch
  * @param queryClient - React Query client instance
- * @param batchId - Batch ID to invalidate
+ * @param collectionId - Collection ID to invalidate
  */
-export function invalidateBatchQuery(queryClient: QueryClient, batchId: number | null): void {
-  if (batchId) {
-    queryClient.invalidateQueries({ queryKey: ['batch', batchId] });
+export function invalidateCollectionQuery(queryClient: QueryClient, collectionId: number | null): void {
+  if (collectionId) {
+    queryClient.invalidateQueries({ queryKey: ['collection', collectionId] });
   }
 }
 

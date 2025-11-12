@@ -12,9 +12,10 @@ The application uses SQLite for data storage and processes images through ML mod
 """
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from db import init_db
-from config import CORS_ORIGINS
+from config import CORS_ORIGINS, UPLOAD_DIR
 from api.routers import collections, models, runs, system
 from api.error_handlers import (
     validation_exception_handler,
@@ -22,6 +23,7 @@ from api.error_handlers import (
 )
 from fastapi.exceptions import RequestValidationError
 from utils.logger import logger
+from utils.resource_detector import pick_threads
 
 
 @asynccontextmanager
@@ -31,12 +33,19 @@ async def lifespan(app: FastAPI):
     
     On startup:
     - Initializes the SQLite database and creates all tables from schema.sql
+    - Optimizes CPU threading for PyTorch operations
     
     On shutdown:
     - Currently no cleanup needed (SQLite handles connection closing automatically)
     """
     # Startup: Initialize database schema and tables
     logger.info("Starting Mussel Counter backend...")
+    
+    # Optimize CPU threading for PyTorch (only affects CPU mode, not GPU/MPS)
+    threads = pick_threads()
+    if threads:
+        logger.info(f"Optimized PyTorch CPU threading: {threads} threads")
+    
     await init_db()
     logger.info("Database initialized")
     yield
@@ -74,5 +83,9 @@ app.include_router(system.router)  # Health check, DB version
 app.include_router(collections.router)  # Collection management and image uploads
 app.include_router(models.router)  # Model information
 app.include_router(runs.router)  # Inference run management
+
+# Mount static files to serve uploaded images
+# This allows frontend to access images via /uploads/{filename}
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 logger.info("FastAPI application initialized")

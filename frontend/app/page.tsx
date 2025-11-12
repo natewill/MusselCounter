@@ -6,7 +6,7 @@ import TopBar from '@/components/home/TopBar';
 import UploadArea from '@/components/home/UploadArea';
 import ErrorDisplay from '@/components/home/ErrorDisplay';
 import { loadModels } from '@/utils/home/models';
-import { createQuickProcessBatch } from '@/utils/home/batch';
+import { createQuickProcessCollection } from '@/utils/home/collection';
 import { handleFileSelect, handleDroppedItems } from '@/utils/home/files';
 import { safeGetNumber } from '@/utils/storage';
 
@@ -17,13 +17,13 @@ export default function Home() {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [activeBatchId, setActiveBatchId] = useState(null);
+  const [activeCollectionId, setActiveCollectionId] = useState(null);
   
-  // Load activeBatchId from storage on mount
+  // Load activeCollectionId from storage on mount
   useEffect(() => {
-    safeGetNumber('quickProcessBatchId').then((storedBatchId) => {
-      if (storedBatchId) {
-        setActiveBatchId(storedBatchId);
+    safeGetNumber('quickProcessCollectionId').then((storedCollectionId) => {
+      if (storedCollectionId) {
+        setActiveCollectionId(storedCollectionId);
       }
     });
   }, []);
@@ -56,12 +56,12 @@ export default function Home() {
       if (files.length > 0) {
         handleFileSelect(
           files,
-          activeBatchId,
-          setActiveBatchId,
+          activeCollectionId,
+          setActiveCollectionId,
           selectedModelId,
           setLoading,
           setError,
-          createQuickProcessBatch,
+          createQuickProcessCollection,
           router
         ).catch(() => {
           // Error already handled in handleFileSelect
@@ -72,12 +72,12 @@ export default function Home() {
       const files = e.dataTransfer.files;
       handleFileSelect(
         files,
-        activeBatchId,
-        setActiveBatchId,
+        activeCollectionId,
+        setActiveCollectionId,
         selectedModelId,
         setLoading,
         setError,
-        createQuickProcessBatch,
+        createQuickProcessCollection,
         router
       ).catch(() => {
         // Error already handled in handleFileSelect
@@ -89,12 +89,12 @@ export default function Home() {
     const files = e.target.files;
     handleFileSelect(
       files,
-      activeBatchId,
-      setActiveBatchId,
+      activeCollectionId,
+      setActiveCollectionId,
       selectedModelId,
       setLoading,
       setError,
-      createQuickProcessBatch,
+      createQuickProcessCollection,
       router
     ).catch(() => {
       // Error already handled in handleFileSelect
@@ -116,12 +116,12 @@ export default function Home() {
     if (files && files.length > 0) {
       handleFileSelect(
         files,
-        activeBatchId,
-        setActiveBatchId,
+        activeCollectionId,
+        setActiveCollectionId,
         selectedModelId,
         setLoading,
         setError,
-        createQuickProcessBatch,
+        createQuickProcessCollection,
         router
       ).catch(() => {
         // Error already handled in handleFileSelect
@@ -129,13 +129,13 @@ export default function Home() {
     }
   };
 
-  const handleCreateBatch = () => {
-    // Navigate to batches page (or show form - keeping it simple for now)
+  const handleCreateCollection = () => {
+    // Navigate to collections page (or show form - keeping it simple for now)
     try {
-      router.push('/batches');
+      router.push('/collections');
     } catch (err) {
       console.warn('Navigation failed (page may not exist yet):', err);
-      setError('Batches page not available yet');
+      setError('Collections page not available yet');
     }
   };
 
@@ -145,7 +145,7 @@ export default function Home() {
         models={models}
         selectedModelId={selectedModelId}
         onModelChange={setSelectedModelId}
-        onCreateBatch={handleCreateBatch}
+        onCreateCollection={handleCreateCollection}
         loading={loading}
       />
 

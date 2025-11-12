@@ -1,4 +1,26 @@
+import { useMemo } from 'react';
+
 export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, flashingImageIds, greenHueImageIds, isRunning, currentThreshold }) {
+  // Sort images so recently processed ones (with green hue) appear at the top during a run
+  const sortedImages = useMemo(() => {
+    if (!isRunning || !greenHueImageIds || greenHueImageIds.size === 0) {
+      return images;
+    }
+    
+    // During a run, sort processed images (green hue) to the top
+    return [...images].sort((a, b) => {
+      const aHasGreenHue = greenHueImageIds.has(a.image_id);
+      const bHasGreenHue = greenHueImageIds.has(b.image_id);
+      
+      // Images with green hue come first
+      if (aHasGreenHue && !bHasGreenHue) return -1;
+      if (!aHasGreenHue && bHasGreenHue) return 1;
+      
+      // If both have or both don't have green hue, maintain original order
+      return 0;
+    });
+  }, [images, greenHueImageIds, isRunning]);
+
   return (
     <>
       <style>{`
@@ -48,16 +70,17 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
       <h2 className="text-xl font-semibold mb-4 text-zinc-900 dark:text-zinc-100">
         Images ({images.length})
       </h2>
-      {images.length === 0 ? (
+      {sortedImages.length === 0 ? (
         <div className="text-zinc-600 dark:text-zinc-400">No images in this batch yet.</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {images.map((image) => {
+          {sortedImages.map((image) => {
             // Check if image has been processed with the selected model
             const processedModelIds = image.processed_model_ids || [];
-            const isProcessed = selectedModelId && processedModelIds.includes(selectedModelId);
+            const isProcessedWithSelectedModel = selectedModelId && processedModelIds.includes(selectedModelId);
             
-            // Check if image has results (was processed) - if it has results, don't show orange hue
+            // Check if image has results for the CURRENT model+threshold combination
+            // An image may have results from YOLO at 0.47, but not from RCNN at 0.47
             const hasResults = (image.live_mussel_count !== null && image.live_mussel_count !== undefined) ||
                               (image.dead_mussel_count !== null && image.dead_mussel_count !== undefined) ||
                               image.processed_at;
@@ -69,23 +92,31 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                                     (currentThreshold !== null && currentThreshold !== undefined && 
                                      Math.abs(resultThreshold - currentThreshold) < 0.001); // Allow small floating point differences
             
+            // Check if results are valid for CURRENT model + threshold combination
+            // Results are only valid if: processed with selected model AND threshold matches
+            const hasValidResults = hasResults && isProcessedWithSelectedModel && thresholdMatches;
+            
             // Check if this image should flash green (final flash on completion)
             const isFlashing = flashingImageIds && flashingImageIds.has(image.image_id);
             // Check if this image should have persistent green hue (during run only)
             // Show green hue for images in greenHueImageIds (processed in current run, including with new threshold) AND run is active
             const hasGreenHue = isRunning && (greenHueImageIds && greenHueImageIds.has(image.image_id));
             
-            // Only show orange hue if it needs processing AND doesn't have results yet AND doesn't have green hue
-            // Also show orange if threshold changed (even if processed with same model) - needs reprocessing
-            // Once it has results (even if not in processed_model_ids yet), remove the orange hue
-            // Also don't show orange if it's in greenHueImageIds (to prevent delay)
-            const needsProcessing = selectedModelId && !hasGreenHue && 
-                                   ((!isProcessed && !hasResults) || (hasResults && !thresholdMatches));
+            // Show orange hue if a model is selected AND image doesn't have green hue AND doesn't have valid results
+            // Valid results = processed with current model + current threshold
+            // This means changing models or thresholds will bring back the orange hue
+            const needsProcessing = selectedModelId && !hasGreenHue && !hasValidResults;
+            
+            // Extract filename from stored_path for thumbnail URL
+            // stored_path format: "data/uploads/{hash}_{filename}"
+            const thumbnailUrl = image.stored_path 
+              ? `http://127.0.0.1:8000/uploads/${image.stored_path.split('/').pop()}`
+              : null;
             
             return (
               <div
                 key={image.image_id}
-                className={`border rounded-lg p-4 hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors relative ${
+                className={`border rounded-lg overflow-hidden hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors relative ${
                   isFlashing
                     ? 'green-flash'
                     : hasGreenHue
@@ -99,29 +130,56 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                   <button
                     onClick={() => onDeleteImage(image.image_id)}
                     disabled={deletingImageId === image.image_id}
-                    className="absolute top-2 right-2 p-1 text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Remove image from batch"
+                    className="absolute top-2 right-2 p-1 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-sm rounded text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed z-10"
+                    title="Remove image from collection"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 )}
-                <div className="font-medium text-zinc-900 dark:text-zinc-100 mb-2 truncate pr-6">
-                  {image.filename}
-                </div>
-                <div className="flex gap-4 text-sm">
-                  <div>
-                    <span className="text-zinc-600 dark:text-zinc-400">Live: </span>
-                    <span className="font-medium text-green-600 dark:text-green-400">
-                      {image.live_mussel_count || 0}
-                    </span>
+                
+                {/* Image Thumbnail */}
+                {thumbnailUrl && (
+                  <div className="relative w-full h-48 bg-zinc-100 dark:bg-zinc-800">
+                    <img 
+                      src={thumbnailUrl} 
+                      alt={image.filename}
+                      className="w-full h-full object-cover"
+                      loading="lazy"
+                      onError={(e) => {
+                        // Fallback if image fails to load
+                        e.target.style.display = 'none';
+                        e.target.nextElementSibling.style.display = 'flex';
+                      }}
+                    />
+                    {/* Fallback placeholder */}
+                    <div className="absolute inset-0 hidden items-center justify-center text-zinc-400 dark:text-zinc-600">
+                      <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-zinc-600 dark:text-zinc-400">Dead: </span>
-                    <span className="font-medium text-red-600 dark:text-red-400">
-                      {image.dead_mussel_count || 0}
-                    </span>
+                )}
+                
+                {/* Image Info */}
+                <div className="p-4">
+                  <div className="font-medium text-zinc-900 dark:text-zinc-100 mb-2 truncate text-sm">
+                    {image.filename}
+                  </div>
+                  <div className="flex gap-4 text-sm">
+                    <div>
+                      <span className="text-zinc-600 dark:text-zinc-400">Live: </span>
+                      <span className="font-medium text-green-600 dark:text-green-400">
+                        {image.live_mussel_count || 0}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-zinc-600 dark:text-zinc-400">Dead: </span>
+                      <span className="font-medium text-red-600 dark:text-red-400">
+                        {image.dead_mussel_count || 0}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>

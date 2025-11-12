@@ -24,14 +24,12 @@ from datetime import datetime
 from pathlib import Path
 
 import aiosqlite
-import torch
 
 from config import DB_PATH
 from utils.collection_utils import get_collection_images
 from utils.model_utils.db import get_model
 from utils.model_utils.inference import run_rcnn_inference_batch, run_yolo_inference_batch
 from utils.model_utils.loader import load_model
-from utils.resource_detector import auto_bs
 from .db import get_run, update_run_status
 from .image_processor import process_image_for_run
 
@@ -121,14 +119,15 @@ async def process_collection_run(db: aiosqlite.Connection, run_id: int):
             await _fail(db, run_id, f"Model weights file not found: {weights_path}")
             return
         
-        # Get optimal batch size from database (default to 8 if not found)
+        # Load model in background thread to avoid blocking the event loop
+        # Model loading can take 100-500ms and includes GPU/CPU operations
         try:
-            optimal_batch_size = model_row['optimal_batch_size']
-        except (KeyError, TypeError):
-            optimal_batch_size = 8
-        
-        try:
-            model_device = load_model(weights_path, model_type, optimal_batch_size=optimal_batch_size)
+            to_thread = getattr(asyncio, "to_thread", None)
+            if to_thread:
+                model_device = await to_thread(load_model, weights_path, model_type)
+            else:
+                loop = asyncio.get_event_loop()
+                model_device = await loop.run_in_executor(None, load_model, weights_path, model_type)
         except Exception as e:
             await _fail(db, run_id, f"Failed to load model: {e}")
             return

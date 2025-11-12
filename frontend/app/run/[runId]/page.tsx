@@ -8,6 +8,7 @@ import { useStorageData } from '@/hooks/useStorageData';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { useImageDelete } from '@/hooks/useImageDelete';
 import { useStartRun } from '@/hooks/useStartRun';
+import { useStopRun } from '@/hooks/useStopRun';
 import { useRunState } from '@/hooks/useRunState';
 import PageHeader from '@/components/run/PageHeader';
 import BatchTotals from '@/components/run/BatchTotals';
@@ -39,6 +40,9 @@ export default function RunResultsPage() {
   
   // Handle starting new run
   const { handleStartNewRun } = useStartRun(batchId, selectedModelId, threshold, loading, setLoading, setError);
+  
+  // Handle stopping run (refresh data on success)
+  const { stopping, handleStopRun } = useStopRun(setError, () => setLoading(true));
 
   // Loading state
   if (loading && !batchId) {
@@ -72,7 +76,13 @@ export default function RunResultsPage() {
 
         {/* Two-column layout for Run Status and Run Settings */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <RunStatus latestRun={latestRun} isRunning={isRunning} images={images} />
+          <RunStatus 
+            latestRun={latestRun} 
+            isRunning={isRunning} 
+            images={images} 
+            onStopRun={handleStopRun}
+            stopping={stopping}
+          />
           
           <ThresholdControl
             threshold={threshold}

@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 import torch
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
 
@@ -15,26 +14,10 @@ def _load_checkpoint(weights_path: str, device: torch.device):
     return checkpoint
 
 
-def _detect_optimal_batch_size(model, model_type: str, device) -> int:
-    """Detect optimal batch size for a model"""
-    from ..resource_detector import auto_bs
+def load_rcnn_model(weights_path: str, model_type: str):
+    """Load R-CNN model and calculate optimal batch size based on model parameters."""
+    from ..resource_detector import calculate_batch_size_from_model
     
-    device_str = str(device)
-    
-    try:
-        if "yolo" in model_type.lower():
-            optimal_bs = auto_bs(model, lambda bs: torch.randn(bs, 3, 640, 640), start=64, device=device_str)
-        elif "rcnn" in model_type.lower() or "faster" in model_type.lower():
-            optimal_bs = auto_bs(model, lambda bs: [torch.randn(3, 800, 600) for _ in range(bs)], start=16, device=device_str)
-        else:
-            optimal_bs = 8
-        return optimal_bs
-    except Exception as e:
-        logger.warning(f"Batch size detection failed, using default 8: {e}")
-        return 8
-
-
-def load_rcnn_model(weights_path: str, detect_batch_size: bool = False, optimal_batch_size: int = None):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = fasterrcnn_resnet50_fpn(pretrained=False, num_classes=3)
     try:
@@ -44,16 +27,23 @@ def load_rcnn_model(weights_path: str, detect_batch_size: bool = False, optimal_
     model.to(device)
     model.eval()
     
-    # Only detect batch size if requested (e.g., when adding model to DB)
-    if detect_batch_size:
-        optimal_bs = _detect_optimal_batch_size(model, "rcnn", device)
-        return model, device, optimal_bs
+    # Inference optimizations: disable gradient tracking and unnecessary operations
+    torch.set_grad_enabled(False)  # Don't track gradients (inference only)
+    if device.type == 'cpu':
+        # CPU-specific optimizations to reduce overhead
+        torch.backends.cudnn.enabled = False
     
-    # For inference, use provided batch size from database
-    return model, device, optimal_batch_size
+    logger.debug(f"[Model Loader] R-CNN model loaded on {device} with inference optimizations")
+    
+    # Calculate batch size based on actual model size (parameter count)
+    batch_size = calculate_batch_size_from_model(model, device)
+    return model, device, batch_size
 
 
-def load_yolo_model(weights_path: str, detect_batch_size: bool = False, optimal_batch_size: int = None):
+def load_yolo_model(weights_path: str, model_type: str):
+    """Load YOLO model and calculate optimal batch size based on model parameters."""
+    from ..resource_detector import calculate_batch_size_from_model
+    
     try:
         from ultralytics import YOLO
     except ImportError as exc:  # pragma: no cover - configuration error
@@ -77,13 +67,19 @@ def load_yolo_model(weights_path: str, detect_batch_size: bool = False, optimal_
         model.model.to(device)
     model.model.eval()
     
-    # Only detect batch size if requested (e.g., when adding model to DB)
-    if detect_batch_size:
-        optimal_bs = _detect_optimal_batch_size(model, "yolo", device)
-        return model, device, optimal_bs
+    # Inference optimizations: disable gradient tracking and unnecessary operations
+    torch.set_grad_enabled(False)  # Don't track gradients (inference only)
+    if device.type == 'cpu':
+        # CPU-specific optimizations to reduce overhead
+        torch.backends.cudnn.enabled = False
     
-    # For inference, use provided batch size from database
-    return model, device, optimal_batch_size
+    logger.debug(f"[Model Loader] YOLO model loaded on {device} with inference optimizations")
+    
+    # Calculate batch size based on actual model size (parameter count)
+    # Note: YOLO models wrap the actual model in model.model
+    actual_model = model.model if hasattr(model, 'model') else model
+    batch_size = calculate_batch_size_from_model(actual_model, device)
+    return model, device, batch_size
 
 
 def load_ssd_model(weights_path: str):  # pragma: no cover - placeholder
@@ -94,23 +90,24 @@ def load_cnn_model(weights_path: str):  # pragma: no cover - placeholder
     raise NotImplementedError("CNN detection model loading not implemented.")
 
 
-def load_model(weights_path: str, model_type: str, detect_batch_size: bool = False, optimal_batch_size: int = None):
-    """Load model and optionally detect optimal batch size.
+def load_model(weights_path: str, model_type: str):
+    """Load model and get default batch size based on available hardware.
+    
+    Uses sensible defaults optimized for CPU but supports GPU if available.
+    No runtime detection needed - instant loading.
     
     Args:
         weights_path: Path to model weights
         model_type: Type of model (RCNN, YOLO, etc.)
-        detect_batch_size: If True, run batch size detection (slow, do once when adding model)
-        optimal_batch_size: Pre-detected optimal batch size from database (for inference)
         
     Returns:
-        Tuple of (model, device, optimal_batch_size)
+        Tuple of (model, device, batch_size)
     """
     model_type_lower = model_type.lower()
     if "rcnn" in model_type_lower or "faster" in model_type_lower:
-        return load_rcnn_model(weights_path, detect_batch_size, optimal_batch_size)
+        return load_rcnn_model(weights_path, model_type)
     if "yolo" in model_type_lower:
-        return load_yolo_model(weights_path, detect_batch_size, optimal_batch_size)
+        return load_yolo_model(weights_path, model_type)
     if "ssd" in model_type_lower:
         return load_ssd_model(weights_path)
     if "cnn" in model_type_lower and "rcnn" not in model_type_lower:
@@ -118,4 +115,3 @@ def load_model(weights_path: str, model_type: str, detect_batch_size: bool = Fal
     raise ValueError(
         f"Unsupported model type: {model_type}. Supported types: RCNN, YOLO, SSD, CNN."
     )
-

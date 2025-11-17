@@ -286,3 +286,67 @@ export async function deleteImageFromCollection(collectionId: number, imageId: n
   
   return response.data;
 }
+
+/**
+ * Validate image ID
+ */
+function validateImageId(imageId: unknown): number {
+  if (imageId === null || imageId === undefined) {
+    throw new Error('Image ID is required');
+  }
+  const id = Number(imageId);
+  if (isNaN(id) || id <= 0 || !Number.isInteger(id)) {
+    throw new Error('Invalid image ID');
+  }
+
+  return id
+}
+
+/**
+ * Validate run ID
+ */
+function validateRunId(runId: unknown): number {
+  if (runId === null || runId === undefined) {
+    throw new Error('Run ID is required');
+  }
+  const rid = Number(runId);
+  if (isNaN(rid) || rid <= 0 || !Number.isInteger(rid)) {
+    throw new Error('Invalid run ID');
+  }
+  return rid
+}
+
+/**
+ * gets image details from a specific run
+ */
+export async function getImageDetails(imageId: number, runId: number) {
+  const validatedImageId = validateImageId(imageId);
+  const validatedRunId = validateRunId(runId);
+  
+  const response = await apiClient.get(`/api/images/${validatedImageId}/results/${validatedRunId}`);
+  return response.data;
+}
+
+/**
+ * change the label of a polygon/mussel
+ */
+export async function updatePolygonClassification(
+  imageId: number, 
+  runId: number, 
+  polygonIndex: number, 
+  newClass: 'live' | 'dead'
+) {
+  const validatedImageId = validateImageId(imageId);
+  const validatedRunId = validateRunId(runId);
+  
+  if (newClass !== 'live' && newClass !== 'dead') {
+    throw new Error('Classification must be "live" or "dead"');
+  }
+  
+  const response = await apiClient.patch(
+    `/api/images/${validatedImageId}/results/${validatedRunId}/polygons/${polygonIndex}`,
+    { new_class: newClass }
+  );
+  
+  return response.data;
+}

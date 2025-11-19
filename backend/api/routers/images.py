@@ -8,10 +8,11 @@ including inference results, polygon data, and metadata.
 import json
 from pathlib import Path
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
 from db import get_db
 from utils.security import validate_integer_id
+from datetime import datetime
 
 router = APIRouter(prefix="/api/images", tags=["images"])
 
@@ -202,4 +203,129 @@ async def get_image_results_endpoint(image_id: int, run_id: int) -> ImageDetailR
             # Comparison data
             other_runs=other_runs
         )
+
+
+@router.patch("/{image_id}/results/{run_id}/polygons/{polygon_index}", response_model=Dict)
+async def update_polygon_classification(
+    image_id: int, 
+    run_id: int, 
+    polygon_index: int,
+    new_class: str = Body(..., embed=True)
+) -> Dict:
+    """
+    Update the classification of a specific polygon (mussel detection).
+    
+    Changes a polygon from "live" to "dead" or vice versa, updates the JSON file,
+    and recalculates the counts in the database.
+    
+    Args:
+        image_id: ID of the image
+        run_id: ID of the run
+        polygon_index: Index of the polygon in the polygons array (0-based)
+        new_class: New classification ("live" or "dead")
+        
+    Returns:
+        Updated image result data
+    """
+    from utils.security import validate_integer_id
+    
+    image_id = validate_integer_id(image_id)
+    run_id = validate_integer_id(run_id)
+    
+    if new_class not in ["live", "dead"]:
+        raise HTTPException(status_code=400, detail="Classification must be 'live' or 'dead'")
+    
+    async with get_db() as db:
+        # Get the image result to find polygon_path
+        cursor = await db.execute("""
+            SELECT polygon_path, live_mussel_count, dead_mussel_count
+            FROM image_result
+            WHERE image_id = ? AND run_id = ?
+        """, (image_id, run_id))
+        
+        result = await cursor.fetchone()
+        if not result:
+            raise HTTPException(status_code=404, detail="Image result not found")
+        
+        polygon_path = result['polygon_path']
+        if not polygon_path or not Path(polygon_path).exists():
+            raise HTTPException(status_code=404, detail="Polygon file not found")
+        
+        # Load polygon data
+        with open(polygon_path, 'r') as f:
+            polygon_data = json.load(f)
+        
+        polygons = polygon_data.get('polygons', [])
+        if polygon_index < 0 or polygon_index >= len(polygons):
+            raise HTTPException(status_code=400, detail="Invalid polygon index")
+        
+        # Update the polygon classification
+        old_class = polygons[polygon_index]['class']
+        if old_class == new_class:
+            return {"message": "Classification unchanged", "polygon_index": polygon_index}
+        
+        polygons[polygon_index]['class'] = new_class
+        
+        # if its the first edit, store original class and flag as manually edited
+        if 'original_class' not in polygons[polygon_index]:
+            polygons[polygon_index]['original_class'] = old_class
+            polygons[polygon_index]['manually_edited'] = True
+        elif new_class == polygons[polygon_index]['original_class']:
+            if 'manually_edited' in polygons[polygon_index]:
+                del polygons[polygon_index]['manually_edited']
+            if 'original_class' in polygons[polygon_index]:
+                del polygons[polygon_index]['original_class']
+        
+        # Recalculate counts
+        live_count = sum(1 for p in polygons if p['class'] == 'live')
+        dead_count = sum(1 for p in polygons if p['class'] == 'dead')
+        
+        # Update polygon file
+        polygon_data['polygons'] = polygons
+        polygon_data['live_count'] = live_count
+        polygon_data['dead_count'] = dead_count
+        
+        with open(polygon_path, 'w') as f:
+            json.dump(polygon_data, f, indent=2)
+        
+        # Update database
+        now = datetime.now().isoformat()
+        await db.execute("""
+            UPDATE image_result
+            SET live_mussel_count = ?,
+                dead_mussel_count = ?,
+                processed_at = ?
+            WHERE image_id = ? AND run_id = ?
+        """, (live_count, dead_count, now, image_id, run_id))
+        
+        # Update run totals (recalculate from all image results in this run)
+        run_cursor = await db.execute("""
+            SELECT SUM(live_mussel_count) as total_live,
+                   SUM(dead_mussel_count) as total_dead
+            FROM image_result
+            WHERE run_id = ?
+        """, (run_id,))
+        
+        totals = await run_cursor.fetchone()
+        total_live = totals['total_live'] or 0
+        total_dead = totals['total_dead'] or 0
+        
+        await db.execute("""
+            UPDATE run
+            SET live_mussel_count = ?
+            WHERE run_id = ?
+        """, (total_live, run_id))
+        
+        await db.commit()
+        
+        return {
+            "message": "Classification updated successfully",
+            "polygon_index": polygon_index,
+            "old_class": old_class,
+            "new_class": new_class,
+            "live_count": live_count,
+            "dead_count": dead_count,
+            "total_live": total_live,
+            "total_dead": total_dead
+        }
 

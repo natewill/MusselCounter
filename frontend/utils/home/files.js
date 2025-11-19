@@ -54,7 +54,6 @@ export async function handleFileSelect(
   files,
   activeCollectionId,
   setActiveCollectionId,
-  selectedModelId,
   setLoading,
   setError,
   createQuickProcessCollection,

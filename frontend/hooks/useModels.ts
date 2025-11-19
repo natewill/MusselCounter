@@ -6,7 +6,7 @@ export function useModels() {
   const [selectedModelId, setSelectedModelId] = useState<number | null>(null);
   const defaultModelSetRef = useRef(false);
 
-  useEffect(() => {
+  const loadModels = () => {
     getModels()
       .then((data) => {
         setModels(data);
@@ -19,6 +19,20 @@ export function useModels() {
       .catch((err) => {
         console.error('Failed to load models:', err);
       });
+  };
+
+  useEffect(() => {
+    loadModels();
+    
+    // Listen for model updates
+    const handleModelsUpdated = () => {
+      loadModels();
+    };
+    window.addEventListener('modelsUpdated', handleModelsUpdated);
+    
+    return () => {
+      window.removeEventListener('modelsUpdated', handleModelsUpdated);
+    };
   }, []);
 
   return { models, selectedModelId, setSelectedModelId };

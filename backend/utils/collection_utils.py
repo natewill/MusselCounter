@@ -30,6 +30,8 @@ async def create_collection(
         (name, description, now, now)
     )
     await db.commit()
+
+    print(name, description, now)
     return cursor.lastrowid
 
 

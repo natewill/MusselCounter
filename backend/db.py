@@ -163,7 +163,7 @@ async def init_db() -> None:
                 f"(timestamp: {existing_metadata['value']})"
             )
         
-        # Initialize models from models/ directory (happens once per database init)
+        # Models are now added via the API endpoint, not automatically on startup
         await _initialize_models(db)
 
 

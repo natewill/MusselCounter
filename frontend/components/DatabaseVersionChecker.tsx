@@ -22,6 +22,7 @@ export default function DatabaseVersionChecker() {
         // Get current database version from backend
         const { db_version } = await getDbVersion();
         
+    
         if (!db_version) {
           // If no version returned, database might be in an inconsistent state
           // Clear localStorage to be safe
@@ -32,6 +33,9 @@ export default function DatabaseVersionChecker() {
         
         // Get stored version from localStorage
         const storedVersion = await safeGetItem(DB_VERSION_KEY);
+        
+        console.log('storedVersion', storedVersion);
+        console.log('db_version', db_version);
         
         if (storedVersion !== db_version) {
           // Database was reset or is different - clear all localStorage

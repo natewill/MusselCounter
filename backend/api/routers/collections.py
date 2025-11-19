@@ -46,6 +46,7 @@ async def create_collection_endpoint(request: CreateCollectionRequest) -> Dict[s
     Returns the ID of the newly created collection.
     """
     async with get_db() as db:
+        print("hello!!!!")
         collection_id = await create_collection(db, request.name, request.description)
         return {"collection_id": collection_id}
 

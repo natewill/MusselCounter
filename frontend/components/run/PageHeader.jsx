@@ -1,4 +1,5 @@
 import { useRouter } from 'next/navigation';
+import AddModelButton from './AddModelButton';
 
 export default function PageHeader({ batchName, children }) {
   const router = useRouter();
@@ -20,11 +21,14 @@ export default function PageHeader({ batchName, children }) {
             <p className="text-zinc-600 dark:text-zinc-400 mt-2">Batch: {batchName}</p>
           )}
         </div>
-        {children && (
-          <div className="ml-4">
-            {children}
-          </div>
-        )}
+        <div className="flex items-center gap-4">
+          <AddModelButton />
+          {children && (
+            <div>
+              {children}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

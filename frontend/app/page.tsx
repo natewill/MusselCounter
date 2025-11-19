@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import TopBar from '@/components/home/TopBar';
 import UploadArea from '@/components/home/UploadArea';
 import ErrorDisplay from '@/components/home/ErrorDisplay';
-import { loadModels } from '@/utils/home/models';
 import { createQuickProcessCollection } from '@/utils/home/collection';
 import { handleFileSelect, handleDroppedItems } from '@/utils/home/files';
 import { safeGetNumber } from '@/utils/storage';
@@ -22,19 +21,13 @@ export default function Home() {
   // Load activeCollectionId from storage on mount
   useEffect(() => {
     safeGetNumber('quickProcessCollectionId').then((storedCollectionId) => {
+      console.log('storedCollectionId', storedCollectionId);
       if (storedCollectionId) {
         setActiveCollectionId(storedCollectionId);
       }
     });
   }, []);
-  const [models, setModels] = useState([]);
-  const [selectedModelId, setSelectedModelId] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-
-  // Load models on mount
-  useEffect(() => {
-    loadModels(setModels, setSelectedModelId);
-  }, []);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -58,7 +51,6 @@ export default function Home() {
           files,
           activeCollectionId,
           setActiveCollectionId,
-          selectedModelId,
           setLoading,
           setError,
           createQuickProcessCollection,
@@ -74,7 +66,6 @@ export default function Home() {
         files,
         activeCollectionId,
         setActiveCollectionId,
-        selectedModelId,
         setLoading,
         setError,
         createQuickProcessCollection,
@@ -91,7 +82,6 @@ export default function Home() {
       files,
       activeCollectionId,
       setActiveCollectionId,
-      selectedModelId,
       setLoading,
       setError,
       createQuickProcessCollection,
@@ -118,7 +108,6 @@ export default function Home() {
         files,
         activeCollectionId,
         setActiveCollectionId,
-        selectedModelId,
         setLoading,
         setError,
         createQuickProcessCollection,
@@ -129,22 +118,33 @@ export default function Home() {
     }
   };
 
-  const handleCreateCollection = () => {
-    // Navigate to collections page (or show form - keeping it simple for now)
+  const handleCreateCollection = async () => {
+    if (loading) return;
+    
+    setLoading(true);
+    setError(null);
+    
     try {
-      router.push('/collections');
+      let collectionId = activeCollectionId;
+      
+      // Create a new collection if we don't have one
+      if (!collectionId) {
+        collectionId = await createQuickProcessCollection(setActiveCollectionId);
+      }
+      console.log('collectionId', collectionId);
+      // Just navigate to run page - user will click "Start New Run" button there
+      router.push(`/run/${collectionId}`);
+      setLoading(false);
     } catch (err) {
-      console.warn('Navigation failed (page may not exist yet):', err);
-      setError('Collections page not available yet');
+      console.error('Failed to create collection or navigate:', err);
+      setError(err.message || 'Failed to create run. Please try again.');
+      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black relative">
       <TopBar
-        models={models}
-        selectedModelId={selectedModelId}
-        onModelChange={setSelectedModelId}
         onCreateCollection={handleCreateCollection}
         loading={loading}
       />

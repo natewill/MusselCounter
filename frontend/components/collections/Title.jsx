@@ -11,7 +11,7 @@ export default function Title() {
         >
             ← Back to Home
         </button>
-        <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
+        <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 mt-4">
                 Colletion History
         </h1>
     </div>

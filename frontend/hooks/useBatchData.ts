@@ -20,21 +20,12 @@ export function useBatchData(runId: number) {
           return;
         }
 
-        // Fallback to legacy key for backwards compatibility
-        const legacyBatchId = await safeGetNumber('currentBatchId');
-        if (legacyBatchId) {
-          setCollectionId(legacyBatchId);
-          await safeSetItem('currentCollectionId', legacyBatchId.toString());
-          return;
-        }
-
         // Otherwise fetch run details to determine collection id
         try {
           const runData = await getRun(runId);
           if (runData && runData.collection_id) {
             setCollectionId(runData.collection_id);
             await safeSetItem('currentCollectionId', runData.collection_id.toString());
-            await safeSetItem('currentBatchId', runData.collection_id.toString());
           } else {
             setError('Run not found. Please upload images from the home page.');
             setLoading(false);
@@ -43,7 +34,6 @@ export function useBatchData(runId: number) {
           // If getRun fails, assume runId is actually a collectionId (new flow from home)
           setCollectionId(runId);
           await safeSetItem('currentCollectionId', runId.toString());
-          await safeSetItem('currentBatchId', runId.toString());
         }
       } catch (err) {
         console.error('Failed to load run data:', err);

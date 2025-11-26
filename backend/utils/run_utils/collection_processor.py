@@ -66,6 +66,7 @@ import asyncio
 import json
 import logging
 import os
+from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
@@ -185,18 +186,20 @@ async def process_collection_run(db: aiosqlite.Connection, run_id: int):
             await _fail(db, run_id, "No images found in collection")
             return
         
-        # Filter out duplicate images (marked with is_duplicate = 1)
-        # Duplicates are images that were already in the collection when uploaded
+        # Filter out duplicate images based on file_hash
+        # If multiple images have the same file_hash, keep only the first one (by image_id)
+        hash_to_images = defaultdict(list)
+        for img in all_images:
+            if img.get('file_hash'):
+                hash_to_images[img['file_hash']].append(img)
+        
         duplicate_image_ids = set()
-        try:
-            cursor = await db.execute(
-                """SELECT image_id FROM collection_image 
-                   WHERE collection_id = ? AND is_duplicate = 1""",
-                (collection_id,)
-            )
-            duplicate_image_ids = {row[0] for row in await cursor.fetchall()}
-        except Exception:
-            pass
+        for hash_val, images_with_hash in hash_to_images.items():
+            if len(images_with_hash) > 1:
+                # Sort by image_id and keep the first one, mark others as duplicates
+                sorted_images = sorted(images_with_hash, key=lambda x: x['image_id'])
+                for img in sorted_images[1:]:  # All except the first
+                    duplicate_image_ids.add(img['image_id'])
         
         if duplicate_image_ids:
             all_images = [img for img in all_images if img['image_id'] not in duplicate_image_ids]

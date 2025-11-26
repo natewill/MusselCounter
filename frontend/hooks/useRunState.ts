@@ -4,6 +4,7 @@ import {
   resultsChanged,
   shouldFlashImage,
   getProcessedImageIds,
+  findDuplicateImageIds,
   type ImageResult
 } from '@/utils/run/runUtils';
 
@@ -13,7 +14,7 @@ interface Image {
   dead_mussel_count: number | null;
   processed_at: string | null;
   result_threshold: number | null;
-  is_duplicate: number | boolean;
+  file_hash: string | null;
   processed_model_ids: number[];
 }
 
@@ -70,6 +71,9 @@ export function useRunState(
     // Build a map of current image results
     const currentImageResults = buildImageResultsMap(batchData.images);
     
+    // Find duplicate images based on file_hash
+    const duplicateImageIds = findDuplicateImageIds(batchData.images);
+    
     // Find images that just got results (newly processed or reprocessed with new threshold)
     const newlyProcessedIds: number[] = [];
     
@@ -82,7 +86,7 @@ export function useRunState(
       }
       
       // Skip duplicates
-      if (img.is_duplicate === 1 || img.is_duplicate === true) {
+      if (duplicateImageIds.has(imageId)) {
         continue;
       }
       
@@ -111,7 +115,8 @@ export function useRunState(
           latestModelId,
           latestThreshold,
           currentStatus,
-          previousResult
+          previousResult,
+          duplicateImageIds
         );
         
         if (shouldFlash) {

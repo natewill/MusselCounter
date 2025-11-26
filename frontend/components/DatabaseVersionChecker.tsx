@@ -46,6 +46,7 @@ export default function DatabaseVersionChecker() {
           
           // Store the new version
           await safeSetItem(DB_VERSION_KEY, db_version);
+          console.log('Stored new version', db_version);
         } else {
           // Versions match, ensure we have the version stored
           await safeSetItem(DB_VERSION_KEY, db_version);

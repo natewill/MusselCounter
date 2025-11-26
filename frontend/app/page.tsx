@@ -131,7 +131,6 @@ export default function Home() {
       if (!collectionId) {
         collectionId = await createQuickProcessCollection(setActiveCollectionId);
       }
-      console.log('collectionId', collectionId);
       // Just navigate to run page - user will click "Start New Run" button there
       router.push(`/run/${collectionId}`);
       setLoading(false);

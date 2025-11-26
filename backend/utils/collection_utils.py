@@ -106,7 +106,7 @@ async def get_collection_images(db: aiosqlite.Connection, collection_id: int):
         List of image rows with processed_model_ids added
     """
     cursor = await db.execute(
-        """SELECT i.*, ci.added_at, ci.is_duplicate
+        """SELECT i.*, ci.added_at
                FROM image i
                JOIN collection_image ci ON i.image_id = ci.image_id
                WHERE ci.collection_id = ?
@@ -146,7 +146,6 @@ async def get_collection_images_with_results(
         i.created_at,
         i.updated_at,
         ci.added_at,
-        ci.is_duplicate,
         l.live_mussel_count,
         l.dead_mussel_count,
         l.polygon_path,

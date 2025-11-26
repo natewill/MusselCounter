@@ -262,7 +262,6 @@ results = model.detect(image, threshold=0.5)
 - collection_id
 - image_id
 - added_at
-- is_duplicate (boolean)
 ```
 
 **model**

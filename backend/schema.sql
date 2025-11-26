@@ -27,7 +27,6 @@ CREATE TABLE IF NOT EXISTS collection_image (
   collection_id      INTEGER NOT NULL,
   image_id      INTEGER NOT NULL,
   added_at      TEXT NOT NULL,            -- When this image was added to this collection
-  is_duplicate  INTEGER DEFAULT 0,        -- 1 if this image was already in collection when uploaded
   PRIMARY KEY (collection_id, image_id),
   FOREIGN KEY (collection_id) REFERENCES collection(collection_id),
   FOREIGN KEY (image_id) REFERENCES image(image_id)

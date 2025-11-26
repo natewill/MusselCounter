@@ -15,7 +15,7 @@ export interface Image {
   dead_mussel_count: number | null;
   processed_at: string | null;
   result_threshold: number | null;
-  is_duplicate: number | boolean;
+  file_hash: string | null;
   processed_model_ids: number[];
 }
 
@@ -98,10 +98,11 @@ export function shouldFlashImage(
   latestModelId: number,
   latestThreshold: number | null,
   currentStatus: string | null,
-  previousResult: ImageResult | null
+  previousResult: ImageResult | null,
+  duplicateImageIds: Set<number>
 ): boolean {
   // Skip duplicates
-  if (image.is_duplicate === 1 || image.is_duplicate === true) {
+  if (duplicateImageIds.has(imageId)) {
     return false;
   }
   
@@ -143,16 +144,50 @@ export function shouldFlashImage(
 }
 
 /**
+ * Find duplicate images based on file_hash
+ * Returns a Set of image_ids that are duplicates (same hash appears more than once)
+ * For each duplicate hash, keeps the image with the lowest image_id
+ */
+export function findDuplicateImageIds(images: Image[]): Set<number> {
+  const hashToImages = new Map<string, Image[]>();
+  
+  // Group images by file_hash
+  images.forEach(img => {
+    if (img.file_hash) {
+      if (!hashToImages.has(img.file_hash)) {
+        hashToImages.set(img.file_hash, []);
+      }
+      hashToImages.get(img.file_hash)!.push(img);
+    }
+  });
+  
+  // Find hashes that appear more than once
+  const duplicateImageIds = new Set<number>();
+  hashToImages.forEach((imagesWithHash, hash) => {
+    if (imagesWithHash.length > 1) {
+      // Sort by image_id and keep the first one, mark others as duplicates
+      const sortedImages = [...imagesWithHash].sort((a, b) => a.image_id - b.image_id);
+      for (let i = 1; i < sortedImages.length; i++) {
+        duplicateImageIds.add(sortedImages[i].image_id);
+      }
+    }
+  });
+  
+  return duplicateImageIds;
+}
+
+/**
  * Get all processed image IDs from a batch (excluding duplicates)
  */
 export function getProcessedImageIds(images: Image[]): number[] {
+  const duplicateIds = findDuplicateImageIds(images);
   return images
     .filter(img => {
       const hasResults = 
         (img.live_mussel_count !== null && img.live_mussel_count !== undefined) ||
         (img.dead_mussel_count !== null && img.dead_mussel_count !== undefined) ||
         img.processed_at;
-      return hasResults && !(img.is_duplicate === 1 || img.is_duplicate === true);
+      return hasResults && !duplicateIds.has(img.image_id);
     })
     .map(img => img.image_id);
 }

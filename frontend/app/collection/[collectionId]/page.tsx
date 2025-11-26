@@ -32,7 +32,7 @@ export default function RunResultsPage() {
   const { models, selectedModelId, setSelectedModelId } = useModels();
   const { collectionId: resolvedCollectionId, collectionData, collection, images, latestRun, isRunning, threshold, setThreshold, loading, error, setError, setLoading } = useCollectionData(collectionId);
   const { successMessage, setSuccessMessage, recentlyUploadedImageIds, setRecentlyUploadedImageIds } = useStorageData();
-  const { uploading, handleFileInputChange } = useImageUpload(collectionId, setError, setLoading, setRecentlyUploadedImageIds);
+  const { uploading, handleFileInputChange } = useImageUpload(collectionId, setError, setLoading, setRecentlyUploadedImageIds, setSuccessMessage);
   const { deletingImageId, handleDeleteImage } = useImageDelete(collectionId, setError);
 
   // Use custom hook for run state management (flashing, green hue, etc.)

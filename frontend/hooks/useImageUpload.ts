@@ -2,15 +2,16 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { uploadImagesToCollection } from '@/lib/api';
 import { validateImageFiles } from '@/utils/validation';
-import { safeSetItem } from '@/utils/storage';
 import { filterNonDuplicateIds } from '@/utils/imageUtils';
 import { invalidateCollectionQuery } from '@/utils/queryUtils';
+import { formatUploadSuccessMessage } from '@/utils/messageUtils';
 
 export function useImageUpload(
   collectionId: number | null,
   setError: (error: string | null) => void,
   setLoading: (loading: boolean) => void,
-  setRecentlyUploadedImageIds: (ids: Set<number> | ((prev: Set<number>) => Set<number>)) => void
+  setRecentlyUploadedImageIds: (ids: Set<number> | ((prev: Set<number>) => Set<number>)) => void,
+  setSuccessMessage: (message: string | null) => void
 ) {
   const [uploading, setUploading] = useState(false);
   const queryClient = useQueryClient();
@@ -28,9 +29,9 @@ export function useImageUpload(
       const nonDuplicateIds = filterNonDuplicateIds(uploadedImageIds, duplicateImageIds);
       setRecentlyUploadedImageIds(new Set(nonDuplicateIds));
       
-      // Store counts in localStorage for display
-      await safeSetItem('uploadedImageCount', addedCount.toString());
-      await safeSetItem('duplicateImageCount', duplicateCount.toString());
+      // Set success message immediately
+      const message = formatUploadSuccessMessage(addedCount, duplicateCount);
+      setSuccessMessage(message);
       
       // Invalidate and refetch collection data
       invalidateCollectionQuery(queryClient, collectionId);

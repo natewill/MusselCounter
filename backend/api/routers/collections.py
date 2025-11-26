@@ -170,6 +170,14 @@ async def recalculate_threshold_endpoint(
 
         run_id = run_row[0]
 
+        # Debug: Check how many detections exist for this run
+        debug_cursor = await db.execute(
+            "SELECT COUNT(*) FROM detection WHERE run_id = ?",
+            (run_id,)
+        )
+        detection_count = (await debug_cursor.fetchone())[0]
+        logger.info(f"[RECALCULATE] Found {detection_count} detections for run {run_id} with threshold {threshold}")
+
         # Query detections and recalculate counts with new threshold
         # Count logic:
         # - If class IS NOT NULL (manual override), always count it
@@ -194,6 +202,7 @@ async def recalculate_threshold_endpoint(
         )
 
         rows = await cursor.fetchall()
+        logger.info(f"[RECALCULATE] Recalculated counts for {len(rows)} images")
 
         # Build response
         images_dict = {}

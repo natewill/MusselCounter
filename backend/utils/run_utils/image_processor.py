@@ -26,12 +26,59 @@ async def _record_error(db_path: str, run_id: int, image_id: int, message: str) 
     return (image_id, False, 0, 0)
 
 
-async def _run_inference(model_device, image_path: str, threshold: float, model_type: str):
+async def _get_counts_from_db(db_path: str, run_id: int, image_id: int, threshold: float) -> tuple[int, int]:
+    """
+    Query the database to get live/dead counts for an image based on threshold.
+    
+    Uses the same logic as the recalculation endpoint:
+    - If class IS NOT NULL (manual override), always count it
+    - If class IS NULL (auto mode), count if confidence >= threshold
+    
+    Args:
+        db_path: Path to database
+        run_id: Run ID
+        image_id: Image ID
+        threshold: Threshold to filter by
+        
+    Returns:
+        Tuple of (live_count, dead_count)
+    """
+    async with aiosqlite.connect(db_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            """SELECT
+                   SUM(CASE
+                       WHEN class = 'live' THEN 1
+                       WHEN class IS NULL AND confidence >= ? AND original_class = 'live' THEN 1
+                       ELSE 0
+                   END) as live_count,
+                   SUM(CASE
+                       WHEN class = 'dead' THEN 1
+                       WHEN class IS NULL AND confidence >= ? AND original_class = 'dead' THEN 1
+                       ELSE 0
+                   END) as dead_count
+               FROM detection
+               WHERE run_id = ? AND image_id = ?""",
+            (threshold, threshold, run_id, image_id)
+        )
+        row = await cursor.fetchone()
+        live_count = row['live_count'] or 0
+        dead_count = row['dead_count'] or 0
+        return (live_count, dead_count)
+
+
+async def _run_inference(model_device, image_path: str, model_type: str):
+    """
+    Run inference on a single image.
+    
+    Note: Inference always returns ALL detections (no threshold filtering).
+    Counts are calculated by querying the database after detections are saved.
+    """
     to_thread = getattr(asyncio, "to_thread", None)
     if to_thread:
-        return await to_thread(run_inference_on_image, model_device, image_path, threshold, model_type)
+        return await to_thread(run_inference_on_image, model_device, image_path, model_type)
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, run_inference_on_image, model_device, image_path, threshold, model_type)
+    return await loop.run_in_executor(None, run_inference_on_image, model_device, image_path, model_type)
 
 
 def _save_polygons(image_id: int, result: dict, threshold: float) -> Optional[str]:
@@ -126,14 +173,26 @@ async def process_image_for_run(
         if not Path(image_path).exists():
             return await _record_error(db_path, run_id, image_id, f"Image file not found: {image_path}")
         try:
-            result = await _run_inference(model_device, image_path, threshold, model_type)
+            result = await _run_inference(model_device, image_path, model_type)
         except Exception as exc:
             logger.error("Inference error for image %s: %s", image_id, exc, exc_info=True)
             return await _record_error(db_path, run_id, image_id, f"Inference error: {exc}")
-        polygon_path = _save_polygons(image_id, result, threshold)
-
-        # Save individual detections to database for threshold recalculation
+        
+        # Save ALL detections to database (threshold 0.0)
         await _save_detections_to_db(db_path, run_id, image_id, result)
+
+        # Query database to get counts based on run's threshold
+        # This uses the same logic as the recalculation endpoint
+        try:
+            live_count, dead_count = await _get_counts_from_db(db_path, run_id, image_id, threshold)
+        except Exception as e:
+            logger.error(f"Failed to get counts from DB for image {image_id}: {e}", exc_info=True)
+            # Fallback: count all detections (shouldn't happen, but safe fallback)
+            live_count = sum(1 for p in result['polygons'] if p.get('class') == 'live')
+            dead_count = sum(1 for p in result['polygons'] if p.get('class') == 'dead')
+        
+        # Save polygon JSON with filtered counts
+        polygon_path = _save_polygons(image_id, {**result, 'live_count': live_count, 'dead_count': dead_count}, threshold)
 
         now = datetime.now().isoformat()
         async with aiosqlite.connect(db_path) as db:
@@ -145,10 +204,10 @@ async def process_image_for_run(
                 """INSERT OR REPLACE INTO image_result
                    (run_id, image_id, live_mussel_count, dead_mussel_count, polygon_path, processed_at, error_msg)
                    VALUES (?, ?, ?, ?, ?, ?, NULL)""",
-                (run_id, image_id, result["live_count"], result["dead_count"], polygon_path, now),
+                (run_id, image_id, live_count, dead_count, polygon_path, now),
             )
             await db.commit()
-        return (image_id, True, result["live_count"], result["dead_count"])
+        return (image_id, True, live_count, dead_count)
     except Exception as exc:
         logger.error("Error processing image %s: %s", image_id, exc, exc_info=True)
         return await _record_error(db_path, run_id, image_id, f"Processing error: {exc}")

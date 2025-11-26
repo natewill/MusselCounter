@@ -15,7 +15,7 @@ from utils.security import validate_integer_id, sanitize_filename, validate_path
 from utils.validation import validate_file_size
 from api.schemas import ModelResponse
 from config import MODELS_DIR, MAX_MODEL_SIZE
-from datetime import datetime
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 
@@ -188,7 +188,7 @@ async def create_model_endpoint(
             )
         
         # Insert new model
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         logger.info(f"[MODEL_UPLOAD] Inserting new model: name={model_name}, type={model_type}, path={file_path}")
         cursor = await db.execute(
             """INSERT INTO model (name, type, weights_path, description, optimal_batch_size, created_at, updated_at)

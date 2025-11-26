@@ -3,7 +3,7 @@ Collection utility functions for managing collections and their images.
 Handles collection creation, image retrieval with results, and collection operations.
 """
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 import aiosqlite
 
 
@@ -23,7 +23,7 @@ async def create_collection(
     Returns:
         Collection ID of the created collection
     """
-    now = datetime.now().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     cursor = await db.execute(
         """INSERT INTO collection (name, description, created_at, updated_at)
            VALUES (?, ?, ?, ?)""",
@@ -210,6 +210,25 @@ async def get_latest_run(db: aiosqlite.Connection, collection_id: int):
     return await cursor.fetchone()
 
 
+async def get_latest_run_by_model(db: aiosqlite.Connection, collection_id: int, model_id: int):
+    """
+    Get the most recent run for a collection with a specific model.
+    
+    Args:
+        db: Database connection
+        collection_id: Collection ID
+        model_id: Model ID to filter by
+        
+    Returns:
+        Row with run data, or None if no runs exist for that model
+    """
+    cursor = await db.execute(
+        "SELECT * FROM run WHERE collection_id = ? AND model_id = ? ORDER BY run_id DESC LIMIT 1",
+        (collection_id, model_id)
+    )
+    return await cursor.fetchone()
+
+
 async def get_all_runs(db: aiosqlite.Connection, collection_id: int):
     """
     Get all runs for a collection, ordered by run_id (newest first).
@@ -253,7 +272,7 @@ async def update_collection(
         values.append(description)
     if updates:
         updates.append("updated_at = ?")
-        values.append(datetime.now().isoformat())
+        values.append(datetime.now(timezone.utc).isoformat())
         values.append(collection_id)
         query = f"UPDATE collection SET {', '.join(updates)} WHERE collection_id = ?"
         await db.execute(query, values)

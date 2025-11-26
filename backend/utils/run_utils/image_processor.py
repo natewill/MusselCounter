@@ -1,6 +1,6 @@
 import asyncio
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 import aiosqlite
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 async def _record_error(db_path: str, run_id: int, image_id: int, message: str) -> tuple[int, bool, int, int]:
     try:
         async with aiosqlite.connect(db_path) as db:
-            now = datetime.now().isoformat()
+            now = datetime.now(timezone.utc).isoformat()
             await db.execute(
                 """INSERT OR REPLACE INTO image_result
                        (run_id, image_id, live_mussel_count, dead_mussel_count, polygon_path, processed_at, error_msg)
@@ -119,7 +119,7 @@ async def _save_detections_to_db(db_path: str, run_id: int, image_id: int, resul
             logger.debug(f"No polygons to save for image {image_id}")
             return
 
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         detection_rows = []
 
         for polygon in polygons:
@@ -194,7 +194,7 @@ async def process_image_for_run(
         # Save polygon JSON with filtered counts
         polygon_path = _save_polygons(image_id, {**result, 'live_count': live_count, 'dead_count': dead_count}, threshold)
 
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         async with aiosqlite.connect(db_path) as db:
             await db.execute(
                 """UPDATE image SET width = ?, height = ?, updated_at = ? WHERE image_id = ?""",

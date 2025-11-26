@@ -260,9 +260,9 @@ def _run_yolo(model_device_tuple, image_paths):
     paths = image_paths if isinstance(image_paths, list) else [image_paths]
     
     # Run YOLO inference
-    # conf=0.0: Always get ALL detections (threshold filtering happens later for display)
+    # conf=0.01: Minimum confidence threshold for YOLO detections (filters out very low confidence detections)
     # verbose=False: Don't print progress to console
-    detections = model(paths, conf=0.0, verbose=False)
+    detections = model(paths, conf=0.01, verbose=False)
     
     # Process results for each image
     outputs = []

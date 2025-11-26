@@ -1,4 +1,4 @@
-export default function RunStatus({ latestRun, isRunning, images, onStopRun, stopping }) {
+export default function RunStatus({ latestRun, isRunning, images, onStopRun, stopping, serverTime }) {
   // Calculate values first for logging and use later
   // Use processed_count from run table for accurate real-time progress (updated as batches complete)
   // Fall back to counting images with counts if processed_count not available
@@ -46,13 +46,42 @@ export default function RunStatus({ latestRun, isRunning, images, onStopRun, sto
   const processedImages = processedImagesCalc;
   const progress = progressCalc;
 
+  const parseDate = (value) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+    // If timestamp is missing timezone information, assume UTC
+    return new Date(`${value}Z`);
+  };
+
   // Calculate duration
   const getDuration = () => {
-    if (!latestRun.started_at) return null;
-    const startTime = new Date(latestRun.started_at);
-    const endTime = latestRun.finished_at ? new Date(latestRun.finished_at) : new Date();
-    const durationMs = endTime - startTime;
+    if (!latestRun?.started_at) return null;
+    
+    const startTime = parseDate(latestRun.started_at);
+    if (!startTime || Number.isNaN(startTime.getTime())) {
+      return null;
+    }
+    
+    let endTime = null;
+    if (latestRun.finished_at) {
+      endTime = parseDate(latestRun.finished_at);
+    } else if (serverTime) {
+      endTime = parseDate(serverTime);
+    }
+    
+    if (!endTime || Number.isNaN(endTime.getTime())) {
+      endTime = new Date();
+    }
+
+    const durationMs = endTime.getTime() - startTime.getTime();
     const durationSeconds = durationMs / 1000;
+    
+    if (durationSeconds < 0) {
+      return '0.0s';
+    }
     
     if (durationSeconds < 60) {
       return `${durationSeconds.toFixed(1)}s`;
@@ -157,12 +186,18 @@ export default function RunStatus({ latestRun, isRunning, images, onStopRun, sto
         )}
         {latestRun.started_at && (
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            Started: {new Date(latestRun.started_at).toLocaleString()}
+            Started: {(() => {
+              const parsed = parseDate(latestRun.started_at);
+              return parsed && !Number.isNaN(parsed.getTime()) ? parsed.toLocaleString() : '—';
+            })()}
           </div>
         )}
         {latestRun.finished_at && (
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            Finished: {new Date(latestRun.finished_at).toLocaleString()}
+            Finished: {(() => {
+              const parsed = parseDate(latestRun.finished_at);
+              return parsed && !Number.isNaN(parsed.getTime()) ? parsed.toLocaleString() : '—';
+            })()}
           </div>
         )}
       </div>

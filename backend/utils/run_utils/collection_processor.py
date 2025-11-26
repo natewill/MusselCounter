@@ -66,7 +66,7 @@ import asyncio
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import aiosqlite
@@ -219,7 +219,7 @@ async def _handle_all_images_processed(db: aiosqlite.Connection, run_id: int, co
     row = await cursor.fetchone()
     total_live_count = row[0] or 0
     
-    now = datetime.now().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     await db.execute(
         """UPDATE run 
            SET status = 'completed', 
@@ -277,7 +277,7 @@ async def _process_batch_inference(
             results = await _batch_infer(model_type, model_device, image_paths)
             polygon_dir = Path("data/polygons")
             polygon_dir.mkdir(parents=True, exist_ok=True)
-            now = datetime.now().isoformat()
+            now = datetime.now(timezone.utc).isoformat()
             batch_results = []
             updates = []
             for (image_id, _, _), result in zip(image_data, results):
@@ -342,7 +342,7 @@ async def _process_batch_inference(
             processed_count += len(batch_result)
             if updates:
                 async with aiosqlite.connect(db_path) as db_batch:
-                    dimension_updates = [(width, height, datetime.now().isoformat(), image_id) 
+                    dimension_updates = [(width, height, datetime.now(timezone.utc).isoformat(), image_id) 
                                         for _, _, _, _, width, height, image_id in updates]
                     await db_batch.executemany(
                         """UPDATE image 
@@ -438,10 +438,19 @@ async def _finalize_run(
     run_id: int,
     collection_id: int,
     results: list,
-    total_images: int
+    images_processed_in_this_run: int,
+    images_already_done: int = 0
 ):
     """
     Aggregate results and update run status to completed.
+    
+    Args:
+        db: Database connection
+        run_id: Run ID
+        collection_id: Collection ID
+        results: List of (image_id, success, live_count, dead_count) tuples from this run
+        images_processed_in_this_run: Number of images that were processed in this run
+        images_already_done: Number of images that were already processed before this run
     """
     successes = [result for result in results if result[1]]
     successful_images = len(successes)
@@ -455,8 +464,11 @@ async def _finalize_run(
     total_live_count = row[0] or 0
     
     # Update run with final results
-    now = datetime.now().isoformat()
-    final_status = 'completed' if successful_images == total_images else 'completed_with_errors'
+    now = datetime.now(timezone.utc).isoformat()
+    # Compare successful images to images processed in THIS run, not total collection
+    # This fixes the issue where deleting and re-uploading images causes false "completed_with_errors"
+    total_expected = images_processed_in_this_run + images_already_done
+    final_status = 'completed' if successful_images == images_processed_in_this_run else 'completed_with_errors'
     
     await db.execute(
         """UPDATE run 
@@ -465,13 +477,13 @@ async def _finalize_run(
                status = ?,
                finished_at = ?
            WHERE run_id = ?""",
-        (total_images, total_live_count, final_status, now, run_id)
+        (total_expected, total_live_count, final_status, now, run_id)
     )
     
     # Update collection live_mussel_count from run's count
     await db.execute(
         "UPDATE collection SET live_mussel_count = ?, updated_at = ? WHERE collection_id = ?",
-        (total_live_count, datetime.now().isoformat(), collection_id)
+        (total_live_count, datetime.now(timezone.utc).isoformat(), collection_id)
     )
     
     await db.commit()
@@ -539,7 +551,7 @@ async def process_collection_run(db: aiosqlite.Connection, run_id: int):
             )
         
         # Finalize: Aggregate results and update status
-        await _finalize_run(db, run_id, collection_id, results, total_images)
+        await _finalize_run(db, run_id, collection_id, results, len(images_to_process), images_already_done)
         
     except Exception as e:
         await _fail(db, run_id, f"Run processing error: {e}")

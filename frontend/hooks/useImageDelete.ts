@@ -5,7 +5,8 @@ import { invalidateCollectionQuery } from '@/utils/queryUtils';
 
 export function useImageDelete(
   collectionId: number | null,
-  setError: (error: string | null) => void
+  setError: (error: string | null) => void,
+  isRunning: boolean = false
 ) {
   const [deletingImageId, setDeletingImageId] = useState<number | null>(null);
   const queryClient = useQueryClient();
@@ -26,6 +27,10 @@ export function useImageDelete(
 
   const handleDeleteImage = async (imageId: number) => {
     if (!collectionId) return;
+    if (isRunning) {
+      setError('Cannot delete images while a run is in progress');
+      return;
+    }
     
     setDeletingImageId(imageId);
     setError(null);

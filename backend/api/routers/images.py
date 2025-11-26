@@ -12,7 +12,7 @@ from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
 from db import get_db
 from utils.security import validate_integer_id
-from datetime import datetime
+from datetime import datetime, timezone
 
 router = APIRouter(prefix="/api/images", tags=["images"])
 
@@ -346,7 +346,7 @@ async def update_polygon_classification(
         dead_count = counts['dead_count'] or 0
 
         # Update image_result
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         await db.execute("""
             UPDATE image_result
             SET live_mussel_count = ?,

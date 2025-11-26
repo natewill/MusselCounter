@@ -257,9 +257,15 @@ export async function uploadModel(
 /**
  * Get collection details including images and latest run
  */
-export async function getCollection(collectionId: number) {
+export async function getCollection(collectionId: number, modelId?: number | null) {
   const validatedCollectionId = validateCollectionId(collectionId);
-  const response = await apiClient.get(`/api/collections/${validatedCollectionId}`);
+  const params = new URLSearchParams();
+  if (modelId !== null && modelId !== undefined) {
+    params.set('model_id', modelId.toString());
+  }
+  const queryString = params.toString();
+  const url = `/api/collections/${validatedCollectionId}${queryString ? `?${queryString}` : ''}`;
+  const response = await apiClient.get(url);
   return response.data;
 }
 

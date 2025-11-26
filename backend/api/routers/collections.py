@@ -11,9 +11,9 @@ A collection is a collection of images that can be processed together through
 inference runs. Images are deduplicated by hash, so the same image file
 uploaded multiple times only stores one copy.
 """
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from db import get_db
 from utils.collection_utils import (
@@ -23,6 +23,7 @@ from utils.collection_utils import (
     get_collection_images,
     get_collection_images_with_results,
     get_latest_run,
+    get_latest_run_by_model,
     get_all_runs,
     remove_image_from_collection,
 )
@@ -70,9 +71,18 @@ async def get_all_collections_endpoint() -> List[CollectionListResponse]:
 
 
 @router.get("/{collection_id}", response_model=Dict)
-async def get_collection_endpoint(collection_id: int) -> Dict:
+async def get_collection_endpoint(
+    collection_id: int,
+    model_id: Optional[int] = None
+) -> Dict:
     """
     Get detailed information about a specific collection.
+    
+    Args:
+        collection_id: Collection ID
+        model_id: Optional model ID to filter results by. If provided, returns images
+                  with results from the latest run using that model. If not provided,
+                  returns images with results from the overall latest run.
     
     Returns:
     - Collection metadata (name, description, etc.)
@@ -89,8 +99,13 @@ async def get_collection_endpoint(collection_id: int) -> Dict:
         if not collection:
             raise HTTPException(status_code=404, detail="Collection not found")
         
-        # Get latest run to show results from most recent inference
-        latest_run = await get_latest_run(db, collection_id)
+        # Get latest run - either for specific model or overall latest
+        if model_id is not None:
+            model_id = validate_integer_id(model_id)
+            latest_run = await get_latest_run_by_model(db, collection_id, model_id)
+        else:
+            latest_run = await get_latest_run(db, collection_id)
+        
         if latest_run:
             # If there's a latest run, get images with their results from that run
             latest_run_dict = dict[Any, Any](latest_run)
@@ -112,6 +127,7 @@ async def get_collection_endpoint(collection_id: int) -> Dict:
             "images": [dict(img) for img in images],
             "latest_run": dict(latest_run) if latest_run else None,
             "all_runs": [dict(run) for run in all_runs],
+            "server_time": datetime.now(timezone.utc).isoformat(),
         }
 
 
@@ -211,7 +227,7 @@ async def recalculate_threshold_endpoint(
         images_dict = {}
         live_total = 0
         dead_total = 0
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         # Update each image_result with new counts
         for row in rows:
@@ -361,12 +377,27 @@ async def delete_image_from_collection_endpoint(
         if not await remove_image_from_collection(db, collection_id, image_id):
             raise HTTPException(status_code=404, detail="Image not found")
         
-        # Find all runs that processed this image
+        # Find all runs in this collection that processed this image
         runs_cursor = await db.execute(
-            """SELECT DISTINCT run_id FROM image_result WHERE image_id = ?""",
-            (image_id,)
+            """SELECT DISTINCT ir.run_id
+               FROM image_result ir
+               JOIN run r ON ir.run_id = r.run_id
+               WHERE ir.image_id = ? AND r.collection_id = ?""",
+            (image_id, collection_id)
         )
         affected_runs = await runs_cursor.fetchall()
+        
+        # Delete image_result records for this image from runs in this collection
+        # This ensures that when the image is re-added, it won't be marked as already processed
+        if affected_runs:
+            run_ids = [row[0] for row in affected_runs]
+            placeholders = ','.join(['?'] * len(run_ids))
+            await db.execute(
+                f"""DELETE FROM image_result 
+                   WHERE image_id = ? AND run_id IN ({placeholders})""",
+                (image_id, *run_ids)
+            )
+            logger.info(f"Deleted {len(affected_runs)} image_result records for image {image_id} from collection {collection_id}")
         
         # Recalculate counts for each affected run
         for run_row in affected_runs:
@@ -375,8 +406,7 @@ async def delete_image_from_collection_endpoint(
             # Recalculate totals from remaining image results in this run
             totals_cursor = await db.execute(
                 """SELECT 
-                       SUM(live_mussel_count) as total_live,
-                       SUM(dead_mussel_count) as total_dead
+                       SUM(live_mussel_count) as total_live
                    FROM image_result
                    WHERE run_id = ?""",
                 (run_id,)
@@ -384,7 +414,7 @@ async def delete_image_from_collection_endpoint(
             totals = await totals_cursor.fetchone()
             total_live = totals['total_live'] or 0
             
-            # Update run totals
+            # Update run totals (run table only has live_mussel_count)
             await db.execute(
                 """UPDATE run
                    SET live_mussel_count = ?
@@ -398,9 +428,10 @@ async def delete_image_from_collection_endpoint(
             collection_live_count = latest_run['live_mussel_count'] or 0
             await db.execute(
                 """UPDATE collection 
-                   SET live_mussel_count = ?, updated_at = ?
+                   SET live_mussel_count = ?,
+                       updated_at = ?
                    WHERE collection_id = ?""",
-                (collection_live_count, datetime.now().isoformat(), collection_id)
+                (collection_live_count, datetime.now(timezone.utc).isoformat(), collection_id)
             )
         
         await db.commit()

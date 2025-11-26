@@ -2,7 +2,7 @@
 Database utilities for run management
 """
 import aiosqlite
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 
@@ -42,13 +42,13 @@ async def get_or_create_run(
             await db.execute(
                 """UPDATE run SET status = 'pending', started_at = ? 
                    WHERE run_id = ?""",
-                (datetime.now().isoformat(), run_id)
+                (datetime.now(timezone.utc).isoformat(), run_id)
             )
             await db.commit()
         return (run_id, False)
     
     # Create new run
-    now = datetime.now().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     cursor = await db.execute(
         """INSERT INTO run (collection_id, model_id, started_at, status, threshold)
            VALUES (?, ?, ?, ?, ?)""",
@@ -109,7 +109,7 @@ async def update_run_status(
     # Set finished_at if status is completed or failed
     if status in ('completed', 'failed', 'completed_with_errors'):
         updates.append("finished_at = ?")
-        values.append(datetime.now().isoformat())
+        values.append(datetime.now(timezone.utc).isoformat())
     
     values.append(run_id)
     

@@ -136,11 +136,17 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      onDeleteImage(image.image_id);
+                      if (!isRunning) {
+                        onDeleteImage(image.image_id);
+                      }
                     }}
-                    disabled={deletingImageId === image.image_id}
-                    className="absolute top-2 right-2 p-1 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-sm rounded text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                    title="Remove image from collection"
+                    disabled={isRunning || deletingImageId === image.image_id}
+                    className={`absolute top-2 right-2 p-1 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-sm rounded z-10 ${
+                      isRunning || deletingImageId === image.image_id
+                        ? 'text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50'
+                        : 'text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300'
+                    }`}
+                    title={isRunning ? "Cannot delete images while a run is in progress" : "Remove image from collection"}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

@@ -11,7 +11,7 @@ import aiosqlite
 from contextlib import asynccontextmanager
 from config import DB_PATH, SCHEMA_PATH, RESET_DB_ON_STARTUP, MODELS_DIR
 from utils.logger import logger
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 async def _initialize_models(db: aiosqlite.Connection):
@@ -51,7 +51,7 @@ async def _initialize_models(db: aiosqlite.Connection):
         if not existing:
             # Add model to database (batch size will be detected on first load)
             logger.info(f"Adding model: {model_file.name} ({model_type})")
-            now = datetime.now().isoformat()
+            now = datetime.now(timezone.utc).isoformat()
             await db.execute(
                 """INSERT INTO model (name, type, weights_path, description, optimal_batch_size, created_at, updated_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?)""",
@@ -104,7 +104,7 @@ async def init_db() -> None:
     Note: In production, you'd want proper database migrations instead of
     deleting and recreating the database.
     """
-    from datetime import datetime
+    from datetime import datetime, timezone
     import os
 
     # Skip re-initialization if database already exists and reset flag is not set
@@ -146,7 +146,7 @@ async def init_db() -> None:
         if not existing_metadata:
             # Store database initialization timestamp (new database or existing without metadata)
             # Frontend can check this to detect database resets
-            init_timestamp = datetime.now().isoformat()
+            init_timestamp = datetime.now(timezone.utc).isoformat()
             await db.execute(
                 "INSERT OR REPLACE INTO db_metadata (key, value) VALUES (?, ?)",
                 ("db_init_timestamp", init_timestamp),

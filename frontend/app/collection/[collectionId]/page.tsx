@@ -32,10 +32,10 @@ export default function RunResultsPage() {
   
   // Custom hooks
   const { models, selectedModelId, setSelectedModelId } = useModels();
-  const { collectionId: resolvedCollectionId, collectionData, collection, images, latestRun, isRunning, threshold, setThreshold, loading, error, setError, setLoading } = useCollectionData(collectionId);
+  const { collectionId: resolvedCollectionId, collectionData, collection, images, latestRun, isRunning, serverTime, threshold, setThreshold, loading, error, setError, setLoading } = useCollectionData(collectionId, selectedModelId);
   const { successMessage, setSuccessMessage, recentlyUploadedImageIds, setRecentlyUploadedImageIds } = useStorageData();
   const { uploading, handleFileInputChange } = useImageUpload(collectionId, setError, setLoading, setRecentlyUploadedImageIds, setSuccessMessage);
-  const { deletingImageId, handleDeleteImage } = useImageDelete(collectionId, setError);
+  const { deletingImageId, handleDeleteImage } = useImageDelete(collectionId, setError, isRunning);
 
   // Use custom hook for run state management (flashing, green hue, etc.)
   const { flashingImageIds, greenHueImageIds } = useRunState(collectionData, recentlyUploadedImageIds, setRecentlyUploadedImageIds);
@@ -104,6 +104,7 @@ export default function RunResultsPage() {
             images={images} 
             onStopRun={handleStopRun}
             stopping={stopping}
+            serverTime={serverTime}
           />
           
           <ThresholdControl

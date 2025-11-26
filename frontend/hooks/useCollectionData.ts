@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getCollection } from '@/lib/api';
 import { safeGetNumber, safeSetItem } from '@/utils/storage';
 
-export function useCollectionData(collectionIdParam: number) {
+export function useCollectionData(collectionIdParam: number, selectedModelId?: number | null) {
   const [collectionId, setCollectionId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,8 +38,8 @@ export function useCollectionData(collectionIdParam: number) {
     error: collectionError,
     isLoading: collectionLoading,
   } = useQuery({
-    queryKey: ['collection', collectionId],
-    queryFn: () => getCollection(collectionId!),
+    queryKey: ['collection', collectionId, selectedModelId],
+    queryFn: () => getCollection(collectionId!, selectedModelId ?? undefined),
     enabled: !!collectionId,
     refetchInterval: (query) => {
       const data = query.state.data as Awaited<ReturnType<typeof getCollection>> | undefined;
@@ -107,6 +107,7 @@ export function useCollectionData(collectionIdParam: number) {
   const images = collectionData?.images || [];
   const latestRun = collectionData?.latest_run || null;
   const isRunning = latestRun && (latestRun.status === 'pending' || latestRun.status === 'running');
+  const serverTime = collectionData?.server_time ?? null;
 
   return {
     collectionId,
@@ -115,6 +116,7 @@ export function useCollectionData(collectionIdParam: number) {
     images,
     latestRun,
     isRunning,
+    serverTime,
     threshold,
     setThreshold,
     loading,

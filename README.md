@@ -2,6 +2,11 @@
 
 A web application for automated detection and counting of live and dead mussels in images using machine learning models (YOLO and Faster R-CNN).
 
+## Download
+- Get installers from GitHub Releases: https://github.com/natewill/MusselCounter/releases
+- Direct macOS (Apple Silicon) download (v0.1.0): https://github.com/natewill/MusselCounter/releases/download/v0.1.0/MusselCounter-0.1.0-arm64.dmg
+- For Windows/Linux, build on that OS with `cd electron && npm run dist`, upload the `.exe`/`.AppImage`/`.deb` from `dist/` to the same release, and add the links above. Update the version/filenames when you cut a new release.
+
 ## Setup
 
 ### Prerequisites

@@ -21,6 +21,7 @@ interface FullscreenImageModalProps {
   onClose: () => void;
   onPolygonClick: (index: number) => void;
   onPolygonHover: (index: number | null) => void;
+  imageRef?: React.RefObject<HTMLImageElement>;
 }
 
 export default function FullscreenImageModal({
@@ -35,8 +36,8 @@ export default function FullscreenImageModal({
   onClose,
   onPolygonClick,
   onPolygonHover,
+  imageRef,
 }: FullscreenImageModalProps) {
-  const fullscreenImageRef = useRef<HTMLImageElement>(null);
   const fullscreenContainerRef = useRef<HTMLDivElement>(null);
 
   // Add ESC key handler to close fullscreen
@@ -72,15 +73,15 @@ export default function FullscreenImageModal({
       </button>
 
       {/* Image container */}
-      <div 
+      <div
         className="relative max-w-full max-h-full"
         onClick={(e) => e.stopPropagation()}
         ref={fullscreenContainerRef}
       >
         {/* Image */}
-        <img 
-          ref={fullscreenImageRef}
-          src={imageUrl} 
+        <img
+          ref={imageRef}
+          src={imageUrl}
           alt={filename}
           className="max-w-full max-h-[95vh] object-contain rounded"
         />

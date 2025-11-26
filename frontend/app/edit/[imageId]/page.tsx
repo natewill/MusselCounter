@@ -99,17 +99,17 @@ export default function ImageDetailPage() {
   }, [imageId, modelIdFromQuery]);
 
   // Handle classification change for polygon/mussel
-  const handleClassificationChange = async (polygonIndex: number, newClass: 'live' | 'dead') => {
+  const handleClassificationChange = async (originalIndex: number, newClass: 'live' | 'dead') => {
     if (saving) return;
-    
+
     setSaving(true);
     try {
-      await updatePolygonClassification(imageId, modelIdFromQuery, polygonIndex, newClass);
-      
+      await updatePolygonClassification(imageId, modelIdFromQuery, originalIndex, newClass);
+
       // Refresh image data to show updated counts
       const updatedData = await getImageDetails(imageId, modelIdFromQuery);
       setImageData(updatedData);
-      
+
       // Close modal after successful update
       setSelectedPolygonIndex(null);
     } catch (err) {
@@ -150,14 +150,24 @@ export default function ImageDetailPage() {
     );
   }
 
-  const imageUrl = imageData.stored_path 
+  const imageUrl = imageData.stored_path
     ? `http://127.0.0.1:8000/uploads/${imageData.stored_path.split('/').pop()}`
     : null;
 
-  // Get selected polygon data for modal
-  const selectedPolygon = selectedPolygonIndex !== null && imageData.polygons 
-    ? imageData.polygons[selectedPolygonIndex] 
+  // Filter polygons by threshold - only show detections above the threshold
+  // Also keep track of original indices for editing
+  const filteredPolygonsWithIndices = imageData.polygons
+    .map((polygon, originalIndex) => ({ polygon, originalIndex }))
+    .filter(({ polygon }) => polygon.confidence >= imageData.threshold);
+
+  const filteredPolygons = filteredPolygonsWithIndices.map(({ polygon }) => polygon);
+
+  // Get selected polygon data and original index for modal
+  const selectedPolygonData = selectedPolygonIndex !== null && filteredPolygonsWithIndices[selectedPolygonIndex]
+    ? filteredPolygonsWithIndices[selectedPolygonIndex]
     : null;
+  const selectedPolygon = selectedPolygonData?.polygon || null;
+  const originalPolygonIndex = selectedPolygonData?.originalIndex ?? null;
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black p-8">
@@ -176,7 +186,7 @@ export default function ImageDetailPage() {
           <ImageDisplay
             imageUrl={imageUrl || ''}
             filename={imageData.filename}
-            polygons={imageData.polygons || []}
+            polygons={filteredPolygons}
             scale={imageScale}
             isEditMode={isEditMode}
             editingPolygonIndex={editingPolygonIndex}
@@ -194,7 +204,7 @@ export default function ImageDetailPage() {
           isOpen={isFullscreen}
           imageUrl={imageUrl || ''}
           filename={imageData.filename}
-          polygons={imageData.polygons || []}
+          polygons={filteredPolygons}
           scale={fullscreenScale}
           isEditMode={isEditMode}
           editingPolygonIndex={editingPolygonIndex}
@@ -205,6 +215,7 @@ export default function ImageDetailPage() {
             setIsFullscreen(false);
           }}
           onPolygonHover={(index) => setEditingPolygonIndex(index)}
+          imageRef={fullscreenImageRef}
         />
 
         <EditPolygonModal
@@ -214,8 +225,8 @@ export default function ImageDetailPage() {
           saving={saving}
           onClose={() => setSelectedPolygonIndex(null)}
           onClassificationChange={(newClass) => {
-            if (selectedPolygonIndex !== null) {
-              handleClassificationChange(selectedPolygonIndex, newClass);
+            if (originalPolygonIndex !== null) {
+              handleClassificationChange(originalPolygonIndex, newClass);
             }
           }}
         />

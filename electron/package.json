@@ -1,0 +1,85 @@
+{
+  "name": "mussel-counter-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Desktop Electron shell for MusselCounter",
+  "author": "MusselCounter Team",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "NODE_ENV=development electron .",
+    "pack": "npm run icons && electron-builder --dir",
+    "dist": "npm run icons && electron-builder",
+    "check-ports": "node scripts/check-ports.js",
+    "icons": "node scripts/generate-icons.js"
+  },
+  "devDependencies": {
+    "electron": "^30.0.0",
+    "electron-builder": "^24.13.1",
+    "icon-gen": "^3.0.0"
+  },
+  "build": {
+    "appId": "com.musselcounter.app",
+    "productName": "MusselCounter",
+    "asar": true,
+    "directories": {
+      "output": "../dist"
+    },
+    "files": [
+      "main.js",
+      "package.json",
+      "node_modules/**/*",
+      "scripts/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../backend",
+        "to": "backend",
+        "filter": [
+          "**/*",
+          "!venv/**",
+          "!.pytest_cache/**",
+          "!__pycache__/**",
+          "!*.db",
+          "!logs/**",
+          "!data/uploads/**",
+          "!data/polygons/**",
+          "!data/models/**"
+        ]
+      },
+      {
+        "from": "../frontend",
+        "to": "frontend",
+        "filter": [
+          "**/*",
+          "!.next/cache/**",
+          "!node_modules/.cache/**"
+        ]
+      },
+      {
+        "from": "../README.md",
+        "to": "README.md"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": "dmg",
+      "icon": "../frontend/public/icon.icns"
+    },
+    "dmg": {
+      "icon": "../frontend/public/icon.icns"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "../frontend/public/icon.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Utility",
+      "icon": "../frontend/public"
+    }
+  }
+}

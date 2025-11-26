@@ -81,6 +81,82 @@ npm run dev
 - **API Docs**: http://127.0.0.1:8000/docs (auto-generated Swagger UI)
 - **Image Uploads**: http://127.0.0.1:8000/uploads/{filename}
 
+### Desktop (Electron) App
+Launch the backend and frontend together in a desktop window.
+
+1) Install dependencies (one time):
+```bash
+cd frontend && npm install       # Next.js deps
+cd ../electron && npm install    # Electron shell
+```
+2) Prep the backend env (one time):
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+3) (Recommended) Build the frontend for faster startup:
+```bash
+cd frontend
+npm run build
+```
+4) Start the desktop app (spawns backend + frontend automatically):
+```bash
+cd electron
+npm start
+```
+
+Notes:
+- Uses `backend/venv` if present; otherwise falls back to `python3`/`python` on PATH.
+- Defaults to `next start` when a `.next` build exists; otherwise runs `next dev`. Force dev mode with `NEXT_DEV=true npm start`.
+- Uses ports `8000` (backend) and `3000` (frontend); make sure they are free before launching.
+- Quick preflight: `cd electron && npm run check-ports` to verify the ports are free.
+
+Build installers (Electron):
+```bash
+cd electron
+npm install          # if you have not already
+npm run icons        # regenerate icons from app/icon.svg
+# optional but recommended before packaging:
+cd ../frontend && npm run build && cd ../electron
+npm run dist         # builds icons + installers to dist/ (dmg on macOS, nsis on Windows, AppImage/deb on Linux)
+```
+Ensure Python is available on the target machine; the packaged app still shells out to the backend via uvicorn.
+Installers exclude `backend/venv`, uploads, polygons, and model weights—place your models into `backend/data/models/` on the target machine before running.
+
+App icon:
+- Uses the browser tab logo from `frontend/app/icon.svg`.
+- Generate platform icons automatically (creates `icon.icns`, `icon.ico`, `icon.png`) to `frontend/public/`:
+```bash
+cd electron
+npm install          # if you have not already
+npm run icons
+```
+- Packaging reads icons from `frontend/public/icon.icns|ico|png`; adjust `electron/package.json` if you move them.
+
+Distributing installers:
+- Build on each platform (mac builds .dmg, Windows builds .exe).
+- Upload the artifacts in `dist/` to a GitHub Release for the corresponding version.
+- Share direct links in docs, e.g.:
+  - macOS: `https://github.com/natewill/MusselCounter/releases/download/v0.1.0/MusselCounter-0.1.0-arm64.dmg`
+  - Windows: `https://github.com/natewill/MusselCounter/releases/download/v0.1.0/MusselCounter.Setup.0.1.0.exe`
+Update the version/filenames to match the artifacts produced in your `dist/` folder and the GitHub Release tag.
+
+Bundling Python (so end users don’t need it installed):
+1) On the build machine, create a self-contained runtime under `backend/python-runtime`:
+```bash
+cd backend
+python3 -m venv python-runtime
+source python-runtime/bin/activate
+pip install -r requirements.txt
+deactivate
+```
+2) Put your models in `backend/data/models/`.
+3) Build the frontend (`cd frontend && npm install && npm run build`).
+4) Package (`cd electron && npm install && npm run dist`).
+The packaged app will prefer `backend/python-runtime/bin/python3` (or `Scripts/python.exe` on Windows) so the sponsor doesn’t need system Python or pip.
+
 ---
 
 ## File Structure

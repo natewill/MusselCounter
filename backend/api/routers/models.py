@@ -174,17 +174,18 @@ async def create_model_endpoint(
         # Check if model with same path already exists in DB
         logger.info(f"[MODEL_UPLOAD] Checking for existing model with path: {file_path}")
         cursor = await db.execute(
-            "SELECT model_id FROM model WHERE weights_path = ?",
+            "SELECT model_id, name FROM model WHERE weights_path = ?",
             (str(file_path),)
         )
         existing = await cursor.fetchone()
         
         if existing:
-            logger.info(f"[MODEL_UPLOAD] Model already exists in DB with ID: {existing[0]}")
-            # Model already in database, return it
-            model = await get_model(db, existing[0])
-            logger.info(f"[MODEL_UPLOAD] Returning existing model")
-            return ModelResponse.model_validate(dict(model))
+            logger.error(f"[MODEL_UPLOAD] FAILED: Model already exists in DB with ID: {existing[0]}, name: {existing[1]}")
+            # Model already in database, return error instead of silently returning it
+            raise HTTPException(
+                status_code=400,
+                detail=f"Model '{existing[1]}' already exists. Please upload a different model file or use a different filename."
+            )
         
         # Insert new model
         now = datetime.now().isoformat()

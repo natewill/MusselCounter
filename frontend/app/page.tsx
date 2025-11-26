@@ -7,7 +7,8 @@ import UploadArea from '@/components/home/UploadArea';
 import ErrorDisplay from '@/components/home/ErrorDisplay';
 import { createQuickProcessCollection } from '@/utils/home/collection';
 import { handleFileSelect, handleDroppedItems } from '@/utils/home/files';
-import { safeGetNumber } from '@/utils/storage';
+import { safeGetNumber, safeRemoveItem } from '@/utils/storage';
+import { getCollection } from '@/lib/api';
 
 export default function Home() {
   const router = useRouter();
@@ -127,11 +128,25 @@ export default function Home() {
     try {
       let collectionId = activeCollectionId;
       
-      // Create a new collection if we don't have one
-      if (!collectionId) {
+      // If we have a stored collection ID, verify it still exists
+      if (collectionId) {
+        try {
+          await getCollection(collectionId);
+          // Collection exists, use it
+        } catch (err) {
+          // Collection doesn't exist (404 or other error), create new one
+          const errorMessage = err instanceof Error ? err.message : String(err);
+          console.warn('Collection not found, creating new one:', errorMessage);
+          setActiveCollectionId(null);
+          await safeRemoveItem('quickProcessCollectionId');
+          collectionId = await createQuickProcessCollection(setActiveCollectionId);
+        }
+      } else {
+        // No stored collection, create new one
         collectionId = await createQuickProcessCollection(setActiveCollectionId);
       }
-      // Just navigate to collection page - user will click "Start New Run" button there
+      
+      // Navigate to collection page
       router.push(`/collection/${collectionId}`);
       setLoading(false);
     } catch (err) {

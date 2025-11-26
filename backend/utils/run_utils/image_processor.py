@@ -66,41 +66,48 @@ async def _save_detections_to_db(db_path: str, run_id: int, image_id: int, resul
         image_id: ID of the image being processed
         result: Inference result dict containing polygons with confidence scores
     """
-    polygons = result.get("polygons", [])
-    if not polygons:
-        return
+    try:
+        polygons = result.get("polygons", [])
+        if not polygons:
+            logger.debug(f"No polygons to save for image {image_id}")
+            return
 
-    now = datetime.now().isoformat()
-    detection_rows = []
+        now = datetime.now().isoformat()
+        detection_rows = []
 
-    for polygon in polygons:
-        bbox = polygon.get("bbox", [])
-        bbox_x1 = bbox[0] if len(bbox) > 0 else None
-        bbox_y1 = bbox[1] if len(bbox) > 1 else None
-        bbox_x2 = bbox[2] if len(bbox) > 2 else None
-        bbox_y2 = bbox[3] if len(bbox) > 3 else None
+        for polygon in polygons:
+            bbox = polygon.get("bbox", [])
+            bbox_x1 = bbox[0] if len(bbox) > 0 else None
+            bbox_y1 = bbox[1] if len(bbox) > 1 else None
+            bbox_x2 = bbox[2] if len(bbox) > 2 else None
+            bbox_y2 = bbox[3] if len(bbox) > 3 else None
 
-        detection_rows.append((
-            run_id,
-            image_id,
-            polygon["confidence"],
-            polygon["class"],  # original_class
-            bbox_x1,
-            bbox_y1,
-            bbox_x2,
-            bbox_y2,
-            json.dumps(polygon.get("coords", [])),  # polygon_coords as JSON string
-            now,
-        ))
+            detection_rows.append((
+                run_id,
+                image_id,
+                polygon["confidence"],
+                polygon["class"],  # original_class
+                None,  # class (NULL for auto mode, can be manually overridden later)
+                bbox_x1,
+                bbox_y1,
+                bbox_x2,
+                bbox_y2,
+                json.dumps(polygon.get("coords", [])),  # polygon_coords as JSON string
+                now,
+            ))
 
-    async with aiosqlite.connect(db_path) as db:
-        await db.executemany(
-            """INSERT INTO detection
-               (run_id, image_id, confidence, original_class, bbox_x1, bbox_y1, bbox_x2, bbox_y2, polygon_coords, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            detection_rows,
-        )
-        await db.commit()
+        async with aiosqlite.connect(db_path) as db:
+            await db.executemany(
+                """INSERT INTO detection
+                   (run_id, image_id, confidence, original_class, class, bbox_x1, bbox_y1, bbox_x2, bbox_y2, polygon_coords, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                detection_rows,
+            )
+            await db.commit()
+            logger.info(f"Saved {len(detection_rows)} detections for image {image_id} in run {run_id}")
+    except Exception as exc:
+        logger.error(f"Failed to save detections for image {image_id} in run {run_id}: {exc}", exc_info=True)
+        # Don't raise - allow processing to continue even if detection saving fails
 
 
 async def process_image_for_run(

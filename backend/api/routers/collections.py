@@ -115,6 +115,114 @@ async def get_collection_endpoint(collection_id: int) -> Dict:
         }
 
 
+@router.get("/{collection_id}/recalculate", response_model=Dict)
+async def recalculate_threshold_endpoint(
+    collection_id: int,
+    threshold: float,
+    model_id: int
+) -> Dict:
+    """
+    Recalculate mussel counts for a new threshold without re-running the model.
+
+    Uses stored detection data from the latest run with the specified model
+    to recalculate counts based on the new threshold value.
+
+    Args:
+        collection_id: ID of the collection
+        threshold: New confidence threshold (0.0 - 1.0)
+        model_id: Model ID to use for recalculation
+
+    Returns:
+        {
+            "images": {
+                image_id: {"live_count": int, "dead_count": int},
+                ...
+            },
+            "totals": {"live_total": int, "dead_total": int},
+            "run_id": int or None
+        }
+    """
+    collection_id = validate_integer_id(collection_id)
+    model_id = validate_integer_id(model_id)
+
+    async with get_db() as db:
+        # Verify collection exists
+        collection = await get_collection(db, collection_id)
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Find the latest run for this collection with the specified model
+        cursor = await db.execute(
+            """SELECT run_id FROM run
+               WHERE collection_id = ? AND model_id = ?
+               ORDER BY run_id DESC LIMIT 1""",
+            (collection_id, model_id)
+        )
+        run_row = await cursor.fetchone()
+
+        if not run_row:
+            # No run exists for this model yet
+            return {
+                "images": {},
+                "totals": {"live_total": 0, "dead_total": 0},
+                "run_id": None
+            }
+
+        run_id = run_row[0]
+
+        # Query detections and recalculate counts with new threshold
+        # Count logic:
+        # - If class IS NOT NULL (manual override), always count it
+        # - If class IS NULL (auto mode), count if confidence >= threshold
+        cursor = await db.execute(
+            """SELECT
+                   image_id,
+                   SUM(CASE
+                       WHEN class = 'live' THEN 1
+                       WHEN class IS NULL AND confidence >= ? AND original_class = 'live' THEN 1
+                       ELSE 0
+                   END) as live_count,
+                   SUM(CASE
+                       WHEN class = 'dead' THEN 1
+                       WHEN class IS NULL AND confidence >= ? AND original_class = 'dead' THEN 1
+                       ELSE 0
+                   END) as dead_count
+               FROM detection
+               WHERE run_id = ?
+               GROUP BY image_id""",
+            (threshold, threshold, run_id)
+        )
+
+        rows = await cursor.fetchall()
+
+        # Build response
+        images_dict = {}
+        live_total = 0
+        dead_total = 0
+
+        for row in rows:
+            image_id = row[0]
+            live_count = row[1] or 0
+            dead_count = row[2] or 0
+
+            images_dict[image_id] = {
+                "live_count": live_count,
+                "dead_count": dead_count
+            }
+
+            live_total += live_count
+            dead_total += dead_count
+
+        return {
+            "images": images_dict,
+            "totals": {
+                "live_total": live_total,
+                "dead_total": dead_total
+            },
+            "run_id": run_id
+        }
+
+
 @router.post("/{collection_id}/upload-images", response_model=UploadResponse)
 async def upload_images_endpoint(
     collection_id: int,

@@ -1,9 +1,21 @@
 'use client';
 
-export default function ThresholdControl({ threshold, onThresholdChange, onStartNewRun, disabled, models, selectedModelId, onModelChange, imageCount }) {
+export default function ThresholdControl({ threshold, onThresholdChange, onStartNewRun, disabled, models, selectedModelId, onModelChange, imageCount, isRecalculating, hasRecalculatedData }) {
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg p-6 border border-zinc-200 dark:border-zinc-800 h-full flex flex-col">
-      <h2 className="text-xl font-semibold mb-4 text-zinc-900 dark:text-zinc-100">Run Settings</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Run Settings</h2>
+        {isRecalculating && (
+          <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded">
+            Recalculating...
+          </span>
+        )}
+        {!isRecalculating && hasRecalculatedData && (
+          <span className="text-xs px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded">
+            Using recalculated counts
+          </span>
+        )}
+      </div>
       <div className="space-y-4">
         {/* Model Picker */}
         <div className="flex items-center gap-4">

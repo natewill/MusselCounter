@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 
-export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, flashingImageIds, greenHueImageIds, isRunning, currentThreshold, latestRun }) {
+export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, flashingImageIds, greenHueImageIds, isRunning, currentThreshold, latestRun, recalculatedImages }) {
   // Sort images so recently processed ones (with green hue) appear at the top during a run
   const sortedImages = useMemo(() => {
     if (!isRunning || !greenHueImageIds || greenHueImageIds.size === 0) {
@@ -86,16 +86,10 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                               (image.dead_mussel_count !== null && image.dead_mussel_count !== undefined) ||
                               image.processed_at;
             
-            // Check if the image's result threshold matches the current threshold
-            // If threshold changed, image needs to be reprocessed
-            const resultThreshold = image.result_threshold;
-            const thresholdMatches = resultThreshold === null || resultThreshold === undefined || 
-                                    (currentThreshold !== null && currentThreshold !== undefined && 
-                                     Math.abs(resultThreshold - currentThreshold) < 0.001); // Allow small floating point differences
-            
-            // Check if results are valid for CURRENT model + threshold combination
-            // Results are only valid if: processed with selected model AND threshold matches
-            const hasValidResults = hasResults && isProcessedWithSelectedModel && thresholdMatches;
+            // Check if results are valid for CURRENT model
+            // With threshold recalculation, we only need to check if processed with selected model
+            // Threshold changes no longer require re-running the model
+            const hasValidResults = hasResults && isProcessedWithSelectedModel;
             
             // Check if this image should flash green (final flash on completion)
             const isFlashing = flashingImageIds && flashingImageIds.has(image.image_id);
@@ -186,13 +180,17 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                     <div>
                       <span className="text-zinc-600 dark:text-zinc-400">Live: </span>
                       <span className="font-medium text-green-600 dark:text-green-400">
-                        {image.live_mussel_count || 0}
+                        {recalculatedImages && recalculatedImages[image.image_id]
+                          ? recalculatedImages[image.image_id].live_count
+                          : (image.live_mussel_count || 0)}
                       </span>
                     </div>
                     <div>
                       <span className="text-zinc-600 dark:text-zinc-400">Dead: </span>
                       <span className="font-medium text-red-600 dark:text-red-400">
-                        {image.dead_mussel_count || 0}
+                        {recalculatedImages && recalculatedImages[image.image_id]
+                          ? recalculatedImages[image.image_id].dead_count
+                          : (image.dead_mussel_count || 0)}
                       </span>
                     </div>
                   </div>

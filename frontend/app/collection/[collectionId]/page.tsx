@@ -10,6 +10,7 @@ import { useImageDelete } from '@/hooks/useImageDelete';
 import { useStartRun } from '@/hooks/useStartRun';
 import { useStopRun } from '@/hooks/useStopRun';
 import { useRunState } from '@/hooks/useRunState';
+import { useThresholdRecalculation } from '@/hooks/useThresholdRecalculation';
 import PageHeader from '@/components/run/PageHeader';
 import CollectionTotals from '@/components/run/CollectionTotals';
 import RunStatus from '@/components/run/RunStatus';
@@ -40,9 +41,24 @@ export default function RunResultsPage() {
   
   // Handle starting new run
   const { handleStartNewRun } = useStartRun(collectionId, selectedModelId, threshold, loading, setLoading, setError);
-  
+
   // Handle stopping run (refresh data on success)
   const { stopping, handleStopRun } = useStopRun(setError, () => setLoading(true));
+
+  // Threshold recalculation without re-running model
+  const {
+    recalculatedImages,
+    recalculatedTotals,
+    isRecalculating,
+    hasRecalculatedData
+  } = useThresholdRecalculation(
+    collectionId,
+    threshold,
+    selectedModelId,
+    latestRun?.threshold,
+    latestRun?.model_id,
+    isRunning
+  );
 
   // Loading state
   if (loading && !collectionId) {
@@ -68,7 +84,12 @@ export default function RunResultsPage() {
 
         <ErrorDisplay error={error} onDismiss={() => setError(null)} />
 
-        <CollectionTotals collection={collection} imageCount={images.length} images={images} />
+        <CollectionTotals
+          collection={collection}
+          imageCount={images.length}
+          images={images}
+          recalculatedTotals={recalculatedTotals}
+        />
 
         {uploading && <UploadProgress />}
 
@@ -93,11 +114,13 @@ export default function RunResultsPage() {
             selectedModelId={selectedModelId}
             onModelChange={setSelectedModelId}
             imageCount={images.length}
+            isRecalculating={isRecalculating}
+            hasRecalculatedData={hasRecalculatedData}
           />
         </div>
 
-        <ImageList 
-          images={images} 
+        <ImageList
+          images={images}
           onDeleteImage={handleDeleteImage}
           deletingImageId={deletingImageId}
           selectedModelId={selectedModelId}
@@ -106,6 +129,7 @@ export default function RunResultsPage() {
           isRunning={isRunning}
           currentThreshold={threshold}
           latestRun={latestRun}
+          recalculatedImages={recalculatedImages}
         />
       </div>
     </div>

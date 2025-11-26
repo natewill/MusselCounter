@@ -393,22 +393,51 @@ export async function getImageDetails(imageId: number, runId: number) {
  * change the label of a polygon/mussel
  */
 export async function updatePolygonClassification(
-  imageId: number, 
-  runId: number, 
-  polygonIndex: number, 
+  imageId: number,
+  runId: number,
+  polygonIndex: number,
   newClass: 'live' | 'dead'
 ) {
   const validatedImageId = validateImageId(imageId);
   const validatedRunId = validateRunId(runId);
-  
+
   if (newClass !== 'live' && newClass !== 'dead') {
     throw new Error('Classification must be "live" or "dead"');
   }
-  
+
   const response = await apiClient.patch(
     `/api/images/${validatedImageId}/results/${validatedRunId}/polygons/${polygonIndex}`,
     { new_class: newClass }
   );
-  
+
+  return response.data;
+}
+
+/**
+ * Recalculate mussel counts for a collection with a new threshold
+ * without re-running the model. Uses stored detection data.
+ */
+export async function recalculateThreshold(
+  collectionId: number,
+  threshold: number,
+  modelId: number
+) {
+  const validatedCollectionId = validateCollectionId(collectionId);
+  const validatedModelId = validateModelId(modelId);
+
+  if (threshold < 0 || threshold > 1) {
+    throw new Error('Threshold must be between 0 and 1');
+  }
+
+  const response = await apiClient.get(
+    `/api/collections/${validatedCollectionId}/recalculate`,
+    {
+      params: {
+        threshold,
+        model_id: validatedModelId
+      }
+    }
+  );
+
   return response.data;
 }

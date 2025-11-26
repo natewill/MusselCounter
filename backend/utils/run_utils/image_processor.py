@@ -56,6 +56,53 @@ def _save_polygons(image_id: int, result: dict, threshold: float) -> Optional[st
     return str(polygon_path)
 
 
+async def _save_detections_to_db(db_path: str, run_id: int, image_id: int, result: dict) -> None:
+    """
+    Save individual detections to the detection table for threshold recalculation.
+
+    Args:
+        db_path: Path to SQLite database
+        run_id: ID of the current run
+        image_id: ID of the image being processed
+        result: Inference result dict containing polygons with confidence scores
+    """
+    polygons = result.get("polygons", [])
+    if not polygons:
+        return
+
+    now = datetime.now().isoformat()
+    detection_rows = []
+
+    for polygon in polygons:
+        bbox = polygon.get("bbox", [])
+        bbox_x1 = bbox[0] if len(bbox) > 0 else None
+        bbox_y1 = bbox[1] if len(bbox) > 1 else None
+        bbox_x2 = bbox[2] if len(bbox) > 2 else None
+        bbox_y2 = bbox[3] if len(bbox) > 3 else None
+
+        detection_rows.append((
+            run_id,
+            image_id,
+            polygon["confidence"],
+            polygon["class"],  # original_class
+            bbox_x1,
+            bbox_y1,
+            bbox_x2,
+            bbox_y2,
+            json.dumps(polygon.get("coords", [])),  # polygon_coords as JSON string
+            now,
+        ))
+
+    async with aiosqlite.connect(db_path) as db:
+        await db.executemany(
+            """INSERT INTO detection
+               (run_id, image_id, confidence, original_class, bbox_x1, bbox_y1, bbox_x2, bbox_y2, polygon_coords, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            detection_rows,
+        )
+        await db.commit()
+
+
 async def process_image_for_run(
     db_path: str,
     run_id: int,
@@ -77,6 +124,10 @@ async def process_image_for_run(
             logger.error("Inference error for image %s: %s", image_id, exc, exc_info=True)
             return await _record_error(db_path, run_id, image_id, f"Inference error: {exc}")
         polygon_path = _save_polygons(image_id, result, threshold)
+
+        # Save individual detections to database for threshold recalculation
+        await _save_detections_to_db(db_path, run_id, image_id, result)
+
         now = datetime.now().isoformat()
         async with aiosqlite.connect(db_path) as db:
             await db.execute(
@@ -84,7 +135,7 @@ async def process_image_for_run(
                 (result["image_width"], result["image_height"], now, image_id),
             )
             await db.execute(
-                """INSERT OR REPLACE INTO image_result 
+                """INSERT OR REPLACE INTO image_result
                    (run_id, image_id, live_mussel_count, dead_mussel_count, polygon_path, processed_at, error_msg)
                    VALUES (?, ?, ?, ?, ?, ?, NULL)""",
                 (run_id, image_id, result["live_count"], result["dead_count"], polygon_path, now),

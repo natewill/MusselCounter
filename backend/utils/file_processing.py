@@ -12,7 +12,6 @@ import aiosqlite
 import aiofiles
 from fastapi import UploadFile
 
-from utils.logger import logger
 from utils.security import sanitize_filename, validate_path_in_directory
 from utils.file_validation_lib import validate_image_content, validate_file_size
 from config import UPLOAD_DIR, MAX_FILE_SIZE
@@ -87,10 +86,8 @@ async def process_single_file(
             except FileExistsError:
                 counter += 1
                 continue
-            except Exception as e:
-                logger.exception("Failed to save upload: %s", e)
+            except Exception:
                 return None
 
-    except Exception as e:
-        logger.exception("process_single_file unexpected error: %s", e)
+    except Exception:
         return None

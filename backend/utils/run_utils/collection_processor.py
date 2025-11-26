@@ -64,7 +64,6 @@ With batching (batch_size=4):
 """
 import asyncio
 import json
-import logging
 import os
 from datetime import datetime, timezone
 from pathlib import Path
@@ -78,8 +77,6 @@ from utils.model_utils.inference import run_rcnn_inference_batch, run_yolo_infer
 from utils.model_utils.loader import load_model
 from .db import get_run, update_run_status
 from .image_processor import process_image_for_run, _save_detections_to_db, _get_counts_from_db
-
-logger = logging.getLogger(__name__)
 
 # Manual override settings (takes precedence over environment variables and auto-detection)
 # Set these to override automatic batch size and concurrency detection
@@ -98,11 +95,10 @@ async def _fail(db: aiosqlite.Connection, run_id: int, message: str, status: str
         message: Error message
         status: Status to set (default: 'failed')
     """
-    logger.error(f"[RUN {run_id}] {message}")
     try:
         await update_run_status(db, run_id, status, message)
     except Exception:
-        logger.exception(f"[RUN {run_id}] Failed to update status [{status}]")
+        pass
 
 
 async def _batch_infer(model_type: str, model_device, image_paths: list[str]):
@@ -235,7 +231,6 @@ async def _handle_all_images_processed(db: aiosqlite.Connection, run_id: int, co
         (total_live_count, now, collection_id)
     )
     await db.commit()
-    logger.info(f"[RUN {run_id}] All images already processed")
 
 
 async def _process_batch_inference(
@@ -259,7 +254,6 @@ async def _process_batch_inference(
     auto_max_concurrent = 1
     batch_size = MANUAL_BATCH_SIZE or int(os.getenv("INFERENCE_BATCH_SIZE", auto_batch_size))
     max_concurrent_batches = MANUAL_MAX_CONCURRENT_BATCHES or int(os.getenv("MAX_CONCURRENT_BATCHES", auto_max_concurrent))
-    logger.info(f"[RUN {run_id}] Using batch_size={batch_size}, max_concurrent={max_concurrent_batches}")
     
     semaphore = asyncio.Semaphore(max_concurrent_batches)
     
@@ -287,14 +281,13 @@ async def _process_batch_inference(
                 try:
                     await _save_detections_to_db(db_path, run_id, image_id, result)
                 except Exception as e:
-                    logger.error(f"Failed to save detections for image {image_id}: {e}", exc_info=True)
+                    pass
                 
                 # Query database to get counts based on run's threshold
                 # This uses the same logic as the recalculation endpoint
                 try:
                     live_count, dead_count = await _get_counts_from_db(db_path, run_id, image_id, threshold)
                 except Exception as e:
-                    logger.error(f"Failed to get counts from DB for image {image_id}: {e}", exc_info=True)
                     # Fallback: count all detections (shouldn't happen, but safe fallback)
                     live_count = sum(1 for p in result['polygons'] if p.get('class') == 'live')
                     dead_count = sum(1 for p in result['polygons'] if p.get('class') == 'dead')
@@ -487,7 +480,6 @@ async def _finalize_run(
     )
     
     await db.commit()
-    logger.info(f"[RUN {run_id}] Completed with {total_live_count} live detections")
 
 
 async def process_collection_run(db: aiosqlite.Connection, run_id: int):
@@ -570,4 +562,3 @@ async def process_collection_run(db: aiosqlite.Connection, run_id: int):
                 # All images already processed - mark as completed despite error
                 await _handle_all_images_processed(db, run_id, collection_id, total_images)
                 return
-

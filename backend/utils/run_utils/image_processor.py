@@ -4,10 +4,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 import aiosqlite
-import logging
 from utils.model_utils import run_inference_on_image
-
-logger = logging.getLogger(__name__)
 
 
 async def _record_error(db_path: str, run_id: int, image_id: int, message: str) -> tuple[int, bool, int, int]:
@@ -22,7 +19,7 @@ async def _record_error(db_path: str, run_id: int, image_id: int, message: str) 
             )
             await db.commit()
     except Exception as exc:  # pragma: no cover - log but continue returning failure tuple
-        logger.error("Failed to persist error for image %s: %s", image_id, exc, exc_info=True)
+        pass
     return (image_id, False, 0, 0)
 
 
@@ -116,7 +113,6 @@ async def _save_detections_to_db(db_path: str, run_id: int, image_id: int, resul
     try:
         polygons = result.get("polygons", [])
         if not polygons:
-            logger.debug(f"No polygons to save for image {image_id}")
             return
 
         now = datetime.now(timezone.utc).isoformat()
@@ -151,9 +147,8 @@ async def _save_detections_to_db(db_path: str, run_id: int, image_id: int, resul
                 detection_rows,
             )
             await db.commit()
-            logger.info(f"Saved {len(detection_rows)} detections for image {image_id} in run {run_id}")
     except Exception as exc:
-        logger.error(f"Failed to save detections for image {image_id} in run {run_id}: {exc}", exc_info=True)
+        pass
         # Don't raise - allow processing to continue even if detection saving fails
 
 
@@ -175,7 +170,6 @@ async def process_image_for_run(
         try:
             result = await _run_inference(model_device, image_path, model_type)
         except Exception as exc:
-            logger.error("Inference error for image %s: %s", image_id, exc, exc_info=True)
             return await _record_error(db_path, run_id, image_id, f"Inference error: {exc}")
         
         # Save ALL detections to database (threshold 0.0)
@@ -186,7 +180,6 @@ async def process_image_for_run(
         try:
             live_count, dead_count = await _get_counts_from_db(db_path, run_id, image_id, threshold)
         except Exception as e:
-            logger.error(f"Failed to get counts from DB for image {image_id}: {e}", exc_info=True)
             # Fallback: count all detections (shouldn't happen, but safe fallback)
             live_count = sum(1 for p in result['polygons'] if p.get('class') == 'live')
             dead_count = sum(1 for p in result['polygons'] if p.get('class') == 'dead')
@@ -209,6 +202,4 @@ async def process_image_for_run(
             await db.commit()
         return (image_id, True, live_count, dead_count)
     except Exception as exc:
-        logger.error("Error processing image %s: %s", image_id, exc, exc_info=True)
         return await _record_error(db_path, run_id, image_id, f"Processing error: {exc}")
-

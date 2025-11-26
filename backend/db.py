@@ -10,7 +10,6 @@ This module provides:
 import aiosqlite
 from contextlib import asynccontextmanager
 from config import DB_PATH, SCHEMA_PATH, RESET_DB_ON_STARTUP, MODELS_DIR
-from utils.logger import logger
 from datetime import datetime, timezone
 
 
@@ -23,12 +22,10 @@ async def _initialize_models(db: aiosqlite.Connection):
     """
     models_dir = MODELS_DIR
     if not models_dir.exists():
-        logger.info("No models directory found at %s. Skipping model initialization.", models_dir)
         return
     
     model_files = list(models_dir.glob("*.pt")) + list(models_dir.glob("*.pth"))
     if not model_files:
-        logger.info("No model files found in %s", models_dir)
         return
     
     for model_file in model_files:
@@ -50,7 +47,6 @@ async def _initialize_models(db: aiosqlite.Connection):
         
         if not existing:
             # Add model to database (batch size will be detected on first load)
-            logger.info(f"Adding model: {model_file.name} ({model_type})")
             now = datetime.now(timezone.utc).isoformat()
             await db.execute(
                 """INSERT INTO model (name, type, weights_path, description, optimal_batch_size, created_at, updated_at)
@@ -104,19 +100,14 @@ async def init_db() -> None:
     Note: In production, you'd want proper database migrations instead of
     deleting and recreating the database.
     """
-    from datetime import datetime, timezone
     import os
 
     # Skip re-initialization if database already exists and reset flag is not set
     if os.path.exists(DB_PATH) and not RESET_DB_ON_STARTUP:
-        logger.info("Database already initialized. Skipping init_db()")
         return
 
     # Delete existing database when reset flag is enabled
     if os.path.exists(DB_PATH) and RESET_DB_ON_STARTUP:
-        logger.info(
-            f"Existing database found at {DB_PATH}. Deleting to recreate with new schema..."
-        )
         os.remove(DB_PATH)
 
     # Read the schema file containing CREATE TABLE statements
@@ -152,16 +143,6 @@ async def init_db() -> None:
                 ("db_init_timestamp", init_timestamp),
             )
             await db.commit()
-            logger.info(
-                f"Database initialized at {DB_PATH} with timestamp {init_timestamp}"
-            )
-        else:
-            # Database already has metadata, don't update it
-            # This preserves the original initialization timestamp
-            logger.info(
-                f"Database already initialized at {DB_PATH} "
-                f"(timestamp: {existing_metadata['value']})"
-            )
         
         # Models are now added via the API endpoint, not automatically on startup
         await _initialize_models(db)

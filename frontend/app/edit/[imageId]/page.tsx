@@ -138,7 +138,7 @@ export default function ImageDetailPage() {
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
             <p className="text-red-800 dark:text-red-200">{error || 'Image not found'}</p>
             <Link
-              href={`/collection/${imageData?.collection_id || ''}`}
+              href={`/collection/${imageData?.collection_id || ''}?runId=${runId || ''}`}
               className="text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block"
             >
               ← Back to collection

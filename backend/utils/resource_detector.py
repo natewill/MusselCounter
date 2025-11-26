@@ -1,6 +1,5 @@
 import os
 import torch
-from utils.logger import logger
 
 
 def pick_threads():
@@ -27,12 +26,10 @@ def pick_threads():
     """
     # Skip optimization if using GPU (NVIDIA CUDA)
     if torch.cuda.is_available():
-        logger.debug("[Resource Detection] CUDA available, skipping CPU thread optimization")
         return None
     
     # Skip optimization if using Apple Silicon GPU (Metal Performance Shaders)
     if getattr(torch.backends, "mps", None) and torch.backends.mps.is_available():
-        logger.debug("[Resource Detection] MPS available, skipping CPU thread optimization")
         return None
     
     # Get CPU core count (fallback to 4 if detection fails)
@@ -41,8 +38,6 @@ def pick_threads():
     # Use 1/3 of cores - less aggressive to prevent system overload
     # max(1, ...) ensures at least 1 thread even on single-core systems
     t = max(1, cpu_count // 3)
-    
-    logger.debug(f"[Resource Detection] CPU mode detected: {cpu_count} cores available, setting {t} threads")
     
     # Configure PyTorch threading
     torch.set_num_threads(t)          # Main operation threads
@@ -93,8 +88,6 @@ def calculate_batch_size_from_model(model, device: torch.device) -> int:
     param_count = sum(p.numel() for p in model.parameters())
     param_mb = (param_count * 4) / (1024 * 1024)  # Convert to megabytes
     
-    logger.info(f"[Resource Detection] Model size: {param_count:,} parameters ({param_mb:.1f} MB)")
-    
     # Determine batch size based on device type and model size
     # GPU has most memory, Apple Silicon (MPS) is middle, CPU has least
     
@@ -132,5 +125,4 @@ def calculate_batch_size_from_model(model, device: torch.device) -> int:
         else:
             batch_size = 1
     
-    logger.info(f"[Resource Detection] Calculated batch size: {batch_size} for {param_count:,} params on {device.type}")
     return batch_size

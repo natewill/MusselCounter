@@ -32,7 +32,6 @@ from utils.file_processing import process_single_file
 from utils.validation import validate_file_size, validate_collection_size
 from api.schemas import CreateCollectionRequest, CollectionListResponse, UploadResponse
 from config import MAX_FILE_SIZE, MAX_COLLECTION_SIZE
-from utils.logger import logger
 from utils.security import validate_integer_id
 
 # Create router with prefix - all endpoints will be under /api/collections
@@ -195,7 +194,6 @@ async def recalculate_threshold_endpoint(
             (run_id,)
         )
         detection_count = (await debug_cursor.fetchone())[0]
-        logger.info(f"[RECALCULATE] Found {detection_count} detections for run {run_id}, updating threshold to {threshold}")
 
         # Query detections and recalculate counts with new threshold
         # Count logic:
@@ -221,7 +219,6 @@ async def recalculate_threshold_endpoint(
         )
 
         rows = await cursor.fetchall()
-        logger.info(f"[RECALCULATE] Recalculated counts for {len(rows)} images")
 
         # Build response and update database
         images_dict = {}
@@ -263,7 +260,6 @@ async def recalculate_threshold_endpoint(
         )
 
         await db.commit()
-        logger.info(f"[RECALCULATE] Updated run {run_id} threshold to {threshold}, total live: {live_total}, total dead: {dead_total}")
 
         return {
             "images": images_dict,
@@ -351,7 +347,6 @@ async def upload_images_endpoint(
     except HTTPException:
         raise
     except Exception as exc:
-        logger.error("Upload failure for collection %s: %s", collection_id, exc, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal server error during upload: {exc}")
 
 
@@ -403,13 +398,6 @@ async def delete_image_from_collection_endpoint(
                 (image_id, *run_ids)
             )
             detections_deleted = detections_cursor.rowcount or 0
-            logger.info(
-                "Deleted %s image_result records and %s detections for image %s in collection %s",
-                len(affected_runs),
-                detections_deleted,
-                image_id,
-                collection_id,
-            )
         
         # Recalculate counts for each affected run
         for run_row in affected_runs:
@@ -447,7 +435,5 @@ async def delete_image_from_collection_endpoint(
             )
         
         await db.commit()
-        logger.info(f"Removed image {image_id} from collection {collection_id} and updated counts for {len(affected_runs)} runs")
         
         return {"collection_id": collection_id, "image_id": image_id, "status": "removed"}
-

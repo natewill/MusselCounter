@@ -23,7 +23,6 @@ from api.error_handlers import (
     general_exception_handler
 )
 from fastapi.exceptions import RequestValidationError
-from utils.logger import logger
 from utils.resource_detector import pick_threads
 
 
@@ -41,7 +40,6 @@ def _configure_ssl_certificates():
         import certifi
         os.environ['SSL_CERT_FILE'] = certifi.where()
         os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
-        logger.info("SSL certificates configured using certifi")
     except ImportError:
         # If certifi is not available, try to use system certificates
         # On macOS, these are typically at:
@@ -55,14 +53,7 @@ def _configure_ssl_certificates():
             if os.path.exists(cert_path):
                 os.environ['SSL_CERT_FILE'] = cert_path
                 os.environ['REQUESTS_CA_BUNDLE'] = cert_path
-                logger.info(f"SSL certificates configured using system certificates: {cert_path}")
                 return
-        
-        # If no certificates found, log a warning but don't fail
-        logger.warning(
-            "SSL certificates not found. If you encounter SSL errors when loading models, "
-            "install certifi: pip install certifi"
-        )
 
 
 @asynccontextmanager
@@ -78,21 +69,15 @@ async def lifespan(app: FastAPI):
     - Currently no cleanup needed (SQLite handles connection closing automatically)
     """
     # Startup: Initialize database schema and tables
-    logger.info("Starting Mussel Counter backend...")
-    
     # Configure SSL certificates (fixes macOS SSL certificate issues)
     _configure_ssl_certificates()
     
     # Optimize CPU threading for PyTorch (only affects CPU mode, not GPU/MPS)
     threads = pick_threads()
-    if threads:
-        logger.info(f"Optimized PyTorch CPU threading: {threads} threads")
     
     await init_db()
-    logger.info("Database initialized")
     yield
     # Shutdown: (nothing needed for now - SQLite connections close automatically)
-    logger.info("Shutting down Mussel Counter backend...")
 
 
 # Create FastAPI app instance
@@ -130,5 +115,3 @@ app.include_router(images.router)  # Image detail and results
 # Mount static files to serve uploaded images
 # This allows frontend to access images via /uploads/{filename}
 app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
-
-logger.info("FastAPI application initialized")

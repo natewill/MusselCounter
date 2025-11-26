@@ -22,6 +22,7 @@ import LoadingState from '@/components/run/LoadingState';
 import ErrorState from '@/components/run/ErrorState';
 import UploadProgress from '@/components/run/UploadProgress';
 import SuccessMessage from '@/components/run/SuccessMessage';
+import { shouldEnableStartRunButton } from '@/utils/run/runUtils';
 
 export default function RunResultsPage() {
   const params = useParams();
@@ -109,7 +110,13 @@ export default function RunResultsPage() {
             threshold={threshold}
             onThresholdChange={setThreshold}
             onStartNewRun={handleStartNewRun}
-            disabled={loading || uploading || isRunning || images.length === 0}
+            disabled={
+              loading ||
+              uploading ||
+              isRunning ||
+              images.length === 0 ||
+              !shouldEnableStartRunButton(images, selectedModelId, latestRun, recentlyUploadedImageIds)
+            }
             models={models}
             selectedModelId={selectedModelId}
             onModelChange={setSelectedModelId}

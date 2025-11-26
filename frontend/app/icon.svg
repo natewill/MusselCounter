@@ -1,42 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
   <defs>
-    <linearGradient id="shellGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#FFB347;stop-opacity:1" />
-      <stop offset="50%" style="stop-color:#FF8C00;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#FF6F00;stop-opacity:1" />
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea"/>
+      <stop offset="100%" style="stop-color:#764ba2"/>
     </linearGradient>
-    <linearGradient id="highlightGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:0.4" />
-      <stop offset="100%" style="stop-color:#ffffff;stop-opacity:0" />
-    </linearGradient>
-    <filter id="shadow">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="2"/>
-      <feOffset dx="0" dy="2" result="offsetblur"/>
-      <feComponentTransfer>
-        <feFuncA type="linear" slope="0.3"/>
-      </feComponentTransfer>
-      <feMerge>
-        <feMergeNode/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
   </defs>
 
-  <!-- Shadow base -->
-  <ellipse cx="50" cy="58" rx="38" ry="42" fill="url(#shellGradient)" filter="url(#shadow)"/>
+  <!-- Background -->
+  <rect width="100" height="100" rx="22" fill="url(#bg)"/>
 
-  <!-- Main shell body -->
-  <path d="M 50 12 Q 20 30, 15 58 Q 15 85, 50 95 Q 85 85, 85 58 Q 80 30, 50 12 Z"
-        fill="url(#shellGradient)" stroke="#1e1b4b" stroke-width="1.5"/>
+  <!-- MC Monogram -->
+  <g fill="#FFFFFF">
+    <!-- M -->
+    <path d="M 12 70 L 12 30 L 20 30 L 32.5 50 L 45 30 L 53 30 L 53 70 L 45 70 L 45 45 L 32.5 62 L 20 45 L 20 70 Z"/>
 
-  <!-- Shell ridges with gradient -->
-  <path d="M 50 15 L 50 92" stroke="url(#highlightGradient)" stroke-width="3" stroke-linecap="round" opacity="0.6"/>
-  <path d="M 50 15 Q 35 50, 30 90" stroke="url(#highlightGradient)" stroke-width="2.5" stroke-linecap="round" opacity="0.5"/>
-  <path d="M 50 15 Q 42 50, 40 88" stroke="url(#highlightGradient)" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
-  <path d="M 50 15 Q 58 50, 60 88" stroke="url(#highlightGradient)" stroke-width="2" stroke-linecap="round" opacity="0.4"/>
-  <path d="M 50 15 Q 65 50, 70 90" stroke="url(#highlightGradient)" stroke-width="2.5" stroke-linecap="round" opacity="0.5"/>
-
-  <!-- Shine highlight -->
-  <ellipse cx="40" cy="35" rx="15" ry="20" fill="white" opacity="0.25"/>
-  <ellipse cx="38" cy="32" rx="8" ry="12" fill="white" opacity="0.35"/>
+    <!-- C -->
+    <path d="M 78 30 Q 88 30, 88 40 L 81 40 Q 81 37, 78 37 L 67 37 Q 64 37, 64 40 L 64 60 Q 64 63, 67 63 L 78 63 Q 81 63, 81 60 L 88 60 Q 88 70, 78 70 L 67 70 Q 57 70, 57 60 L 57 40 Q 57 30, 67 30 Z"/>
+  </g>
 </svg>

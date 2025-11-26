@@ -1,8 +1,3 @@
-/**
- * Validation schemas using Zod
- */
-import { z } from 'zod';
-
 // File validation constants
 export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB per file
 export const MAX_TOTAL_SIZE = 500 * 1024 * 1024; // 500MB total per upload
@@ -11,26 +6,6 @@ export const MAX_FILES = 1000; // Maximum number of files per upload
 // Valid image types
 export const VALID_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/bmp', 'image/tiff'];
 export const VALID_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif'];
-
-/**
- * Schema for validating a single file
- */
-const FileSchema = z.object({
-  name: z.string(),
-  size: z.number().max(MAX_FILE_SIZE, `File size must be less than ${MAX_FILE_SIZE / 1024 / 1024}MB`),
-  type: z.string().refine(
-    (type) => VALID_IMAGE_TYPES.includes(type.toLowerCase()),
-    { message: 'Invalid image type. Supported formats: PNG, JPEG, GIF, BMP, TIFF.' }
-  ),
-}).or(
-  z.object({
-    name: z.string().refine(
-      (name) => VALID_EXTENSIONS.some(ext => name.toLowerCase().endsWith(ext)),
-      { message: 'Invalid file extension. Supported formats: PNG, JPEG, GIF, BMP, TIFF.' }
-    ),
-    size: z.number().max(MAX_FILE_SIZE, `File size must be less than ${MAX_FILE_SIZE / 1024 / 1024}MB`),
-  })
-);
 
 /**
  * Validate file type by both MIME type and extension
@@ -87,47 +62,11 @@ export function validateImageFiles(files: FileList | File[]): { validFiles: File
       break;
     }
     
-    // Validate with Zod schema
-    try {
-      FileSchema.parse({
-        name: file.name,
-        size: file.size,
-        type: file.type,
-      });
-      validFiles.push(file);
-      totalSize += file.size;
-    } catch (error) {
-      if (error instanceof z.ZodError) {
-        errors.push(
-          `"${file.name}": ${error.issues[0]?.message || 'Validation failed'}`
-        );
-      } else {
-        errors.push(`"${file.name}": Validation failed`);
-      }
-    }
+    validFiles.push(file);
+    totalSize += file.size;
   }
   
   return { validFiles, errors };
-}
-
-/**
- * Threshold validation schema
- */
-export const ThresholdSchema = z.number().min(0.0).max(1.0).optional().nullable();
-
-/**
- * Validate threshold value (returns validated number or null)
- */
-export function validateThreshold(threshold: unknown): number | null {
-  try {
-    const result = ThresholdSchema.parse(threshold);
-    return result ?? null;
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new Error('Threshold must be a number between 0.0 and 1.0');
-    }
-    throw error;
-  }
 }
 
 /**
@@ -144,7 +83,6 @@ export function isThresholdValid(threshold: number | null | undefined): boolean 
 
 /**
  * Get validation error message for threshold, or null if valid.
- * Exported separately so hooks can surface precise feedback without throwing.
  */
 export const getThresholdValidationError = (
   threshold: number | string | null | undefined
@@ -165,41 +103,3 @@ export const getThresholdValidationError = (
   }
   return null;
 };
-
-/**
- * Batch ID validation schema
- */
-export const BatchIdSchema = z.number().int().positive();
-
-/**
- * Validate batch ID
- */
-export function validateBatchId(batchId: unknown): number {
-  try {
-    return BatchIdSchema.parse(Number(batchId));
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new Error('Invalid batch ID');
-    }
-    throw new Error('Batch ID is required');
-  }
-}
-
-/**
- * Model ID validation schema
- */
-export const ModelIdSchema = z.number().int().positive();
-
-/**
- * Validate model ID
- */
-export function validateModelId(modelId: unknown): number {
-  try {
-    return ModelIdSchema.parse(Number(modelId));
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      throw new Error('Invalid model ID');
-    }
-    throw error;
-  }
-}

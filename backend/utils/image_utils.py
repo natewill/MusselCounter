@@ -55,7 +55,7 @@ async def add_image_to_collection(
     if not p.exists():
         raise FileNotFoundError(f"Image file not found: {p}")
 
-    file_hash = get_file_hash(str(p))
+    file_hash = await get_file_hash(str(p))
     now = datetime.now(timezone.utc).isoformat()
 
     await db.execute("BEGIN")

@@ -49,10 +49,8 @@ export function useStartRun(
     setError(null);
     try {
       const runResponse = await startRun(collectionId, selectedModelId, threshold);
-      
-      window.history.replaceState(null, '', `/run/${runResponse.run_id}`);
-      
-      // Invalidate and refetch batch data to show the new run
+
+      // Invalidate and refetch collection data to show the new run
       invalidateCollectionQuery(queryClient, collectionId);
       
       // Reset loading after run starts (the run will be processed in background)

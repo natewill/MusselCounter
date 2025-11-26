@@ -3,7 +3,7 @@
 import { useRef } from 'react';
 import { useParams } from 'next/navigation';
 import { useModels } from '@/hooks/useModels';
-import { useBatchData } from '@/hooks/useBatchData';
+import { useCollectionData } from '@/hooks/useCollectionData';
 import { useStorageData } from '@/hooks/useStorageData';
 import { useImageUpload } from '@/hooks/useImageUpload';
 import { useImageDelete } from '@/hooks/useImageDelete';
@@ -11,7 +11,7 @@ import { useStartRun } from '@/hooks/useStartRun';
 import { useStopRun } from '@/hooks/useStopRun';
 import { useRunState } from '@/hooks/useRunState';
 import PageHeader from '@/components/run/PageHeader';
-import BatchTotals from '@/components/run/BatchTotals';
+import CollectionTotals from '@/components/run/CollectionTotals';
 import RunStatus from '@/components/run/RunStatus';
 import ThresholdControl from '@/components/run/ThresholdControl';
 import ImageList from '@/components/run/ImageList';
@@ -24,51 +24,51 @@ import SuccessMessage from '@/components/run/SuccessMessage';
 
 export default function RunResultsPage() {
   const params = useParams();
-  const runId = parseInt(Array.isArray(params.runId) ? params.runId[0] : params.runId || '0', 10);
+  const collectionId = parseInt(Array.isArray(params.collectionId) ? params.collectionId[0] : params.collectionId || '0', 10);
   
   const fileInputRef = useRef(null);
   
   // Custom hooks
   const { models, selectedModelId, setSelectedModelId } = useModels();
-  const { batchId, batchData, batch, images, latestRun, isRunning, threshold, setThreshold, loading, error, setError, setLoading } = useBatchData(runId);
+  const { collectionId: resolvedCollectionId, collectionData, collection, images, latestRun, isRunning, threshold, setThreshold, loading, error, setError, setLoading } = useCollectionData(collectionId);
   const { successMessage, setSuccessMessage, recentlyUploadedImageIds, setRecentlyUploadedImageIds } = useStorageData();
-  const { uploading, handleFileInputChange } = useImageUpload(batchId, setError, setLoading, setRecentlyUploadedImageIds);
-  const { deletingImageId, handleDeleteImage } = useImageDelete(batchId, setError);
+  const { uploading, handleFileInputChange } = useImageUpload(collectionId, setError, setLoading, setRecentlyUploadedImageIds);
+  const { deletingImageId, handleDeleteImage } = useImageDelete(collectionId, setError);
 
   // Use custom hook for run state management (flashing, green hue, etc.)
-  const { flashingImageIds, greenHueImageIds } = useRunState(batchData, recentlyUploadedImageIds, setRecentlyUploadedImageIds);
+  const { flashingImageIds, greenHueImageIds } = useRunState(collectionData, recentlyUploadedImageIds, setRecentlyUploadedImageIds);
   
   // Handle starting new run
-  const { handleStartNewRun } = useStartRun(batchId, selectedModelId, threshold, loading, setLoading, setError);
+  const { handleStartNewRun } = useStartRun(collectionId, selectedModelId, threshold, loading, setLoading, setError);
   
   // Handle stopping run (refresh data on success)
   const { stopping, handleStopRun } = useStopRun(setError, () => setLoading(true));
 
   // Loading state
-  if (loading && !batchId) {
+  if (loading && !collectionId) {
     return <LoadingState />;
   }
 
-  // Error state (no batch data)
-  if (error && !batchData) {
+  // Error state (no collection data)
+  if (error && !collectionData) {
     return <ErrorState error={error} />;
   }
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black p-8">
       <div className="max-w-6xl mx-auto">
-        <PageHeader batchName={batch.name}>
+        <PageHeader collectionName={collection.name}>
           <AddImagesButton
             fileInputRef={fileInputRef}
             uploading={uploading}
-            batchId={batchId}
+            collectionId={collectionId}
             onFileChange={handleFileInputChange}
           />
         </PageHeader>
 
         <ErrorDisplay error={error} onDismiss={() => setError(null)} />
 
-        <BatchTotals batch={batch} imageCount={images.length} images={images} />
+        <CollectionTotals collection={collection} imageCount={images.length} images={images} />
 
         {uploading && <UploadProgress />}
 

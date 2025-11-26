@@ -20,7 +20,7 @@ export interface Image {
 }
 
 /**
- * Build a map of current image results from batch images
+ * Build a map of current image results from collection images
  */
 export function buildImageResultsMap(images: Image[]): Map<number, ImageResult> {
   const resultsMap = new Map<number, ImageResult>();
@@ -177,7 +177,7 @@ export function findDuplicateImageIds(images: Image[]): Set<number> {
 }
 
 /**
- * Get all processed image IDs from a batch (excluding duplicates)
+ * Get all processed image IDs from a collection (excluding duplicates)
  */
 export function getProcessedImageIds(images: Image[]): number[] {
   const duplicateIds = findDuplicateImageIds(images);

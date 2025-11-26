@@ -131,8 +131,8 @@ export default function Home() {
       if (!collectionId) {
         collectionId = await createQuickProcessCollection(setActiveCollectionId);
       }
-      // Just navigate to run page - user will click "Start New Run" button there
-      router.push(`/run/${collectionId}`);
+      // Just navigate to collection page - user will click "Start New Run" button there
+      router.push(`/collection/${collectionId}`);
       setLoading(false);
     } catch (err) {
       console.error('Failed to create collection or navigate:', err);

@@ -133,10 +133,10 @@ export async function handleFileSelect(
     await safeSetItem('uploadedImageCount', addedCount.toString());
     await safeSetItem('duplicateImageCount', duplicateCount.toString());
     await safeSetItem('recentlyUploadedImageIds', nonDuplicateIds);
-    
-    // Navigate to run page with collection_id (don't start run yet)
-    // The run page will show "X images added!" and a button to start the run
-    router.push(`/run/${collectionId}`);
+
+    // Navigate to collection page with collection_id (don't start run yet)
+    // The collection page will show "X images added!" and a button to start the run
+    router.push(`/collection/${collectionId}`);
     
     // Don't set loading to false - let the run page handle its own loading state
   } catch (err) {

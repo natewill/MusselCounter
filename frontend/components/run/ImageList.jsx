@@ -72,7 +72,7 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
         Images ({images.length})
       </h2>
       {sortedImages.length === 0 ? (
-        <div className="text-zinc-600 dark:text-zinc-400">No images in this batch yet.</div>
+        <div className="text-zinc-600 dark:text-zinc-400">No images in this collection yet.</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {sortedImages.map((image) => {

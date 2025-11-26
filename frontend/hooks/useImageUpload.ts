@@ -32,7 +32,7 @@ export function useImageUpload(
       await safeSetItem('uploadedImageCount', addedCount.toString());
       await safeSetItem('duplicateImageCount', duplicateCount.toString());
       
-      // Invalidate and refetch batch data
+      // Invalidate and refetch collection data
       invalidateCollectionQuery(queryClient, collectionId);
       
       setLoading(false);

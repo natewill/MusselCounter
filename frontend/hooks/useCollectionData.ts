@@ -1,17 +1,17 @@
 import { useState, useEffect, startTransition } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { getCollection, getRun } from '@/lib/api';
+import { getCollection } from '@/lib/api';
 import { safeGetNumber, safeSetItem } from '@/utils/storage';
 
-export function useBatchData(runId: number) {
+export function useCollectionData(collectionIdParam: number) {
   const [collectionId, setCollectionId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(0.5);
 
-  // Initial load - get collection_id from run or storage
+  // Initial load - get collection_id from storage or URL parameter
   useEffect(() => {
-    const loadRunData = async () => {
+    const loadCollectionData = async () => {
       try {
         // Prefer cached collection id
         const storedCollectionId = await safeGetNumber('currentCollectionId');
@@ -20,29 +20,17 @@ export function useBatchData(runId: number) {
           return;
         }
 
-        // Otherwise fetch run details to determine collection id
-        try {
-          const runData = await getRun(runId);
-          if (runData && runData.collection_id) {
-            setCollectionId(runData.collection_id);
-            await safeSetItem('currentCollectionId', runData.collection_id.toString());
-          } else {
-            setError('Run not found. Please upload images from the home page.');
-            setLoading(false);
-          }
-        } catch {
-          // If getRun fails, assume runId is actually a collectionId (new flow from home)
-          setCollectionId(runId);
-          await safeSetItem('currentCollectionId', runId.toString());
-        }
+        // Use the collectionId from URL parameter
+        setCollectionId(collectionIdParam);
+        await safeSetItem('currentCollectionId', collectionIdParam.toString());
       } catch (err) {
-        console.error('Failed to load run data:', err);
+        console.error('Failed to load collection data:', err);
         setError('Failed to load collection data. Please try again.');
         setLoading(false);
       }
     };
-    loadRunData();
-  }, [runId]);
+    loadCollectionData();
+  }, [collectionIdParam]);
 
   // Use react-query for collection data fetching with automatic polling
   const {
@@ -95,13 +83,6 @@ export function useBatchData(runId: number) {
     }
   }, [collectionId, collectionLoading, collectionData]);
 
-  // Handle URL updates when collection data changes
-  useEffect(() => {
-    if (collectionData?.latest_run && collectionData.latest_run.run_id !== runId) {
-      window.history.replaceState(null, '', `/run/${collectionData.latest_run.run_id}`);
-    }
-  }, [collectionData?.latest_run, runId]);
-
   // Update threshold when latest run changes
   useEffect(() => {
     if (collectionData?.latest_run?.threshold !== null && collectionData?.latest_run?.threshold !== undefined) {
@@ -111,16 +92,16 @@ export function useBatchData(runId: number) {
     }
   }, [collectionData?.latest_run?.threshold]);
 
-  // Derive helper structures for legacy components
+  // Derive helper structures
   const collectionInfo = collectionData?.collection || {
     name: 'Loading...',
     live_mussel_count: 0,
     dead_mussel_count: 0,
   };
 
-  const batch = {
+  const collection = {
     ...collectionInfo,
-    batch_id: collectionInfo?.collection_id ?? collectionId,
+    collection_id: collectionInfo?.collection_id ?? collectionId,
   };
 
   const images = collectionData?.images || [];
@@ -128,9 +109,9 @@ export function useBatchData(runId: number) {
   const isRunning = latestRun && (latestRun.status === 'pending' || latestRun.status === 'running');
 
   return {
-    batchId: collectionId,
-    batchData: collectionData ? { ...collectionData, batch } : null,
-    batch,
+    collectionId,
+    collectionData: collectionData ? { ...collectionData, collection } : null,
+    collection,
     images,
     latestRun,
     isRunning,

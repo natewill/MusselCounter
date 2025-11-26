@@ -3,13 +3,11 @@
 import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { uploadModel } from '@/lib/api';
-import SuccessMessage from './SuccessMessage';
 
-export default function AddModelButton() {
+export default function AddModelButton({ onSuccess }) {
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
-  const [successMessage, setSuccessMessage] = useState(null);
   const queryClient = useQueryClient();
 
   const handleFileChange = async (e) => {
@@ -31,7 +29,7 @@ export default function AddModelButton() {
 
     setUploading(true);
     setError(null);
-    setSuccessMessage(null);
+    onSuccess?.(null);
 
     try {
       const result = await uploadModel(file);
@@ -48,7 +46,7 @@ export default function AddModelButton() {
       }
       
       // Show success message
-      setSuccessMessage(`Model "${result.name}" uploaded successfully!`);
+      onSuccess?.(`Model "${result.name}" uploaded successfully!`);
     } catch (err) {
       console.error('[AddModelButton] Upload failed:', {
         error: err,
@@ -92,9 +90,6 @@ export default function AddModelButton() {
           '+ Add Model'
         )}
       </button>
-      
-      <SuccessMessage message={successMessage} onDismiss={() => setSuccessMessage(null)} />
-      
       {error && (
         <div className="absolute top-full mt-1 right-0 text-red-600 dark:text-red-400 text-sm whitespace-nowrap bg-white dark:bg-zinc-900 px-2 py-1 rounded shadow z-10">
           {error}
@@ -103,4 +98,3 @@ export default function AddModelButton() {
     </div>
   );
 }
-

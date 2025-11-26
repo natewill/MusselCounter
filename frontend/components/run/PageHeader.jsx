@@ -1,7 +1,7 @@
 import { useRouter } from 'next/navigation';
 import AddModelButton from './AddModelButton';
 
-export default function PageHeader({ collectionName, children }) {
+export default function PageHeader({ collectionName, children, onModelSuccess }) {
   const router = useRouter();
 
   return (
@@ -22,7 +22,7 @@ export default function PageHeader({ collectionName, children }) {
           )}
         </div>
         <div className="flex items-center gap-4">
-          <AddModelButton />
+          <AddModelButton onSuccess={onModelSuccess} />
           {children && (
             <div>
               {children}
@@ -33,4 +33,3 @@ export default function PageHeader({ collectionName, children }) {
     </div>
   );
 }
-

@@ -1,6 +1,6 @@
 'use client';
 
-export default function ThresholdControl({ threshold, onThresholdChange, onStartNewRun, disabled, models, selectedModelId, onModelChange }) {
+export default function ThresholdControl({ threshold, onThresholdChange, onStartNewRun, disabled, models, selectedModelId, onModelChange, imageCount }) {
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg p-6 border border-zinc-200 dark:border-zinc-800 h-full flex flex-col">
       <h2 className="text-xl font-semibold mb-4 text-zinc-900 dark:text-zinc-100">Run Settings</h2>
@@ -70,9 +70,15 @@ export default function ThresholdControl({ threshold, onThresholdChange, onStart
             onClick={onStartNewRun}
             disabled={disabled}
             className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+            title={disabled && imageCount === 0 ? 'Upload images before starting a run' : undefined}
           >
             Start New Run with These Settings
           </button>
+          {disabled && imageCount === 0 && (
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 text-center">
+              Upload images to start a run
+            </p>
+          )}
         </div>
       </div>
     </div>

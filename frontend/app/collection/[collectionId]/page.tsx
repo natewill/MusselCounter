@@ -88,10 +88,11 @@ export default function RunResultsPage() {
             threshold={threshold}
             onThresholdChange={setThreshold}
             onStartNewRun={handleStartNewRun}
-            disabled={loading || uploading || isRunning}
+            disabled={loading || uploading || isRunning || images.length === 0}
             models={models}
             selectedModelId={selectedModelId}
             onModelChange={setSelectedModelId}
+            imageCount={images.length}
           />
         </div>
 

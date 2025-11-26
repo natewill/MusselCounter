@@ -98,49 +98,30 @@ Automated test suites are not included in this trimmed-down build. To verify cha
 
 ```
 backend/
-├── main.py                      # FastAPI app entry point - starts the server
-├── config.py                    # Configuration settings (file paths, limits, etc.)
-├── db.py                        # Database connection and initialization
-├── schema.sql                   # Database table definitions (SQL)
+├── main.py                      # FastAPI app entry point
+├── config.py                    # Settings (paths, limits, env)
+├── db.py                        # Database connection/init
+├── schema.sql                   # SQLite schema
 ├── requirements.txt             # Python dependencies
-│
-├── api/                         # API Layer - HTTP endpoints
-│   ├── routers/                 # Endpoint definitions grouped by resource
-│   │   ├── collections.py       # Collection CRUD and image uploads
-│   │   ├── models.py            # Model information endpoints
-│   │   ├── runs.py              # Start/stop inference runs
-│   │   ├── images.py            # Image detail with polygon data
-│   │   └── system.py            # Health check, DB version
-│   ├── schemas.py               # Pydantic models (request/response validation)
-│   └── error_handlers.py        # Error response formatting
-│
-├── utils/                       # Business Logic & Utilities
-│   ├── model_utils/             # ML Model Operations
-│   │   ├── loader.py            # Load models from disk (R-CNN, YOLO)
-│   │   ├── inference.py         # Run models on images, get detections
-│   │   └── db.py                # Model database operations
-│   │
-│   ├── run_utils/               # Inference Run Orchestration
-│   │   ├── collection_processor.py  # Main coordinator - handles entire run
-│   │   ├── image_processor.py       # Process individual images
-│   │   └── db.py                    # Run database operations
-│   │
-│   ├── collection_utils.py      # Collection database operations
-│   ├── image_utils.py            # Image database ops & deduplication
-│   ├── file_processing.py        # File validation & saving
-│   ├── resource_detector.py      # CPU/batch size optimization
-│   ├── validation.py             # Input validation (IDs, sizes, etc.)
-│   ├── security.py               # Security checks (path validation, etc.)
-│   └── logger.py                 # Logging configuration
-│
-├── data/                        # Persistent Data
-│   ├── models/                  # ML model weight files (.pt, .pth)
-│   ├── uploads/                 # Uploaded image files
-│   └── polygons/                # Detection results (JSON files)
-│
-├── BACKEND_GUIDE.md             # Comprehensive backend explanation
-├── COLLECTION_PROCESSOR_EXPLAINED.md  # Deep dive on inference runs
-└── RESOURCE_DETECTION.md        # CPU optimization & batch sizing details
+├── api/                         # API layer
+│   ├── routers/                 # collections.py, models.py, runs.py, images.py, system.py
+│   ├── schemas.py               # Pydantic models
+│   ├── error_handlers.py        # Error formatting
+│   └── middleware/              # ASGI middleware init
+├── utils/                       # Business logic
+│   ├── model_utils/             # Loader/inference/model DB helpers
+│   ├── run_utils/               # Run orchestration and DB helpers
+│   ├── collection_utils.py      # Collection DB ops
+│   ├── image_utils.py           # Image DB ops & dedup
+│   ├── file_processing.py       # Upload validation/saving
+│   ├── resource_detector.py     # CPU/batch tuning
+│   ├── validation.py            # Input validation
+│   ├── security.py              # Path/security checks
+│   └── logger.py                # Logging setup
+├── data/                        # Persistent data (models/uploads/polygons)
+├── BACKEND_GUIDE.md             # Backend walkthrough
+├── COLLECTION_PROCESSOR_EXPLAINED.md  # Run coordination deep dive
+└── RESOURCE_DETECTION.md        # Batch sizing notes
 ```
 
 **Key Principles**:
@@ -153,39 +134,20 @@ backend/
 
 ```
 frontend/
-├── app/                         # Next.js App Router - Pages & Routing
-│   ├── page.tsx                 # Home page (/)
-│   ├── run/[runId]/page.tsx     # Run results page (/run/123)
-│   └── layout.tsx               # Root layout with global styles
-│
-├── components/                  # React Components
-│   ├── run/                     # Run results page components
-│   │   ├── ImageList.jsx        # Grid of image cards with thumbnails
-│   │   ├── RunStatus.jsx        # Run progress & status display
-│   │   ├── BatchTotals.jsx      # Live/dead count summary
-│   │   ├── ThresholdControl.jsx # Threshold slider
-│   │   └── ...                  # Other run page components
-│   └── home/                    # Home page components
-│       └── UploadArea.jsx       # Drag & drop image upload
-│
-├── hooks/                       # Custom React Hooks (reusable logic)
-│   ├── useBatchData.ts          # Fetch & poll collection/run data
-│   ├── useRunState.ts           # Manage run state (flashing, green hues)
-│   ├── useImageUpload.ts        # Handle image upload logic
-│   ├── useStartRun.ts           # Start inference run
-│   ├── useStopRun.ts            # Stop/cancel run
-│   └── ...                      # Other hooks
-│
-├── lib/                         # Utilities & API Client
-│   └── api.ts                   # Axios client for backend API calls
-│
-├── utils/                       # Helper Functions
-│   ├── run/                     # Run-related utilities
-│   ├── home/                    # Home page utilities
-│   └── validation.ts            # Input validation
-│
-└── public/                      # Static Assets
-    └── ...                      # Images, fonts, etc.
+├── app/                         # Next.js App Router
+│   ├── layout.tsx               # Root layout + theme
+│   ├── globals.css              # Global styles
+│   ├── page.tsx                 # Home upload page (/)
+│   ├── collection/[collectionId]/page.tsx   # Run/results dashboard
+│   └── edit/[imageId]/page.tsx              # Image detail + polygon editor (requires ?runId=)
+├── components/                  # UI building blocks
+│   ├── home/                    # Upload/top bar/error display
+│   ├── run/                     # Run status, thresholds, image list, upload controls
+│   └── edit/                    # Image display, overlays, modals for polygon edits
+├── hooks/                       # Data fetching and UI state (useCollectionData, useModels, useImageUpload, useRunState, etc.)
+├── lib/                         # API client (`api.ts`)
+├── utils/                       # Validation, storage, query helpers
+└── public/                      # Static assets
 ```
 
 **Key Principles**:
@@ -263,82 +225,20 @@ All Athan needs to do is download the `.exe`, and open the app.
 
 ## Pages
 
-### Dashboard `/home` or `/`
-Two modes for processing images:
+### Home `/`
+- Drag-and-drop or picker upload for files/folders.
+- Quick-process mode: creates/recalls an active collection, uploads files, and redirects to that collection’s dashboard.
+- Manual create: create a fresh collection and jump to it to start a run.
 
-**Quick Process Mode:**
-- Upload image(s) or folder
-- Automatically creates a collection with a default name (timestamp-based) on first upload
-- All subsequent uploads in the same session are added to the same collection
-- Automatically adds images to the active collection
-- Automatically starts inference run
-- Navigates to `/run/[runId]` to show progress/results
-- On run results page: can add more images → auto-starts new run → sees updated totals
-- Collection totals represent cumulative count from all images (latest run)
-- Collection exists but is invisible to user (can rename later if needed)
-- New session or explicit collection creation starts a fresh collection
+### Collection Dashboard `/collection/[collectionId]`
+- Shows collection totals and images with status hues (pending/processing/complete).
+- Start/stop runs, choose model, and adjust threshold; supports threshold-only recalculation without rerunning the model.
+- Upload more images inline, see upload progress, and manage deletions.
 
-**Create Collection Mode:**
-- Optional: Enter collection name and description
-- Create a collection explicitly
-- Upload/add images to the collection
-- Navigate to `/collections/[collectionId]` where user can start a run manually
-- Useful for organizing and labeling related images
-
-### Collection History `/collections`
-Lists all previous collections.  
-- View all collections with basic info (name, description, image count, live mussel count)
-- Search/filter collections
-- Click to navigate to `/collections/[collectionId]`
-
-### Collection View `/collections/[collectionId]`
-View collection information and latest run results (read-only).  
-- Display collection details (name, description, image count, live mussel count)
-- Show latest run results (if exists)
-- Display all images in the collection with their polygon predictions and counts
-- "Start New Run" button → navigates to `/run/[runId]` (creates new run)
-- Link to edit page for collection management
-
-### Collection Edit `/collections/[collectionId]/edit`
-Edit collection and manage images.  
-- Add more images to the collection
-- Update collection name/description
-- View/manage images in the collection
-
-### Run Results `/run/[runId]`
-Display results for a collection with seamless image addition.  
-- Shows **collection totals** (live_mussel_count, dead_mussel_count) - represents total across ALL images in collection
-- Displays current run status (pending, running, completed, failed, cancelled) with progress
-- **Stop Run** button for cancelling ongoing inference
-- Lists **all images in the collection** with thumbnail previews
-- Shows individual live/dead counts for each image
-- **Visual Indicators**:
-  - Orange hue: Image needs processing for current model/threshold combination
-  - Green hue (persistent): Currently processing
-  - Green flash: Just finished processing
-- **Smart Sorting**: Recently processed images automatically move to the top during runs
-- **"Add More Images" button** - upload more images, automatically starts new run
-- When new run completes, totals update in place (no page navigation)
-- **Smart Run Reuse**: Switching models or thresholds brings back orange hue for unprocessed combinations
-- Run only processes images that haven't been run with current model/threshold
-- Can change threshold and re-run (reuses existing run if same model/threshold)
-- Model selector to switch between available models
-
-### Image Detail `/images/[imageId]`
-View detailed inference results for a specific image.  
-- **Full-size image display** with polygon/bounding box overlays
-- **Detection visualization**: Each mussel outlined with label (live/dead) and confidence score
-- **Statistics panel**:
-  - Live and dead mussel counts
-  - Total count and percentages (e.g., "83% alive")
-  - Model used (name and type)
-  - Confidence threshold applied
-  - Processing timestamp
-- **Comparison view**: See results from other models/thresholds run on the same image
-- **Collection context**: Breadcrumb navigation back to collection
-- **Image metadata**: Filename, dimensions, file hash, upload date
-- View raw polygon coordinates and confidence scores
-- Future: Relabel detections, adjust individual polygons
+### Image Detail & Editing `/edit/[imageId]?runId=<runId>`
+- View a single image with polygons, stats, and model/threshold context.
+- Toggle overlays, open fullscreen, and reclassify polygons (live/dead) with modal confirmations.
+- Link back to the source collection.
 
 ---
 

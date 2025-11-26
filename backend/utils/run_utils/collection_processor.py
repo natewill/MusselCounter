@@ -77,7 +77,7 @@ from utils.model_utils.db import get_model
 from utils.model_utils.inference import run_rcnn_inference_batch, run_yolo_inference_batch
 from utils.model_utils.loader import load_model
 from .db import get_run, update_run_status
-from .image_processor import process_image_for_run, _save_detections_to_db
+from .image_processor import process_image_for_run, _save_detections_to_db, _get_counts_from_db
 
 logger = logging.getLogger(__name__)
 
@@ -103,47 +103,6 @@ async def _fail(db: aiosqlite.Connection, run_id: int, message: str, status: str
         await update_run_status(db, run_id, status, message)
     except Exception:
         logger.exception(f"[RUN {run_id}] Failed to update status [{status}]")
-
-
-async def _get_counts_from_db(db_path: str, run_id: int, image_id: int, threshold: float) -> tuple[int, int]:
-    """
-    Query the database to get live/dead counts for an image based on threshold.
-    
-    Uses the same logic as the recalculation endpoint:
-    - If class IS NOT NULL (manual override), always count it
-    - If class IS NULL (auto mode), count if confidence >= threshold
-    
-    Args:
-        db_path: Path to database
-        run_id: Run ID
-        image_id: Image ID
-        threshold: Threshold to filter by
-        
-    Returns:
-        Tuple of (live_count, dead_count)
-    """
-    async with aiosqlite.connect(db_path) as db:
-        db.row_factory = aiosqlite.Row
-        cursor = await db.execute(
-            """SELECT
-                   SUM(CASE
-                       WHEN class = 'live' THEN 1
-                       WHEN class IS NULL AND confidence >= ? AND original_class = 'live' THEN 1
-                       ELSE 0
-                   END) as live_count,
-                   SUM(CASE
-                       WHEN class = 'dead' THEN 1
-                       WHEN class IS NULL AND confidence >= ? AND original_class = 'dead' THEN 1
-                       ELSE 0
-                   END) as dead_count
-               FROM detection
-               WHERE run_id = ? AND image_id = ?""",
-            (threshold, threshold, run_id, image_id)
-        )
-        row = await cursor.fetchone()
-        live_count = row['live_count'] or 0
-        dead_count = row['dead_count'] or 0
-        return (live_count, dead_count)
 
 
 async def _batch_infer(model_type: str, model_device, image_paths: list[str]):

@@ -56,44 +56,6 @@ export default function RunStatus({ latestRun, isRunning, images, onStopRun, sto
     return new Date(`${value}Z`);
   };
 
-  // Calculate duration
-  const getDuration = () => {
-    if (!latestRun?.started_at) return null;
-    
-    const startTime = parseDate(latestRun.started_at);
-    if (!startTime || Number.isNaN(startTime.getTime())) {
-      return null;
-    }
-    
-    let endTime = null;
-    if (latestRun.finished_at) {
-      endTime = parseDate(latestRun.finished_at);
-    } else if (serverTime) {
-      endTime = parseDate(serverTime);
-    }
-    
-    if (!endTime || Number.isNaN(endTime.getTime())) {
-      endTime = new Date();
-    }
-
-    const durationMs = endTime.getTime() - startTime.getTime();
-    const durationSeconds = durationMs / 1000;
-    
-    if (durationSeconds < 0) {
-      return '0.0s';
-    }
-    
-    if (durationSeconds < 60) {
-      return `${durationSeconds.toFixed(1)}s`;
-    } else if (durationSeconds < 3600) {
-      return `${(durationSeconds / 60).toFixed(1)}m`;
-    } else {
-      return `${(durationSeconds / 3600).toFixed(1)}h`;
-    }
-  };
-
-  const duration = getDuration();
-
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg p-6 border border-zinc-200 dark:border-zinc-800 h-full">
       <h2 className="text-xl font-semibold mb-4 text-zinc-900 dark:text-zinc-100">Current Run</h2>
@@ -108,11 +70,6 @@ export default function RunStatus({ latestRun, isRunning, images, onStopRun, sto
           }`}>
             {latestRun.status}
           </span>
-          {duration && (
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">
-              ({duration})
-            </span>
-          )}
         </div>
 
         {/* Progress Bar - Show when running or pending */}
@@ -204,4 +161,3 @@ export default function RunStatus({ latestRun, isRunning, images, onStopRun, sto
     </div>
   );
 }
-

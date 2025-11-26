@@ -16,7 +16,7 @@ export interface Image {
   processed_at: string | null;
   result_threshold: number | null;
   file_hash: string | null;
-  processed_model_ids: number[];
+  processed_model_ids: number[] | null;
 }
 
 /**
@@ -177,18 +177,72 @@ export function findDuplicateImageIds(images: Image[]): Set<number> {
 }
 
 /**
+ * Check if there are any images that have not been processed by the selected model
+ * while excluding duplicate uploads.
+ */
+export function hasUnprocessedImages(
+  images: Image[],
+  selectedModelId: number,
+  duplicateIds: Set<number>
+): boolean {
+  return images.some(image => {
+    if (duplicateIds.has(image.image_id)) return false;
+
+    const processedModelIds = image.processed_model_ids ?? [];
+    return processedModelIds.length === 0 || !processedModelIds.includes(selectedModelId);
+  });
+}
+
+/**
  * Get all processed image IDs from a collection (excluding duplicates)
  */
 export function getProcessedImageIds(images: Image[]): number[] {
   const duplicateIds = findDuplicateImageIds(images);
   return images
     .filter(img => {
-      const hasResults = 
+      const hasResults =
         (img.live_mussel_count !== null && img.live_mussel_count !== undefined) ||
         (img.dead_mussel_count !== null && img.dead_mussel_count !== undefined) ||
         img.processed_at;
       return hasResults && !duplicateIds.has(img.image_id);
     })
     .map(img => img.image_id);
+}
+
+/**
+ * Determine whether the "Start New Run" button should be enabled.
+ */
+export function shouldEnableStartRunButton(
+  images: Image[],
+  selectedModelId: number | null,
+  latestRun: { model_id: number | null } | null,
+  recentlyUploadedImageIds: Set<number>
+): boolean {
+  if (!selectedModelId || images.length === 0) {
+    return false;
+  }
+
+  const duplicateIds = findDuplicateImageIds(images);
+
+  const hasNewNonDuplicateUploads = Array.from(recentlyUploadedImageIds).some(
+    imageId => !duplicateIds.has(imageId)
+  );
+  if (hasNewNonDuplicateUploads) {
+    return true;
+  }
+
+  if (!latestRun) {
+    return true;
+  }
+
+  if (latestRun.model_id !== selectedModelId) {
+    return true;
+  }
+
+  if (hasUnprocessedImages(images, selectedModelId, duplicateIds)) {
+    return true;
+  }
+
+  return false;
 }
 

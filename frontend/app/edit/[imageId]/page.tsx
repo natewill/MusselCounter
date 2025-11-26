@@ -11,13 +11,41 @@ import FullscreenImageModal from '@/components/edit/FullscreenImageModal';
 import EditPolygonModal from '@/components/edit/EditPolygonModal';
 import { useImageScale } from '@/hooks/useImageScale';
 
+interface Polygon {
+  coords: number[][];
+  class: 'live' | 'dead';
+  confidence: number;
+  original_class?: string;
+  manually_edited: boolean;
+}
+
+interface ImageData {
+  image_id: number;
+  collection_id: number;
+  filename: string;
+  stored_path: string;
+  file_hash: string;
+  width?: number;
+  height?: number;
+  live_mussel_count: number;
+  dead_mussel_count: number;
+  total_mussel_count: number;
+  live_percentage: number | null;
+  model_name: string;
+  model_type: string;
+  threshold: number;
+  processed_at: string;
+  created_at: string;
+  polygons: Polygon[];
+}
+
 export default function ImageDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const imageId = parseInt(Array.isArray(params.imageId) ? params.imageId[0] : params.imageId || '0', 10);
   const runId = parseInt(searchParams.get('runId') || '0', 10);
   
-  const [imageData, setImageData] = useState<any>(null);
+  const [imageData, setImageData] = useState<ImageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -175,7 +203,6 @@ export default function ImageDetailPage() {
             setIsFullscreen(false);
           }}
           onPolygonHover={(index) => setEditingPolygonIndex(index)}
-          imageData={imageData}
         />
 
         <EditPolygonModal

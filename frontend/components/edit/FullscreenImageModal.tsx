@@ -21,7 +21,6 @@ interface FullscreenImageModalProps {
   onClose: () => void;
   onPolygonClick: (index: number) => void;
   onPolygonHover: (index: number | null) => void;
-  imageData: { width?: number; height?: number };
 }
 
 export default function FullscreenImageModal({
@@ -36,7 +35,6 @@ export default function FullscreenImageModal({
   onClose,
   onPolygonClick,
   onPolygonHover,
-  imageData,
 }: FullscreenImageModalProps) {
   const fullscreenImageRef = useRef<HTMLImageElement>(null);
   const fullscreenContainerRef = useRef<HTMLDivElement>(null);

@@ -23,7 +23,6 @@ from api.error_handlers import (
     general_exception_handler
 )
 from fastapi.exceptions import RequestValidationError
-from utils.resource_detector import pick_threads
 
 
 def _configure_ssl_certificates():
@@ -71,9 +70,6 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize database schema and tables
     # Configure SSL certificates (fixes macOS SSL certificate issues)
     _configure_ssl_certificates()
-    
-    # Optimize CPU threading for PyTorch (only affects CPU mode, not GPU/MPS)
-    threads = pick_threads()
     
     await init_db()
     yield

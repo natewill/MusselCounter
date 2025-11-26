@@ -239,22 +239,16 @@ The system logs its decisions for transparency:
 ## Troubleshooting
 
 ### Issue: "Out of Memory" errors
-**Solution**: Reduce batch size via environment variable:
-```bash
-INFERENCE_BATCH_SIZE=1
-```
+**Solution**: Batch sizes are fixed (CPU): R-CNN uses 1, YOLO uses 2. Reduce model size if needed.
 
 ### Issue: Inference too slow
 **Solution**: 
 1. Check you're using appropriate model size (not YOLOv8x on CPU)
-2. Verify thread optimization ran: `grep "Optimized PyTorch" logs`
+2. Threads fixed to 2/1; consider smaller models if still slow
 3. Consider GPU acceleration
 
 ### Issue: High CPU usage causing lag
-**Solution**: Already optimized! Current settings use `cpu_count // 3` which is conservative. If still lagging, reduce further by editing `resource_detector.py`:
-```python
-t = max(1, cpu_count // 4)  # Even more conservative
-```
+**Solution**: Threads fixed to 2 main / 1 interop; further reduction would slow inference more. Hardware upgrade is the next step.
 
 ---
 
@@ -305,4 +299,3 @@ Potential enhancements (not currently implemented):
 5. **Profile-based optimization**: Learn optimal settings over time based on actual runs
 
 For now, the current implementation provides excellent performance without complexity.
-

@@ -124,6 +124,7 @@ export default function RunResultsPage() {
             imageCount={images.length}
             isRecalculating={isRecalculating}
             hasRecalculatedData={hasRecalculatedData}
+            isRunning={isRunning}
           />
         </div>
 

@@ -98,8 +98,9 @@ export function validateImageFiles(files: FileList | File[]): { validFiles: File
       totalSize += file.size;
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const zodError = error as z.ZodError;
-        errors.push(`"${file.name}": ${zodError.errors[0]?.message || 'Validation failed'}`);
+        errors.push(
+          `"${file.name}": ${error.issues[0]?.message || 'Validation failed'}`
+        );
       } else {
         errors.push(`"${file.name}": Validation failed`);
       }
@@ -142,24 +143,28 @@ export function isThresholdValid(threshold: number | null | undefined): boolean 
 }
 
 /**
- * Get validation error message for threshold, or null if valid
+ * Get validation error message for threshold, or null if valid.
+ * Exported separately so hooks can surface precise feedback without throwing.
  */
-export function getThresholdValidationError(threshold: number | null | undefined): string | null {
-  if (threshold === null || threshold === undefined) {
-    return null; // null/undefined is valid
+export const getThresholdValidationError = (
+  threshold: number | string | null | undefined
+): string | null => {
+  if (threshold === null || threshold === undefined || threshold === '') {
+    return null; // null/undefined/empty is valid (uses default)
   }
-  const thresh = Number(threshold);
-  if (isNaN(thresh)) {
+
+  const numericThreshold = Number(threshold);
+  if (Number.isNaN(numericThreshold)) {
     return 'Threshold must be a number';
   }
-  if (thresh < 0.0) {
+  if (numericThreshold < 0.0) {
     return 'Threshold must be at least 0.0';
   }
-  if (thresh > 1.0) {
+  if (numericThreshold > 1.0) {
     return 'Threshold must be at most 1.0';
   }
   return null;
-}
+};
 
 /**
  * Batch ID validation schema
@@ -195,7 +200,6 @@ export function validateModelId(modelId: unknown): number {
     if (error instanceof z.ZodError) {
       throw new Error('Invalid model ID');
     }
-    throw new Error('Model ID is required');
+    throw error;
   }
 }
-

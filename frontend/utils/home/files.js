@@ -120,7 +120,7 @@ export async function handleFileSelect(
     // Store collection_id in localStorage for run page
     await safeSetItem('currentCollectionId', collectionId.toString());
     
-    // Store upload counts in localStorage to show success message
+    // Get upload counts for success message
     const addedCount = uploadResult?.added_count || 0;
     const duplicateCount = uploadResult?.duplicate_count || 0;
     const uploadedImageIds = uploadResult?.image_ids || [];
@@ -130,13 +130,20 @@ export async function handleFileSelect(
     const { filterNonDuplicateIds } = await import('@/utils/imageUtils');
     const nonDuplicateIds = filterNonDuplicateIds(uploadedImageIds, duplicateImageIds);
     
-    await safeSetItem('uploadedImageCount', addedCount.toString());
-    await safeSetItem('duplicateImageCount', duplicateCount.toString());
+    // Store recently uploaded image IDs (still needed for flashing)
     await safeSetItem('recentlyUploadedImageIds', nonDuplicateIds);
 
-    // Navigate to collection page with collection_id (don't start run yet)
+    // Navigate to collection page with upload counts in URL query params
     // The collection page will show "X images added!" and a button to start the run
-    router.push(`/collection/${collectionId}`);
+    const params = new URLSearchParams();
+    if (addedCount > 0) {
+      params.set('added', addedCount.toString());
+    }
+    if (duplicateCount > 0) {
+      params.set('duplicates', duplicateCount.toString());
+    }
+    const queryString = params.toString();
+    router.push(`/collection/${collectionId}${queryString ? `?${queryString}` : ''}`);
     
     // Don't set loading to false - let the run page handle its own loading state
   } catch (err) {

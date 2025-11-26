@@ -55,7 +55,7 @@ export default function ThresholdControl({ threshold, onThresholdChange, onStart
               step="0.01"
               value={threshold}
               onChange={(e) => onThresholdChange(parseFloat(e.target.value))}
-              disabled={disabled}
+              disabled={imageCount === 0}
               className="flex-1 h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <input
@@ -70,7 +70,7 @@ export default function ThresholdControl({ threshold, onThresholdChange, onStart
                   onThresholdChange(value);
                 }
               }}
-              disabled={disabled}
+              disabled={imageCount === 0}
               className="w-20 px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>

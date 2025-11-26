@@ -93,7 +93,6 @@ export default function FullscreenImageModal({
             editingPolygonIndex={editingPolygonIndex}
             onPolygonClick={onPolygonClick}
             onPolygonHover={onPolygonHover}
-            imageRef={fullscreenImageRef}
           />
         )}
       </div>

@@ -164,6 +164,7 @@ export default function ImageDetailPage() {
         <ImageHeader
           filename={imageData.filename}
           collectionId={imageData.collection_id}
+          runId={runId}
           isEditMode={isEditMode}
           onToggleEditMode={() => setIsEditMode(!isEditMode)}
           visiblePolygons={visiblePolygons}

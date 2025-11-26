@@ -104,7 +104,6 @@ export default function RunResultsPage() {
             images={images} 
             onStopRun={handleStopRun}
             stopping={stopping}
-            serverTime={serverTime}
           />
           
           <ThresholdControl

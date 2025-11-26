@@ -5,6 +5,7 @@ import Link from 'next/link';
 interface ImageHeaderProps {
   filename: string;
   collectionId: number;
+  runId?: number | null;
   isEditMode: boolean;
   onToggleEditMode: () => void;
   visiblePolygons: boolean;
@@ -14,15 +15,20 @@ interface ImageHeaderProps {
 export default function ImageHeader({
   filename,
   collectionId,
+  runId,
   isEditMode,
   onToggleEditMode,
   visiblePolygons,
   onToggleVisiblePolygons,
 }: ImageHeaderProps) {
+  const backUrl = runId 
+    ? `/collection/${collectionId}?runId=${runId}`
+    : `/collection/${collectionId}`;
+
   return (
     <div className="mb-6">
       <Link
-        href={`/collection/${collectionId}`}
+        href={backUrl}
         className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-2 mb-4"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -44,7 +50,7 @@ export default function ImageHeader({
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
-            {isEditMode ? 'Edit Image' : 'Edit Image'}
+            {isEditMode ? 'Exit Edit Mode' : 'Edit Image'}
           </button>
           <button
             onClick={onToggleVisiblePolygons}

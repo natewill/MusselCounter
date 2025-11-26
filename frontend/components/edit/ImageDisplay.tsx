@@ -69,7 +69,6 @@ export default function ImageDisplay({
                 editingPolygonIndex={editingPolygonIndex}
                 onPolygonClick={onPolygonClick}
                 onPolygonHover={onPolygonHover}
-                imageRef={imageRef}
               />
             )}
           </div>

@@ -13,7 +13,6 @@ interface BoundingBoxesOverlayProps {
   editingPolygonIndex: number | null;
   onPolygonClick: (index: number) => void;
   onPolygonHover: (index: number | null) => void;
-  imageRef: React.RefObject<HTMLImageElement>;
 }
 
 export default function BoundingBoxesOverlay({
@@ -23,17 +22,12 @@ export default function BoundingBoxesOverlay({
   editingPolygonIndex,
   onPolygonClick,
   onPolygonHover,
-  imageRef,
 }: BoundingBoxesOverlayProps) {
   if (!polygons || polygons.length === 0) return null;
 
   return (
     <svg
       className="absolute top-0 left-0 w-full h-full pointer-events-none rounded"
-      style={{
-        width: imageRef.current?.offsetWidth || '100%',
-        height: imageRef.current?.offsetHeight || 'auto',
-      }}
     >
       {polygons.map((polygon: Polygon, index: number) => {
         // Scale coordinates
@@ -133,4 +127,3 @@ export default function BoundingBoxesOverlay({
     </svg>
   );
 }
-

@@ -1,4 +1,4 @@
-export default function RunStatus({ latestRun, isRunning, images, onStopRun, stopping, serverTime }) {
+export default function RunStatus({ latestRun, isRunning, images, onStopRun, stopping }) {
   // Calculate values first for logging and use later
   // Use processed_count from run table for accurate real-time progress (updated as batches complete)
   // Fall back to counting images with counts if processed_count not available

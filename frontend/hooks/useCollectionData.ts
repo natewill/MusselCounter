@@ -1,7 +1,6 @@
 import { useState, useEffect, startTransition } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getCollection } from '@/lib/api';
-import { safeGetNumber, safeSetItem } from '@/utils/storage';
 
 export function useCollectionData(collectionIdParam: number, selectedModelId?: number | null) {
   const [collectionId, setCollectionId] = useState<number | null>(null);
@@ -9,27 +8,9 @@ export function useCollectionData(collectionIdParam: number, selectedModelId?: n
   const [error, setError] = useState<string | null>(null);
   const [threshold, setThreshold] = useState(0.5);
 
-  // Initial load - get collection_id from storage or URL parameter
+  // Initial load - use the collectionId from URL parameter only
   useEffect(() => {
-    const loadCollectionData = async () => {
-      try {
-        // Prefer cached collection id
-        const storedCollectionId = await safeGetNumber('currentCollectionId');
-        if (storedCollectionId) {
-          setCollectionId(storedCollectionId);
-          return;
-        }
-
-        // Use the collectionId from URL parameter
-        setCollectionId(collectionIdParam);
-        await safeSetItem('currentCollectionId', collectionIdParam.toString());
-      } catch (err) {
-        console.error('Failed to load collection data:', err);
-        setError('Failed to load collection data. Please try again.');
-        setLoading(false);
-      }
-    };
-    loadCollectionData();
+    setCollectionId(collectionIdParam);
   }, [collectionIdParam]);
 
   // Use react-query for collection data fetching with automatic polling
@@ -125,4 +106,3 @@ export function useCollectionData(collectionIdParam: number, selectedModelId?: n
     setLoading,
   };
 }
-

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { safeRemoveItem, safeGetJSON } from '@/utils/storage';
 import { formatUploadSuccessMessage } from '@/utils/messageUtils';
 
 export function useStorageData() {
@@ -38,13 +37,7 @@ export function useStorageData() {
         }
       }
       
-      // Load recently uploaded image IDs from localStorage (still needed for flashing)
-      // This should only run once on mount
-      const recentlyUploadedIds = await safeGetJSON('recentlyUploadedImageIds');
-      if (recentlyUploadedIds && Array.isArray(recentlyUploadedIds)) {
-        await safeRemoveItem('recentlyUploadedImageIds');
-        setRecentlyUploadedImageIds(new Set(recentlyUploadedIds));
-      }
+      // For current session only; no persistence across reloads
     };
     
     loadStorageData();
@@ -64,4 +57,3 @@ export function useStorageData() {
 
   return { successMessage, setSuccessMessage, recentlyUploadedImageIds, setRecentlyUploadedImageIds };
 }
-

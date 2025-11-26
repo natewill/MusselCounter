@@ -108,13 +108,13 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
               ? `http://127.0.0.1:8000/uploads/${image.stored_path.split('/').pop()}`
               : null;
             
-            // Get run_id for the link (use latest run if available, otherwise image might not have results)
-            const runIdForLink = latestRun?.run_id || null;
+            // Use selected model if available; otherwise fall back to latest run
+            const modelIdForLink = selectedModelId ?? latestRun?.model_id ?? null;
             
             return (
               <Link
                 key={image.image_id}
-                href={runIdForLink ? `/edit/${image.image_id}?runId=${runIdForLink}` : '#'}
+                href={modelIdForLink ? `/edit/${image.image_id}?modelId=${modelIdForLink}` : '#'}
                 className={`block border rounded-lg overflow-hidden hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors relative ${
                   isFlashing
                     ? 'green-flash'
@@ -123,10 +123,10 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                     : needsProcessing
                     ? 'border-amber-300 dark:border-amber-700 bg-amber-50/20 dark:bg-amber-900/15 ring-2 ring-amber-300/20 dark:ring-amber-700/20'
                     : 'border-zinc-200 dark:border-zinc-800'
-                } ${!runIdForLink ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                } ${!modelIdForLink ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                 onClick={(e) => {
-                  // Prevent navigation if no run_id available
-                  if (!runIdForLink) {
+                  // Prevent navigation if no model_id available
+                  if (!modelIdForLink) {
                     e.preventDefault();
                   }
                 }}
@@ -210,4 +210,3 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
     </>
   );
 }
-

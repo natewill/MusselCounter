@@ -5,7 +5,7 @@ import Link from 'next/link';
 interface ImageHeaderProps {
   filename: string;
   collectionId: number;
-  runId?: number | null;
+  modelId?: number | null;
   isEditMode: boolean;
   onToggleEditMode: () => void;
   visiblePolygons: boolean;
@@ -15,14 +15,14 @@ interface ImageHeaderProps {
 export default function ImageHeader({
   filename,
   collectionId,
-  runId,
+  modelId,
   isEditMode,
   onToggleEditMode,
   visiblePolygons,
   onToggleVisiblePolygons,
 }: ImageHeaderProps) {
-  const backUrl = runId 
-    ? `/collection/${collectionId}?runId=${runId}`
+  const backUrl = modelId
+    ? `/collection/${collectionId}?modelId=${modelId}`
     : `/collection/${collectionId}`;
 
   return (
@@ -79,4 +79,3 @@ export default function ImageHeader({
     </div>
   );
 }
-

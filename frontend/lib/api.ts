@@ -346,27 +346,15 @@ function validateImageId(imageId: unknown): number {
 }
 
 /**
- * Validate run ID
- */
-function validateRunId(runId: unknown): number {
-  if (runId === null || runId === undefined) {
-    throw new Error('Run ID is required');
-  }
-  const rid = Number(runId);
-  if (isNaN(rid) || rid <= 0 || !Number.isInteger(rid)) {
-    throw new Error('Invalid run ID');
-  }
-  return rid
-}
-
-/**
  * gets image details from a specific run
  */
-export async function getImageDetails(imageId: number, runId: number) {
+export async function getImageDetails(imageId: number, modelId: number) {
   const validatedImageId = validateImageId(imageId);
-  const validatedRunId = validateRunId(runId);
+  const validatedModelId = validateModelId(modelId);
   
-  const response = await apiClient.get(`/api/images/${validatedImageId}/results/${validatedRunId}`);
+  const response = await apiClient.get(`/api/images/${validatedImageId}/results`, {
+    params: { model_id: validatedModelId },
+  });
   return response.data;
 }
 
@@ -375,19 +363,19 @@ export async function getImageDetails(imageId: number, runId: number) {
  */
 export async function updatePolygonClassification(
   imageId: number,
-  runId: number,
+  modelId: number,
   polygonIndex: number,
   newClass: 'live' | 'dead'
 ) {
   const validatedImageId = validateImageId(imageId);
-  const validatedRunId = validateRunId(runId);
+  const validatedModelId = validateModelId(modelId);
 
   if (newClass !== 'live' && newClass !== 'dead') {
     throw new Error('Classification must be "live" or "dead"');
   }
 
   const response = await apiClient.patch(
-    `/api/images/${validatedImageId}/results/${validatedRunId}/polygons/${polygonIndex}`,
+    `/api/images/${validatedImageId}/results/${validatedModelId}/polygons/${polygonIndex}`,
     { new_class: newClass }
   );
 

@@ -36,6 +36,7 @@ interface ImageData {
   threshold: number;
   processed_at: string;
   created_at: string;
+  model_id?: number;
   polygons: Polygon[];
 }
 
@@ -43,7 +44,7 @@ export default function ImageDetailPage() {
   const params = useParams();
   const searchParams = useSearchParams();
   const imageId = parseInt(Array.isArray(params.imageId) ? params.imageId[0] : params.imageId || '0', 10);
-  const runId = parseInt(searchParams.get('runId') || '0', 10);
+  const modelIdFromQuery = parseInt(searchParams.get('modelId') || '0', 10);
   
   const [imageData, setImageData] = useState<ImageData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -74,28 +75,31 @@ export default function ImageDetailPage() {
 
   // Fetch image data
   useEffect(() => {
-    if (!imageId || !runId) {
-      setError('Image ID and Run ID are required');
+    if (!imageId || !modelIdFromQuery) {
+      console.log('[ImageDetail] Missing IDs', { imageId, modelId: modelIdFromQuery });
+      setError('Image ID and model ID are required');
       setLoading(false);
       return;
     }
 
+    console.log('[ImageDetail] Fetching image data', { imageId, modelId: modelIdFromQuery });
     const fetchImageData = async () => {
       try {
         setLoading(true);
-        const data = await getImageDetails(imageId, runId);
+        const data = await getImageDetails(imageId, modelIdFromQuery);
         setImageData(data);
         setError(null);
       } catch (err) {
-        console.error('Failed to load image data:', err);
-        setError((err as Error).message || 'Failed to load image details');
+        const message = (err as Error).message || 'Failed to load image details';
+        console.log('[ImageDetail] Failed to load image data', { err, message });
+        setError(message);
       } finally {
         setLoading(false);
       }
     };
 
     fetchImageData();
-  }, [imageId, runId]);
+  }, [imageId, modelIdFromQuery]);
 
   // Handle classification change for polygon/mussel
   const handleClassificationChange = async (polygonIndex: number, newClass: 'live' | 'dead') => {
@@ -103,10 +107,10 @@ export default function ImageDetailPage() {
     
     setSaving(true);
     try {
-      await updatePolygonClassification(imageId, runId, polygonIndex, newClass);
+      await updatePolygonClassification(imageId, modelIdFromQuery, polygonIndex, newClass);
       
       // Refresh image data to show updated counts
-      const updatedData = await getImageDetails(imageId, runId);
+      const updatedData = await getImageDetails(imageId, modelIdFromQuery);
       setImageData(updatedData);
       
       // Close modal after successful update
@@ -138,7 +142,7 @@ export default function ImageDetailPage() {
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
             <p className="text-red-800 dark:text-red-200">{error || 'Image not found'}</p>
             <Link
-              href={`/collection/${imageData?.collection_id || ''}?runId=${runId || ''}`}
+              href={`/collection/${imageData?.collection_id ?? ''}?modelId=${imageData?.model_id ?? modelIdFromQuery ?? ''}`}
               className="text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block"
             >
               ← Back to collection
@@ -161,10 +165,22 @@ export default function ImageDetailPage() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black p-8">
       <div className="max-w-6xl mx-auto">
+        {(() => {
+          const backModelId = modelIdFromQuery || imageData?.model_id;
+          const backUrl = `/collection/${imageData?.collection_id ?? ''}?modelId=${backModelId ?? ''}`;
+          console.log('[ImageDetail] Render header/back link', {
+            backUrl,
+            imageModelId: imageData?.model_id,
+            queryModelId: modelIdFromQuery,
+            collectionId: imageData?.collection_id,
+          });
+          return null;
+        })()}
+
         <ImageHeader
           filename={imageData.filename}
           collectionId={imageData.collection_id}
-          runId={runId}
+          modelId={modelIdFromQuery || imageData.model_id}
           isEditMode={isEditMode}
           onToggleEditMode={() => setIsEditMode(!isEditMode)}
           visiblePolygons={visiblePolygons}

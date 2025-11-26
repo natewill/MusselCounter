@@ -56,8 +56,8 @@ class ImageDetailResponse(BaseModel):
     other_runs: List[Dict[str, Any]]  # Other runs that processed this image
 
 
-@router.get("/{image_id}/results/{run_id}", response_model=ImageDetailResponse)
-async def get_image_results_endpoint(image_id: int, run_id: int) -> ImageDetailResponse:
+@router.get("/{image_id}/results", response_model=ImageDetailResponse)
+async def get_image_results_endpoint(image_id: int, model_id: int) -> ImageDetailResponse:
     """
     Get detailed results for a specific image from a specific run.
     
@@ -82,7 +82,7 @@ async def get_image_results_endpoint(image_id: int, run_id: int) -> ImageDetailR
         HTTPException 400: If invalid IDs provided
     """
     image_id = validate_integer_id(image_id)
-    run_id = validate_integer_id(run_id)
+    model_id = validate_integer_id(model_id)
     
     async with get_db() as db:
         # Get main image and result data
@@ -112,15 +112,17 @@ async def get_image_results_endpoint(image_id: int, run_id: int) -> ImageDetailR
             JOIN run r ON ir.run_id = r.run_id
             JOIN model m ON r.model_id = m.model_id
             LEFT JOIN collection c ON r.collection_id = c.collection_id
-            WHERE i.image_id = ? AND ir.run_id = ?
-        """, (image_id, run_id))
+            WHERE i.image_id = ? AND r.model_id = ?
+            ORDER BY r.run_id DESC
+            LIMIT 1
+        """, (image_id, model_id))
         
         result = await cursor.fetchone()
         
         if not result:
             raise HTTPException(
                 status_code=404, 
-                detail=f"No results found for image {image_id} in run {run_id}"
+                detail=f"No results found for image {image_id} with model {model_id}"
             )
         
         # Load polygon data from JSON file
@@ -159,10 +161,10 @@ async def get_image_results_endpoint(image_id: int, run_id: int) -> ImageDetailR
             FROM image_result ir
             JOIN run r ON ir.run_id = r.run_id
             JOIN model m ON r.model_id = m.model_id
-            WHERE ir.image_id = ? AND r.run_id != ?
+            WHERE ir.image_id = ? AND r.model_id != ?
             ORDER BY r.started_at DESC
             LIMIT 10
-        """, (image_id, run_id))
+        """, (image_id, model_id))
         
         other_runs = [dict(row) for row in await other_runs_cursor.fetchall()]
         
@@ -205,10 +207,10 @@ async def get_image_results_endpoint(image_id: int, run_id: int) -> ImageDetailR
         )
 
 
-@router.patch("/{image_id}/results/{run_id}/polygons/{polygon_index}", response_model=Dict)
+@router.patch("/{image_id}/results/{model_id}/polygons/{polygon_index}", response_model=Dict)
 async def update_polygon_classification(
     image_id: int,
-    run_id: int,
+    model_id: int,
     polygon_index: int,
     new_class: str = Body(..., embed=True)
 ) -> Dict:
@@ -231,7 +233,7 @@ async def update_polygon_classification(
     from utils.security import validate_integer_id
 
     image_id = validate_integer_id(image_id)
-    run_id = validate_integer_id(run_id)
+    model_id = validate_integer_id(model_id)
 
     if new_class not in ["live", "dead"]:
         raise HTTPException(status_code=400, detail="Classification must be 'live' or 'dead'")
@@ -239,18 +241,21 @@ async def update_polygon_classification(
     async with get_db() as db:
         # Get the detection by polygon_index (ORDER BY detection_id to match insertion order)
         cursor = await db.execute("""
-            SELECT detection_id, original_class, class
+            SELECT detection_id, original_class, class, run_id
             FROM detection
-            WHERE image_id = ? AND run_id = ?
+            WHERE image_id = ? AND run_id = (
+                SELECT run_id FROM run WHERE model_id = ? ORDER BY run_id DESC LIMIT 1
+            )
             ORDER BY detection_id
             LIMIT 1 OFFSET ?
-        """, (image_id, run_id, polygon_index))
+        """, (image_id, model_id, polygon_index))
 
         detection = await cursor.fetchone()
         if not detection:
             raise HTTPException(status_code=404, detail="Detection not found")
 
         detection_id = detection['detection_id']
+        run_id = detection['run_id']
         original_class = detection['original_class']
         current_class = detection['class']
 
@@ -386,4 +391,3 @@ async def update_polygon_classification(
             "total_live": total_live,
             "total_dead": total_dead
         }
-

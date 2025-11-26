@@ -24,8 +24,16 @@ SCHEMA_PATH = Path(__file__).parent / "schema.sql"  # Path to SQL schema file
 RESET_DB_ON_STARTUP = os.getenv("RESET_DB_ON_STARTUP", "false").lower() in {"1", "true", "yes"}
 
 # CORS (Cross-Origin Resource Sharing) settings
-# These URLs are allowed to make requests to the API (frontend locations)
-CORS_ORIGINS = ["http://localhost:3000", "http://127.0.0.1:3000"]
+# For a solo app we default to allowing any origin. To restrict, set FRONTEND_URL.
+FRONTEND_URL = os.getenv("FRONTEND_URL")
+if FRONTEND_URL:
+    CORS_ORIGINS = [
+        FRONTEND_URL,
+        FRONTEND_URL.replace("localhost", "127.0.0.1") if "localhost" in FRONTEND_URL else None,
+    ]
+    CORS_ORIGINS = [origin for origin in CORS_ORIGINS if origin]
+else:
+    CORS_ORIGINS = ["*"]
 
 # Model inference settings
 DEFAULT_THRESHOLD = 0.5  # Default confidence threshold for mussel detection (0.0 to 1.0)

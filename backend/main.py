@@ -89,8 +89,8 @@ app = FastAPI(
 # Without this, browser would block cross-origin requests
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,  # List of allowed frontend URLs
-    allow_credentials=True,  # Allow cookies/auth headers
+    allow_origins=CORS_ORIGINS,  # List of allowed frontend URLs (["*"] allowed for solo app)
+    allow_credentials=False if CORS_ORIGINS == ["*"] else True,  # "*" requires credentials=False
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allow all request headers
 )

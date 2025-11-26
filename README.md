@@ -1,10 +1,12 @@
 # Mussel Counter Application
 
+A web application for automated detection and counting of live and dead mussels in images using machine learning models (YOLO and Faster R-CNN).
+
 ## Setup
 
 ### Prerequisites
-- Node.js (v18+), if you don't have node install in mac by running `brew install node`
-- Python (3.8+)
+- **Node.js** (v18+) - Install on macOS: `brew install node`
+- **Python** (3.8+)
 
 ### Backend Setup
 ```bash
@@ -22,7 +24,6 @@ pip install -r requirements.txt
 - `ultralytics` - YOLO model support
 - `pillow` - Image processing
 - `aiofiles` - Async file I/O operations
-- `python-dotenv` - Environment variable management
 
 ### Add Models
 Place your model files in `backend/data/models/` directory. The application automatically detects and loads models on startup.
@@ -30,17 +31,14 @@ Place your model files in `backend/data/models/` directory. The application auto
 **Supported file formats:** `.pt`, `.pth`, `.ckpt`
 
 **Supported Model Types:**
-The application supports object detection models that output bounding boxes:
-- **Faster R-CNN**: ResNet50-FPN backbone (automatically detected from filename)
-- **YOLO**: YOLOv5, YOLOv8 variants (nano, small, medium, large, xlarge)
-- **SSD**: Single Shot Detector (placeholder, not yet implemented)
-- **CNN**: Custom CNN-based detection (placeholder, not yet implemented)
+- **Faster R-CNN**: ResNet50-FPN backbone (detected from filename containing "rcnn" or "faster")
+- **YOLO**: YOLOv5, YOLOv8 variants (detected from filename containing "yolo")
 
 **Auto-Detection:**
 - Models are automatically added to the database on first startup
-- Model type is inferred from filename (e.g., "yolo" → YOLO, "rcnn"/"faster" → R-CNN)
-- Batch size is automatically calculated based on model parameter count and available hardware
-- No manual database setup required!
+- Model type is inferred from filename
+- Batch size is automatically calculated based on model parameter count
+- No manual database setup required
 
 **Example:**
 ```bash
@@ -60,7 +58,9 @@ cd frontend
 npm install
 ```
 
-## Running
+---
+
+## Running the Application
 
 **Terminal 1 - Backend:**
 ```bash
@@ -76,19 +76,10 @@ npm run dev
 ```
 
 **Access Points:**
+- **Frontend**: http://localhost:3000
 - **Backend API**: http://127.0.0.1:8000
 - **API Docs**: http://127.0.0.1:8000/docs (auto-generated Swagger UI)
-- **Frontend**: http://localhost:3000
-- **Image Uploads**: http://127.0.0.1:8000/uploads/{filename} (static file serving)
-
----
-
-## Testing
-
-Automated test suites are not included in this trimmed-down build. To verify changes manually:
-- Start backend (`uvicorn main:app --reload`) and frontend (`npm run dev`) in separate terminals.
-- Confirm uploads, model detection, and run workflows on the dashboard and run pages.
-- Check API docs at `http://127.0.0.1:8000/docs` for endpoint responses.
+- **Image Uploads**: http://127.0.0.1:8000/uploads/{filename}
 
 ---
 
@@ -103,276 +94,279 @@ backend/
 ├── db.py                        # Database connection/init
 ├── schema.sql                   # SQLite schema
 ├── requirements.txt             # Python dependencies
-├── api/                         # API layer
-│   ├── routers/                 # collections.py, models.py, runs.py, images.py, system.py
-│   ├── schemas.py               # Pydantic models
-│   ├── error_handlers.py        # Error formatting
-│   └── middleware/              # ASGI middleware init
-├── utils/                       # Business logic
-│   ├── model_utils/             # Loader/inference/model DB helpers
-│   ├── run_utils/               # Run orchestration and DB helpers
-│   ├── collection_utils.py      # Collection DB ops
-│   ├── image_utils.py           # Image DB ops & dedup
+├── api/
+│   ├── routers/                 # API endpoints (collections, models, runs, images, system)
+│   ├── schemas.py               # Pydantic request/response models
+│   └── error_handlers.py        # Error formatting
+├── utils/
+│   ├── model_utils/             # Model loading, inference, DB operations
+│   ├── run_utils/               # Run orchestration and processing
+│   ├── collection_utils.py      # Collection database operations
+│   ├── image_utils.py           # Image DB ops & deduplication
 │   ├── file_processing.py       # Upload validation/saving
-│   ├── resource_detector.py     # CPU/batch tuning
 │   ├── validation.py            # Input validation
-│   ├── security.py              # Path/security checks
-│   └── logger.py                # Logging setup
-├── data/                        # Persistent data (models/uploads/polygons)
-├── BACKEND_GUIDE.md             # Backend walkthrough
+│   └── security.py              # Path/security checks
+├── data/
+│   ├── models/                  # ML model files (.pt, .pth)
+│   ├── uploads/                 # Uploaded images
+│   └── polygons/                # Detection polygon data (JSON)
+├── BACKEND_GUIDE.md             # Backend architecture walkthrough
 ├── COLLECTION_PROCESSOR_EXPLAINED.md  # Run coordination deep dive
-└── RESOURCE_DETECTION.md        # Batch sizing notes
+└── RESOURCE_DETECTION.md        # Batch sizing and optimization notes
 ```
 
-**Key Principles**:
-- **Separation of Concerns**: API layer (HTTP) separate from business logic (utils)
-- **Modular Design**: Each utility handles one responsibility (models, images, runs)
-- **Database Abstraction**: All database operations in dedicated files
-- **Documentation**: Complex parts have dedicated explanation docs
+**Architecture Principles**:
+- **Separation of Concerns**: API layer separate from business logic
+- **Modular Design**: Each utility handles one responsibility
+- **Async-First**: All I/O operations use async/await
+- **Database Abstraction**: All database operations in dedicated utility files
 
 ### Frontend (`frontend/`)
 
 ```
 frontend/
-├── app/                         # Next.js App Router
+├── app/                         # Next.js App Router pages
 │   ├── layout.tsx               # Root layout + theme
 │   ├── globals.css              # Global styles
-│   ├── page.tsx                 # Home upload page (/)
-│   ├── collection/[collectionId]/page.tsx   # Run/results dashboard
-│   └── edit/[imageId]/page.tsx              # Image detail + polygon editor (requires ?runId=)
-├── components/                  # UI building blocks
-│   ├── home/                    # Upload/top bar/error display
-│   ├── run/                     # Run status, thresholds, image list, upload controls
-│   └── edit/                    # Image display, overlays, modals for polygon edits
-├── hooks/                       # Data fetching and UI state (useCollectionData, useModels, useImageUpload, useRunState, etc.)
-├── lib/                         # API client (`api.ts`)
-├── utils/                       # Validation, storage, query helpers
+│   ├── page.tsx                 # Home page (/)
+│   ├── collection/[collectionId]/page.tsx   # Collection dashboard
+│   └── edit/[imageId]/page.tsx              # Image detail + polygon editor
+├── components/                  # Reusable UI components
+│   ├── home/                    # Upload, error display
+│   ├── run/                     # Run status, controls, image list
+│   └── edit/                    # Image display, overlays, edit modals
+├── hooks/                       # Custom React hooks for data fetching
+├── lib/
+│   └── api.ts                   # API client (axios)
+├── utils/                       # Helper functions
 └── public/                      # Static assets
 ```
 
-**Key Principles**:
-- **Component Isolation**: Each component handles one UI piece
-- **Custom Hooks**: Business logic separate from UI rendering
-- **API Abstraction**: All backend calls through `lib/api.ts`
-- **Type Safety**: TypeScript for catching errors early
+**Architecture Principles**:
+- **Component Isolation**: Components focused on single UI responsibilities
+- **Custom Hooks**: Business logic separate from rendering
+- **API Abstraction**: All backend calls through centralized API client
+- **Type Safety**: TypeScript throughout
 
-## Stack
+---
 
-### [Next.js](https://nextjs.org/)
-For hosting frontend, used for serving the front end and API routing. With a React UI.  
-Next.js is specially designed for React, and handles routing while Node.js needs to use Express. Also much more minimal and efficient than Node.  
-Next.js is essentially Node.js + specially made for React + built-in routing + more.
+## Tech Stack
 
-### [Python FastAPI](https://fastapi.tiangolo.com/) + [Uvicorn](https://uvicorn.dev/)
-Since our model is built using Python libraries, we need to use Python-based APIs to run it.  
-FastAPI is a Python backend used to make APIs that will connect to our Next.js frontend.  
-Runs in Python, used to connect our model’s inference to our frontend.  
-Uvicorn is used to run these APIs on a server.  
-ASGI (Asynchronous Server Gateway Interface) runs up a server to host the APIs while being able to handle async requests.  
-Handles Sockets, HTTP, etc. for the API.
+### Backend
+- **FastAPI** + **Uvicorn** - Modern Python web framework with async support
+- **SQLite** - Lightweight, serverless database
+- **PyTorch** + **Ultralytics** - ML inference engine
+- **aiosqlite** - Async database operations
 
-### [SQLite](https://sqlite.org/)
-Lightweight, serverless database for storing:
-- Collections and their metadata
-- Image records and file hashes (for deduplication)
-- Model information and optimal batch sizes
-- Inference runs and their results
-- Image results with mussel counts and polygon data
-
-**Schema Features:**
-- Async operations using `aiosqlite`
-- Automatic database initialization from `schema.sql`
-- Foreign key constraints for data integrity
-- Composite primary keys for efficient run-image relationships
-
-### [PyInstaller](https://pyinstaller.org/)
-Used to bundle the application into an `.exe` file that opens the browser and runs the application.  
-All Athan needs to do is download the `.exe`, and open the app.
+### Frontend
+- **Next.js 16** - React framework with App Router
+- **React 19** - UI library
+- **TanStack Query** - Server state management
+- **Axios** - HTTP client
+- **Tailwind CSS 4** - Utility-first styling
+- **TypeScript** - Type safety
 
 ---
 
 ## Key Features
 
 ### Smart Run Management
-- **Run Reuse**: Runs are uniquely identified by `(collection_id, model_id, threshold)`
-- **Incremental Processing**: Only new images are processed when restarting a run with the same configuration
-- **Real-time Updates**: Image results are written to database immediately as batches complete
-- **Progress Tracking**: Live updates of processed image count during inference
-- **Run Cancellation**: Ability to stop ongoing runs via frontend UI
+- **Run Reuse**: Runs uniquely identified by `(collection_id, model_id, threshold)` tuple
+- **Incremental Processing**: Only new images are processed when restarting a run
+- **Real-time Updates**: Image results written to database as batches complete
+- **Progress Tracking**: Live progress updates during inference
+- **Run Cancellation**: Stop ongoing runs via UI
+
+### Threshold Recalculation
+- **Instant Updates**: Change threshold without re-running model
+- **Confidence Filtering**: Backend stores all detections with confidence scores
+- **On-Demand Calculation**: Counts recalculated from stored detections
+- **Visual Filtering**: Edit page only shows detections above current threshold
 
 ### Resource Optimization
-- **CPU Thread Optimization**: Automatically configures PyTorch threading based on available CPU cores
-- **Dynamic Batch Sizing**: Calculates optimal batch size based on model parameter count (not just model type)
-- **Inference Optimizations**: Disables gradient tracking and unnecessary CUDA operations for faster inference
-- **Non-blocking Model Loading**: Model loading runs in background thread to prevent UI freezing
-- **Lazy Image Loading**: Frontend thumbnails use lazy loading for better performance
+- **CPU Thread Optimization**: PyTorch threading configured based on CPU cores
+- **Dynamic Batch Sizing**: Batch size calculated from model parameter count
+- **Non-blocking Operations**: Model loading and inference run in background
+- **Inference Optimizations**: Gradient tracking disabled, CUDA disabled on CPU
 
 ### Image Management
-- **Deduplication**: Images are deduplicated by MD5 hash - same file uploaded multiple times stores only one copy
-- **Async File I/O**: Uses `aiofiles` for non-blocking file operations
-- **Thumbnail Display**: Image cards show thumbnails with live/dead counts and filename
-- **Visual Feedback**: Color-coded indicators (orange for unprocessed, green for processed, flash animation on completion)
-- **Smart Sorting**: Recently processed images automatically sort to the top during runs
+- **Deduplication**: Images deduplicated by MD5 hash
+- **Async File I/O**: Non-blocking file operations with `aiofiles`
+- **Visual Feedback**: Color-coded status indicators (orange=unprocessed, green=processing, flash on completion)
+- **Smart Sorting**: Recently processed images sort to top
 
 ### Model Support
-- **Auto-Detection**: Models in `data/models/` are automatically loaded on startup
-- **Multi-Model Support**: Supports Faster R-CNN and YOLO variants
-- **Parameter-Based Batching**: Batch size calculated from model parameter count (e.g., YOLOv8n gets larger batches than YOLOv8x)
-- **Device Detection**: Automatically uses GPU if available, optimized for CPU by default
-- **Graceful Fallbacks**: Handles missing models, corrupted weights, and inference errors gracefully
+- **Auto-Detection**: Models automatically loaded from `data/models/` on startup
+- **Multi-Model Support**: Faster R-CNN and YOLO variants
+- **Parameter-Based Batching**: Batch size scales with model size
+- **Graceful Fallbacks**: Handles missing models and inference errors
 
 ---
 
 ## Pages
 
 ### Home `/`
-- Drag-and-drop or picker upload for files/folders.
-- Quick-process mode: creates/recalls an active collection, uploads files, and redirects to that collection’s dashboard.
-- Manual create: create a fresh collection and jump to it to start a run.
+- Drag-and-drop or file picker upload
+- Quick-process mode: create collection and upload in one step
+- Manual mode: create empty collection first
 
 ### Collection Dashboard `/collection/[collectionId]`
-- Shows collection totals and images with status hues (pending/processing/complete).
-- Start/stop runs, choose model, and adjust threshold; supports threshold-only recalculation without rerunning the model.
-- Upload more images inline, see upload progress, and manage deletions.
+- View collection totals and all images
+- Start/stop runs with model selection
+- Adjust threshold with live recalculation
+- Upload additional images
+- Delete images
 
-### Image Detail & Editing `/edit/[imageId]?runId=<runId>`
-- View a single image with polygons, stats, and model/threshold context.
-- Toggle overlays, open fullscreen, and reclassify polygons (live/dead) with modal confirmations.
-- Link back to the source collection.
+### Image Detail `/edit/[imageId]?modelId={modelId}`
+- View single image with detection overlays
+- Edit polygon classifications (live/dead)
+- Toggle overlay visibility
+- Fullscreen view
+- Only shows detections above current threshold
 
 ---
 
-## APIs
+## API Reference
 
 ### Collection Endpoints
 
-#### `GET /api/collections`
-Get all collections information.
+**`GET /api/collections`**
+Get all collections.
 
-#### `POST /api/collections`
+**`POST /api/collections`**
 Create a new collection.
-- Request body: `{ name?: string, description?: string }`
+- Body: `{ name?: string, description?: string }`
 - Returns: `{ collection_id: number }`
 
-#### `GET /api/collections/[collectionId]`
-Get all information about a certain collection.
-- Returns: `{ collection: {...}, images: [...], latest_run: {...} }`
-- `collection.live_mussel_count` and `collection.dead_mussel_count` represent totals from latest run (all images)
-- `images[]` contains all images in the collection with their individual counts
-- `latest_run` shows current run status (pending, running, completed, failed)
-- Used for polling on run results page to get real-time updates
+**`GET /api/collections/{collectionId}`**
+Get collection details with images and latest run.
+- Optional query param: `?model_id={id}` to filter by specific model
+- Returns: Collection metadata, images with results, latest run status
 
-#### `POST /api/collections/[collectionId]/upload-images`
-Upload image files to a collection (multipart/form-data).
-- Request: `files: File[]`
-- Returns: `{ collection_id: number, image_ids: number[], added_count: number, duplicate_count: number, duplicate_image_ids: number[] }`
-- Images are deduplicated by hash - uploading same file twice only stores one copy
-- Files are validated for type and size before processing
+**`POST /api/collections/{collectionId}/upload-images`**
+Upload images (multipart/form-data).
+- Images deduplicated by hash
+- Returns: Added/duplicate counts and image IDs
 
-#### `DELETE /api/collections/[collectionId]/images/[imageId]`
-Remove an image from a collection.
-- Returns: `{ message: "Image removed successfully" }`
-- Deletes the image file and all associated results
+**`DELETE /api/collections/{collectionId}/images/{imageId}`**
+Remove image from collection.
+
+**`GET /api/collections/{collectionId}/recalculate`**
+Recalculate counts for new threshold without re-running model.
+- Query params: `threshold`, `model_id`
 
 ### Model Endpoints
 
-#### `GET /api/models`
+**`GET /api/models`**
 Get all available models.
-- Returns: `[{ model_id, name, type, weights_path, description, ... }]`
 
-#### `GET /api/models/[modelId]`
-Get model information.
-- Returns: `{ model_id, name, type, weights_path, description, ... }`
-
-### Image Endpoints
-
-#### `GET /api/images/{image_id}/results/{run_id}`
-Get detailed inference results for a specific image from a specific run.
-- Returns comprehensive image data including:
-  - **Image metadata**: filename, dimensions, file hash, upload date
-  - **Results**: live/dead counts, total count, percentages
-  - **Polygon data**: Full array of bounding boxes with coordinates, labels, and confidence scores
-  - **Model info**: model name, type, and threshold used
-  - **Collection context**: collection ID and name for navigation
-  - **Comparison data**: Other runs that processed this image (up to 10 most recent)
-- Example response:
-```json
-{
-  "image_id": 123,
-  "filename": "mussel_sample.jpg",
-  "width": 1920,
-  "height": 1080,
-  "live_mussel_count": 15,
-  "dead_mussel_count": 3,
-  "total_mussel_count": 18,
-  "live_percentage": 83.3,
-  "dead_percentage": 16.7,
-  "model_name": "YOLOv8n",
-  "threshold": 0.5,
-  "polygons": [
-    {
-      "label": "live",
-      "confidence": 0.95,
-      "coordinates": [[100,100], [200,100], [200,200], [100,200]]
-    }
-  ],
-  "detection_count": 18,
-  "other_runs": [...]
-}
-```
+**`GET /api/models/{modelId}`**
+Get specific model information.
 
 ### Run Endpoints
 
-#### `POST /api/runs/start`
-Start an inference run on a collection.
-- Request body: `{ collection_id: number, model_id: number, threshold?: number }` (threshold defaults to 0.5)
-- Returns: Full run object with all fields
-- **Smart Run Management**: Reuses existing run if same `(collection_id, model_id, threshold)` combination exists
-- Only processes images that haven't been processed for this specific run
-- Runs in background - API returns immediately with run details
-- Collection totals are updated when run completes
+**`POST /api/collections/{collectionId}/run`**
+Start inference run.
+- Body: `{ model_id: number, threshold?: number }`
+- Returns: Run object with status
+- Reuses existing run if same config exists
 
-#### `GET /api/runs/[runId]`
-Get specific run information.
-- Returns: `{ run_id, collection_id, model_id, threshold, status, live_mussel_count, dead_mussel_count, processed_count, total_images, started_at, finished_at, error_message, ... }`
-- Status can be: `pending`, `running`, `completed`, `failed`, `cancelled`
+**`GET /api/runs/{runId}`**
+Get run status and results.
 
-#### `POST /api/runs/[runId]/stop`
-Stop/cancel a running inference run.
-- Returns: Updated run object with status `cancelled`
-- Only works for runs with status `pending` or `running`
-- Images already processed are saved and counted
+**`POST /api/runs/{runId}/stop`**
+Cancel running inference.
 
-### Static File Endpoints
+### Image Endpoints
 
-#### `GET /uploads/{filename}`
-Serve uploaded image files.
-- Returns: Image file (JPEG, PNG, etc.)
-- Used for displaying image thumbnails in the frontend
-- Files are served from `backend/data/uploads/` directory
+**`GET /api/images/{imageId}/results`**
+Get detailed results for an image.
+- Query params: `collection_id`, `model_id`
+- Returns: Image metadata, counts, polygons, model info
+
+**`POST /api/images/{imageId}/detections/{detectionId}/classify`**
+Update polygon classification.
+- Body: `{ new_class: 'live' | 'dead' }`
+
+### Static Files
+
+**`GET /uploads/{filename}`**
+Serve uploaded images.
 
 ---
 
-## Documentation
+## Database Schema
 
-- **Resource Detection System**: See `backend/RESOURCE_DETECTION.md` for detailed explanation of CPU optimization, batch size calculation, and performance tuning
-- **API Documentation**: Visit http://127.0.0.1:8000/docs when backend is running for interactive API documentation
+**Core Tables:**
+- `collection` - Image collections
+- `image` - Unique images (deduplicated by hash)
+- `collection_image` - Many-to-many junction table
+- `model` - ML models and metadata
+- `run` - Inference runs (unique per collection+model+threshold)
+- `image_result` - Per-image results for each run
+- `detection` - Individual detections with confidence scores
+
+**Key Features:**
+- Foreign key constraints for data integrity
+- Async operations via `aiosqlite`
+- Automatic initialization from `schema.sql`
+- Indexes for fast lookups
 
 ---
 
 ## Performance
 
-### Typical Speeds (on CPU)
+### Typical Speeds (CPU)
 | Model | Parameters | Batch Size | Speed (10 images) |
 |-------|-----------|-----------|-------------------|
 | YOLOv8n | 3.2M | 4 | ~8 seconds |
 | YOLOv8s | 11.2M | 2 | ~12 seconds |
-| Faster R-CNN ResNet50 | 25M | 2 | ~35 seconds |
+| Faster R-CNN | 25M | 2 | ~35 seconds |
 | YOLOv8x | 68.2M | 1 | ~35 seconds |
 
-**Optimizations Applied:**
-- CPU thread count set to `cpu_count // 3` to reduce contention
-- Gradient tracking disabled during inference
-- CUDA backend disabled on CPU for reduced overhead
-- Batch processing for multiple images
-- Non-blocking model loading in background thread
+**Optimizations:**
+- CPU thread count: `cpu_count // 3`
+- Gradient tracking disabled
+- Batch processing
+- Background model loading
+
+---
+
+## Documentation
+
+- **Backend Architecture**: See `backend/BACKEND_GUIDE.md`
+- **Run System**: See `backend/COLLECTION_PROCESSOR_EXPLAINED.md`
+- **Performance Tuning**: See `backend/RESOURCE_DETECTION.md`
+- **Code Guidelines**: See `CLAUDE.md`
+- **Interactive API Docs**: http://127.0.0.1:8000/docs (when running)
+
+---
+
+## Development
+
+### Project Structure
+- **Backend**: Python 3.8+, FastAPI, async/await throughout
+- **Frontend**: Next.js 16 App Router, React 19, TypeScript
+- **Database**: SQLite with async driver
+- **ML Models**: PyTorch 2.0+, Ultralytics YOLO
+
+### Key Files
+- `backend/main.py` - FastAPI app setup
+- `backend/schema.sql` - Database schema
+- `frontend/lib/api.ts` - API client
+- `frontend/hooks/` - Data fetching logic
+
+### Common Tasks
+- **Add endpoint**: Create function in `backend/api/routers/`, add utility in `backend/utils/`
+- **Add component**: Create in `frontend/components/`, use hooks for data
+- **Update schema**: Modify `schema.sql`, delete database to reset
+
+---
+
+## Notes
+
+- Database resets on startup if empty (development mode)
+- Images stored in `backend/data/uploads/`
+- Detection data stored as JSON in `backend/data/polygons/`
+- Frontend polls collection endpoint for real-time updates during runs
+- All coordinates stored in original image dimensions, scaled for display

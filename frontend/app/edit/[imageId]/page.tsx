@@ -76,13 +76,11 @@ export default function ImageDetailPage() {
   // Fetch image data
   useEffect(() => {
     if (!imageId || !modelIdFromQuery) {
-      console.log('[ImageDetail] Missing IDs', { imageId, modelId: modelIdFromQuery });
       setError('Image ID and model ID are required');
       setLoading(false);
       return;
     }
 
-    console.log('[ImageDetail] Fetching image data', { imageId, modelId: modelIdFromQuery });
     const fetchImageData = async () => {
       try {
         setLoading(true);
@@ -91,7 +89,6 @@ export default function ImageDetailPage() {
         setError(null);
       } catch (err) {
         const message = (err as Error).message || 'Failed to load image details';
-        console.log('[ImageDetail] Failed to load image data', { err, message });
         setError(message);
       } finally {
         setLoading(false);
@@ -165,18 +162,6 @@ export default function ImageDetailPage() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black p-8">
       <div className="max-w-6xl mx-auto">
-        {(() => {
-          const backModelId = modelIdFromQuery || imageData?.model_id;
-          const backUrl = `/collection/${imageData?.collection_id ?? ''}?modelId=${backModelId ?? ''}`;
-          console.log('[ImageDetail] Render header/back link', {
-            backUrl,
-            imageModelId: imageData?.model_id,
-            queryModelId: modelIdFromQuery,
-            collectionId: imageData?.collection_id,
-          });
-          return null;
-        })()}
-
         <ImageHeader
           filename={imageData.filename}
           collectionId={imageData.collection_id}

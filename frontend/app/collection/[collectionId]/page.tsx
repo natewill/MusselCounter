@@ -78,19 +78,12 @@ export default function RunResultsPage() {
     const urlModelId = searchParams.get('modelId');
     initializedFromUrlRef.current = true;
 
-    console.log('[ModelSync] Initial load - urlModelId:', urlModelId);
-
     if (urlModelId) {
       lastUrlModelIdRef.current = urlModelId;
       const parsed = parseInt(urlModelId, 10);
       if (!Number.isNaN(parsed)) {
-        console.log('[ModelSync] Applying model from URL:', parsed);
         setSelectedModelId(parsed);
-      } else {
-        console.log('[ModelSync] urlModelId was not a number, ignoring.');
       }
-    } else {
-      console.log('[ModelSync] No modelId in URL on load.');
     }
   }, [searchParams, setSelectedModelId]);
 
@@ -101,19 +94,10 @@ export default function RunResultsPage() {
     const currentUrlModelId = searchParams.get('modelId');
     const currentParsed = currentUrlModelId ? parseInt(currentUrlModelId, 10) : null;
 
-    if (currentParsed === selectedModelId) {
-      console.log('[ModelSync] URL already matches selected model:', selectedModelId);
-      return;
-    }
+    if (currentParsed === selectedModelId) return;
 
     const params = new URLSearchParams(searchParams.toString());
     params.set('modelId', selectedModelId.toString());
-    console.log('[ModelSync] Updating URL modelId', {
-      from: currentParsed,
-      to: selectedModelId,
-      pathname,
-      params: params.toString(),
-    });
     router.replace(`${pathname}?${params.toString()}`);
   }, [selectedModelId, searchParams, router, pathname]);
 

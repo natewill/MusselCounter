@@ -13,6 +13,7 @@ uploaded multiple times only stores one copy.
 """
 from typing import Any, Dict, List
 import asyncio
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from db import get_db
 from utils.collection_utils import (
@@ -46,7 +47,6 @@ async def create_collection_endpoint(request: CreateCollectionRequest) -> Dict[s
     Returns the ID of the newly created collection.
     """
     async with get_db() as db:
-        print("hello!!!!")
         collection_id = await create_collection(db, request.name, request.description)
         return {"collection_id": collection_id}
 
@@ -123,9 +123,9 @@ async def recalculate_threshold_endpoint(
 ) -> Dict:
     """
     Recalculate mussel counts for a new threshold without re-running the model.
-
-    Uses stored detection data from the latest run with the specified model
-    to recalculate counts based on the new threshold value.
+    
+    Updates the run threshold and all image_result counts based on the new threshold value.
+    This permanently changes the threshold for the run.
 
     Args:
         collection_id: ID of the collection
@@ -144,6 +144,9 @@ async def recalculate_threshold_endpoint(
     """
     collection_id = validate_integer_id(collection_id)
     model_id = validate_integer_id(model_id)
+
+    if threshold < 0 or threshold > 1:
+        raise HTTPException(status_code=400, detail="Threshold must be between 0 and 1")
 
     async with get_db() as db:
         # Verify collection exists
@@ -176,7 +179,7 @@ async def recalculate_threshold_endpoint(
             (run_id,)
         )
         detection_count = (await debug_cursor.fetchone())[0]
-        logger.info(f"[RECALCULATE] Found {detection_count} detections for run {run_id} with threshold {threshold}")
+        logger.info(f"[RECALCULATE] Found {detection_count} detections for run {run_id}, updating threshold to {threshold}")
 
         # Query detections and recalculate counts with new threshold
         # Count logic:
@@ -204,11 +207,13 @@ async def recalculate_threshold_endpoint(
         rows = await cursor.fetchall()
         logger.info(f"[RECALCULATE] Recalculated counts for {len(rows)} images")
 
-        # Build response
+        # Build response and update database
         images_dict = {}
         live_total = 0
         dead_total = 0
+        now = datetime.now().isoformat()
 
+        # Update each image_result with new counts
         for row in rows:
             image_id = row[0]
             live_count = row[1] or 0
@@ -221,6 +226,28 @@ async def recalculate_threshold_endpoint(
 
             live_total += live_count
             dead_total += dead_count
+
+            # Update image_result table with new counts
+            await db.execute(
+                """UPDATE image_result
+                   SET live_mussel_count = ?,
+                       dead_mussel_count = ?,
+                       processed_at = ?
+                   WHERE image_id = ? AND run_id = ?""",
+                (live_count, dead_count, now, image_id, run_id)
+            )
+
+        # Update run threshold and totals
+        await db.execute(
+            """UPDATE run
+               SET threshold = ?,
+                   live_mussel_count = ?
+               WHERE run_id = ?""",
+            (threshold, live_total, run_id)
+        )
+
+        await db.commit()
+        logger.info(f"[RECALCULATE] Updated run {run_id} threshold to {threshold}, total live: {live_total}, total dead: {dead_total}")
 
         return {
             "images": images_dict,
@@ -322,6 +349,9 @@ async def delete_image_from_collection_endpoint(
     
     Note: This only removes the link between image and collection.
     The image file and its data remain in the database (in case it's used in other collections).
+    
+    After removal, recalculates mussel counts for all runs that processed this image
+    and updates the collection's total count.
     """
     collection_id = validate_integer_id(collection_id)
     image_id = validate_integer_id(image_id)
@@ -330,5 +360,51 @@ async def delete_image_from_collection_endpoint(
             raise HTTPException(status_code=404, detail="Collection not found")
         if not await remove_image_from_collection(db, collection_id, image_id):
             raise HTTPException(status_code=404, detail="Image not found")
+        
+        # Find all runs that processed this image
+        runs_cursor = await db.execute(
+            """SELECT DISTINCT run_id FROM image_result WHERE image_id = ?""",
+            (image_id,)
+        )
+        affected_runs = await runs_cursor.fetchall()
+        
+        # Recalculate counts for each affected run
+        for run_row in affected_runs:
+            run_id = run_row[0]
+            
+            # Recalculate totals from remaining image results in this run
+            totals_cursor = await db.execute(
+                """SELECT 
+                       SUM(live_mussel_count) as total_live,
+                       SUM(dead_mussel_count) as total_dead
+                   FROM image_result
+                   WHERE run_id = ?""",
+                (run_id,)
+            )
+            totals = await totals_cursor.fetchone()
+            total_live = totals['total_live'] or 0
+            
+            # Update run totals
+            await db.execute(
+                """UPDATE run
+                   SET live_mussel_count = ?
+                   WHERE run_id = ?""",
+                (total_live, run_id)
+            )
+        
+        # Update collection's live_mussel_count from latest run (if exists)
+        latest_run = await get_latest_run(db, collection_id)
+        if latest_run:
+            collection_live_count = latest_run['live_mussel_count'] or 0
+            await db.execute(
+                """UPDATE collection 
+                   SET live_mussel_count = ?, updated_at = ?
+                   WHERE collection_id = ?""",
+                (collection_live_count, datetime.now().isoformat(), collection_id)
+            )
+        
+        await db.commit()
+        logger.info(f"Removed image {image_id} from collection {collection_id} and updated counts for {len(affected_runs)} runs")
+        
         return {"collection_id": collection_id, "image_id": image_id, "status": "removed"}
 

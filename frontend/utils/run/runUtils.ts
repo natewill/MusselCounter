@@ -205,8 +205,19 @@ export function shouldEnableStartRunButton(
     return false;
   }
 
+  // Check if recently uploaded images are actually unprocessed with selected model
   if (recentlyUploadedImageIds.size > 0) {
-    return true;
+    const duplicateIds = findDuplicateImageIds(images);
+    const hasUnprocessedRecentlyUploaded = Array.from(recentlyUploadedImageIds).some(imageId => {
+      const image = images.find(img => img.image_id === imageId);
+      if (!image || duplicateIds.has(imageId)) return false;
+      const processedModelIds = image.processed_model_ids ?? [];
+      return processedModelIds.length === 0 || !processedModelIds.includes(selectedModelId);
+    });
+    
+    if (hasUnprocessedRecentlyUploaded) {
+      return true;
+    }
   }
 
   const duplicateIds = findDuplicateImageIds(images);
@@ -220,13 +231,15 @@ export function shouldEnableStartRunButton(
     return true;
   }
 
+  // If no latest run exists at all, enable button
   if (!latestRun) {
     return true;
   }
 
-  if (latestRun.model_id !== selectedModelId) {
-    return true;
-  }
+  // Note: We don't check latestRun.model_id !== selectedModelId here because
+  // that would incorrectly enable the button when switching back to a model
+  // that has already processed all images. The hasUnprocessedImages check
+  // above already handles whether a new run is needed.
 
   return false;
 }

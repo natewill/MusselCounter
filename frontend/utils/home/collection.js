@@ -7,6 +7,5 @@ export async function createQuickProcessCollection(setActiveCollectionId) {
   const collectionId = response.collection_id;
   setActiveCollectionId(collectionId);
   await safeSetItem('quickProcessCollectionId', collectionId.toString());
-  console.log('Quick Process collection created:', collectionId);
   return collectionId;
 }

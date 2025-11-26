@@ -31,7 +31,6 @@ async def create_collection(
     )
     await db.commit()
 
-    print(name, description, now)
     return cursor.lastrowid
 
 
@@ -64,14 +63,16 @@ async def get_all_collections(db: aiosqlite.Connection):
     return await cursor.fetchall()
 
 
-async def _attach_processed_models(db: aiosqlite.Connection, rows):
+async def _attach_processed_models(db: aiosqlite.Connection, rows, collection_id: int):
     """
     Helper function to add processed_model_ids to a list of images.
-    For each image, finds all model IDs that have successfully processed it.
+    For each image, finds all model IDs that have successfully processed it
+    in runs belonging to the specified collection.
     
     Args:
         db: Database connection
         rows: List of image rows (dict-like objects)
+        collection_id: Collection ID to filter runs by
         
     Returns:
         List of images with processed_model_ids added
@@ -85,8 +86,9 @@ async def _attach_processed_models(db: aiosqlite.Connection, rows):
                FROM image_result ir
                JOIN run r ON ir.run_id = r.run_id
                WHERE r.status = 'completed'
+                 AND r.collection_id = ?
                  AND ir.image_id IN ({placeholders})""",
-        image_ids
+        (collection_id, *image_ids)
     )
     model_map = defaultdict(list)
     for row in await cursor.fetchall():
@@ -114,7 +116,7 @@ async def get_collection_images(db: aiosqlite.Connection, collection_id: int):
         (collection_id,)
     )
     images = await cursor.fetchall()
-    return await _attach_processed_models(db, images)
+    return await _attach_processed_models(db, images, collection_id)
 
 
 async def get_collection_images_with_results(
@@ -163,7 +165,7 @@ async def get_collection_images_with_results(
     """
     cur = await db.execute(sql, (collection_id, current_threshold, current_threshold, collection_id))
     images = await cur.fetchall()
-    return await _attach_processed_models(db, images)
+    return await _attach_processed_models(db, images, collection_id)
 
 
 async def remove_image_from_collection(

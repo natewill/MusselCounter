@@ -34,19 +34,12 @@ export default function DatabaseVersionChecker() {
         // Get stored version from localStorage
         const storedVersion = await safeGetItem(DB_VERSION_KEY);
         
-        console.log('storedVersion', storedVersion);
-        console.log('db_version', db_version);
-        
         if (storedVersion !== db_version) {
           // Database was reset or is different - clear all localStorage
-          console.log('Database version mismatch detected, clearing localStorage');
-          console.log(`Stored version: ${storedVersion}, Current version: ${db_version}`);
-          
           await safeClear();
           
           // Store the new version
           await safeSetItem(DB_VERSION_KEY, db_version);
-          console.log('Stored new version', db_version);
         } else {
           // Versions match, ensure we have the version stored
           await safeSetItem(DB_VERSION_KEY, db_version);

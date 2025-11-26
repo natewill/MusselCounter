@@ -15,21 +15,12 @@ export default function AddModelButton() {
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) {
-      console.log('[AddModelButton] No file selected');
       return;
     }
-
-    console.log('[AddModelButton] File selected:', {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      lastModified: file.lastModified
-    });
 
     // Validate file type
     const validExtensions = ['.pt', '.pth', '.ckpt'];
     const fileExt = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
-    console.log('[AddModelButton] File extension:', fileExt);
     
     if (!validExtensions.includes(fileExt)) {
       const errorMsg = `Invalid file type. Supported: ${validExtensions.join(', ')}`;
@@ -41,19 +32,14 @@ export default function AddModelButton() {
     setUploading(true);
     setError(null);
     setSuccessMessage(null);
-    console.log('[AddModelButton] Starting upload...');
 
     try {
-      console.log('[AddModelButton] Calling uploadModel API...');
       const result = await uploadModel(file);
-      console.log('[AddModelButton] Upload successful:', result);
       
       // Invalidate models query to refresh the list (for any components using React Query)
-      console.log('[AddModelButton] Invalidating models query...');
       await queryClient.invalidateQueries({ queryKey: ['models'] });
       
       // Dispatch custom event to trigger refresh in useModels hook
-      console.log('[AddModelButton] Dispatching modelsUpdated event...');
       window.dispatchEvent(new CustomEvent('modelsUpdated'));
       
       // Reset file input
@@ -63,7 +49,6 @@ export default function AddModelButton() {
       
       // Show success message
       setSuccessMessage(`Model "${result.name}" uploaded successfully!`);
-      console.log('[AddModelButton] Upload complete!');
     } catch (err) {
       console.error('[AddModelButton] Upload failed:', {
         error: err,

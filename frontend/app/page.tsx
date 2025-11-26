@@ -22,7 +22,6 @@ export default function Home() {
   // Load activeCollectionId from storage on mount
   useEffect(() => {
     safeGetNumber('quickProcessCollectionId').then((storedCollectionId) => {
-      console.log('storedCollectionId', storedCollectionId);
       if (storedCollectionId) {
         setActiveCollectionId(storedCollectionId);
       }

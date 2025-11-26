@@ -232,40 +232,15 @@ export async function uploadModel(
   modelType?: string,
   description?: string
 ) {
-  console.log('[uploadModel] Starting upload:', {
-    fileName: file.name,
-    fileSize: file.size,
-    fileType: file.type,
-    name,
-    modelType,
-    description
-  });
-  
   const formData = new FormData();
   formData.append('file', file);
   if (name) formData.append('name', name);
   if (modelType) formData.append('model_type', modelType);
   if (description) formData.append('description', description);
   
-  // Log FormData contents (for debugging)
-  console.log('[uploadModel] FormData entries:');
-  for (const [key, value] of formData.entries()) {
-    if (value instanceof File) {
-      console.log(`  ${key}: File(${value.name}, ${value.size} bytes)`);
-    } else {
-      console.log(`  ${key}: ${value}`);
-    }
-  }
-  
-  console.log('[uploadModel] Making POST request to /api/models');
-  
   try {
     // Don't set Content-Type header - axios will set it automatically with boundary
     const response = await apiClient.post('/api/models', formData);
-    console.log('[uploadModel] Request successful:', {
-      status: response.status,
-      data: response.data
-    });
     return response.data;
   } catch (error) {
     console.error('[uploadModel] Request failed:', {

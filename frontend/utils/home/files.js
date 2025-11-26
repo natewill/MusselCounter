@@ -95,7 +95,6 @@ export async function handleFileSelect(
     let uploadResult;
     try {
       uploadResult = await uploadImagesToCollection(collectionId, imageFiles);
-      console.log('Files uploaded successfully');
     } catch (err) {
       const errorMsg = err.message || '';
       // If collection not found (404), clear stale collection_id and create new collection
@@ -108,7 +107,6 @@ export async function handleFileSelect(
         try {
           collectionId = await createQuickProcessCollection(setActiveCollectionId);
           uploadResult = await uploadImagesToCollection(collectionId, imageFiles);
-          console.log('Files uploaded successfully to new collection');
         } catch (retryErr) {
           throw new Error('Failed to create new collection and upload. ' + (retryErr.message || ''));
         }

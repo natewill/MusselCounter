@@ -397,7 +397,19 @@ async def delete_image_from_collection_endpoint(
                    WHERE image_id = ? AND run_id IN ({placeholders})""",
                 (image_id, *run_ids)
             )
-            logger.info(f"Deleted {len(affected_runs)} image_result records for image {image_id} from collection {collection_id}")
+            detections_cursor = await db.execute(
+                f"""DELETE FROM detection
+                   WHERE image_id = ? AND run_id IN ({placeholders})""",
+                (image_id, *run_ids)
+            )
+            detections_deleted = detections_cursor.rowcount or 0
+            logger.info(
+                "Deleted %s image_result records and %s detections for image %s in collection %s",
+                len(affected_runs),
+                detections_deleted,
+                image_id,
+                collection_id,
+            )
         
         # Recalculate counts for each affected run
         for run_row in affected_runs:

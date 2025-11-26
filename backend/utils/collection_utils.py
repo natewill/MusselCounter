@@ -122,48 +122,81 @@ async def get_collection_images(db: aiosqlite.Connection, collection_id: int):
 async def get_collection_images_with_results(
     db: aiosqlite.Connection,
     collection_id: int,
-    run_id: int,
-    current_threshold: float = None
+    run_id: int | None,
+    current_threshold: float | None = None
 ):
     """
-    Return images in a collection with their latest result (optionally constrained by threshold).
-    Latest is chosen by max(run.run_id) per image.
+    Return images in a collection with their inference results.
+    
+    If run_id is provided, results are scoped strictly to that run to avoid mixing
+    data from other runs. If run_id is None, falls back to selecting the latest
+    run per image (optionally filtered by threshold) for backwards compatibility.
     """
-    sql = """
-    WITH latest_key AS (
-        SELECT ir.image_id, MAX(r.run_id) AS max_run_id
-        FROM image_result ir
-        JOIN run r ON ir.run_id = r.run_id
-        WHERE r.collection_id = ?
-          AND (? IS NULL OR ABS(r.threshold - ?) < 0.001)
-        GROUP BY ir.image_id
-    )
-    SELECT
-        i.image_id,
-        i.filename,
-        i.stored_path,
-        i.file_hash,
-        i.width,
-        i.height,
-        i.created_at,
-        i.updated_at,
-        ci.added_at,
-        l.live_mussel_count,
-        l.dead_mussel_count,
-        l.polygon_path,
-        l.processed_at,
-        l.error_msg,
-        lr.threshold AS result_threshold
-    FROM image i
-    JOIN collection_image ci ON i.image_id = ci.image_id
-    LEFT JOIN latest_key lk ON lk.image_id = i.image_id
-    LEFT JOIN image_result l ON l.image_id = lk.image_id AND l.run_id = lk.max_run_id
-    LEFT JOIN run lr ON lr.run_id = lk.max_run_id
-    WHERE ci.collection_id = ?
-    ORDER BY ci.added_at DESC,
-             COALESCE(l.processed_at, '1970-01-01T00:00:00Z') DESC
-    """
-    cur = await db.execute(sql, (collection_id, current_threshold, current_threshold, collection_id))
+    if run_id is not None:
+        sql = """
+        SELECT
+            i.image_id,
+            i.filename,
+            i.stored_path,
+            i.file_hash,
+            i.width,
+            i.height,
+            i.created_at,
+            i.updated_at,
+            ci.added_at,
+            l.live_mussel_count,
+            l.dead_mussel_count,
+            l.polygon_path,
+            l.processed_at,
+            l.error_msg,
+            lr.threshold AS result_threshold
+        FROM image i
+        JOIN collection_image ci ON i.image_id = ci.image_id
+        LEFT JOIN image_result l ON l.image_id = i.image_id AND l.run_id = ?
+        LEFT JOIN run lr ON lr.run_id = ?
+        WHERE ci.collection_id = ?
+        ORDER BY ci.added_at DESC,
+                 COALESCE(l.processed_at, '1970-01-01T00:00:00Z') DESC
+        """
+        params = (run_id, run_id, collection_id)
+    else:
+        sql = """
+        WITH latest_key AS (
+            SELECT ir.image_id, MAX(r.run_id) AS max_run_id
+            FROM image_result ir
+            JOIN run r ON ir.run_id = r.run_id
+            WHERE r.collection_id = ?
+              AND (? IS NULL OR ABS(r.threshold - ?) < 0.001)
+            GROUP BY ir.image_id
+        )
+        SELECT
+            i.image_id,
+            i.filename,
+            i.stored_path,
+            i.file_hash,
+            i.width,
+            i.height,
+            i.created_at,
+            i.updated_at,
+            ci.added_at,
+            l.live_mussel_count,
+            l.dead_mussel_count,
+            l.polygon_path,
+            l.processed_at,
+            l.error_msg,
+            lr.threshold AS result_threshold
+        FROM image i
+        JOIN collection_image ci ON i.image_id = ci.image_id
+        LEFT JOIN latest_key lk ON lk.image_id = i.image_id
+        LEFT JOIN image_result l ON l.image_id = lk.image_id AND l.run_id = lk.max_run_id
+        LEFT JOIN run lr ON lr.run_id = lk.max_run_id
+        WHERE ci.collection_id = ?
+        ORDER BY ci.added_at DESC,
+                 COALESCE(l.processed_at, '1970-01-01T00:00:00Z') DESC
+        """
+        params = (collection_id, current_threshold, current_threshold, collection_id)
+    
+    cur = await db.execute(sql, params)
     images = await cur.fetchall()
     return await _attach_processed_models(db, images, collection_id)
 

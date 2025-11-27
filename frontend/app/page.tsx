@@ -119,7 +119,11 @@ export default function Home() {
 
           <ErrorDisplay error={error} onDismiss={() => setError(null)} />
         </div>
-        </div>
+      </div>
+
+      <footer className="absolute bottom-4 left-0 right-0 text-center text-sm text-zinc-600 dark:text-zinc-400">
+        Made by Nate Williams, Austin Ashley, Fernando Gomez, Siddharth Rakshit
+      </footer>
     </div>
   );
 }

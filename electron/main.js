@@ -32,7 +32,11 @@ const baseDir = app.isPackaged ? process.resourcesPath : path.resolve(__dirname,
 const backendDir = path.join(baseDir, 'backend');
 const frontendDir = path.join(baseDir, 'frontend');
 
-const bundledRuntimeDir = path.join(backendDir, 'python-runtime', process.platform === 'win32' ? 'Scripts' : 'bin');
+const bundledRuntimeDir = path.join(
+  backendDir,
+  'python-runtime',
+  process.platform === 'win32' ? 'Scripts' : 'bin'
+);
 const bundledPython = path.join(
   backendDir,
   'python-runtime',
@@ -48,8 +52,35 @@ if (!process.env.PYTHON_PATH && fs.existsSync(bundledPython)) {
 let backendProcess;
 let frontendProcess;
 
+// Prefer a real Node.js binary; do NOT fall back to Electron
+function resolveNodePath() {
+  const candidates = [
+    process.env.NODE_BINARY,
+    process.env.NEXT_NODE_BINARY,
+    path.join(frontendDir, 'node_modules', '.bin', 'node'),
+    '/opt/homebrew/bin/node',
+    '/usr/local/bin/node',
+    '/usr/bin/node',
+    'node',
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      fs.accessSync(candidate, fs.constants.X_OK);
+      log(`[resolveNodePath] Using Node at ${candidate}`);
+      return candidate;
+    } catch (err) {
+      continue;
+    }
+  }
+
+  log('[resolveNodePath] No Node.js binary found in candidates');
+  return null;
+}
+
 function resolvePythonPath() {
   if (process.env.PYTHON_PATH) {
+    log(`[resolvePythonPath] Using PYTHON_PATH=${process.env.PYTHON_PATH}`);
     return process.env.PYTHON_PATH;
   }
 
@@ -59,6 +90,7 @@ function resolvePythonPath() {
     : path.join(bundledRuntime, 'bin', 'python3');
 
   if (fs.existsSync(bundledPython)) {
+    log(`[resolvePythonPath] Using bundled runtime at ${bundledPython}`);
     return bundledPython;
   }
 
@@ -66,9 +98,11 @@ function resolvePythonPath() {
   const windowsVenv = path.join(backendDir, 'venv', 'Scripts', 'python.exe');
 
   if (fs.existsSync(posixVenv)) {
+    log(`[resolvePythonPath] Using backend venv at ${posixVenv}`);
     return posixVenv;
   }
   if (fs.existsSync(windowsVenv)) {
+    log(`[resolvePythonPath] Using backend venv at ${windowsVenv}`);
     return windowsVenv;
   }
 
@@ -82,12 +116,14 @@ function resolvePythonPath() {
   for (const candidate of candidates) {
     try {
       fs.accessSync(candidate, fs.constants.X_OK);
+      log(`[resolvePythonPath] Using system python at ${candidate}`);
       return candidate;
     } catch (e) {
       continue;
     }
   }
 
+  log('[resolvePythonPath] Falling back to platform default python');
   return process.platform === 'win32' ? 'python' : 'python3';
 }
 
@@ -130,6 +166,7 @@ function startFrontend() {
   const hasBuild = fs.existsSync(path.join(frontendDir, '.next'));
   const useDevServer = process.env.NEXT_DEV === 'true' || !hasBuild;
   const script = useDevServer ? 'dev' : 'start';
+  log(`[frontend] hasBuild=${hasBuild} useDevServer=${useDevServer} script=${script}`);
 
   const nextBin = resolveNextBinary();
   if (!nextBin) {
@@ -151,6 +188,17 @@ function startFrontend() {
     return { proc: null, script };
   }
 
+  const nodeCmd = resolveNodePath();
+  if (!nodeCmd) {
+    log('[frontend] No Node.js runtime found.');
+    dialog.showErrorBox(
+      'Node.js not found',
+      'Could not find a Node.js runtime to start the frontend. Install Node.js, or set NODE_BINARY/NEXT_NODE_BINARY to the Node path, or bundle Node with the app.'
+    );
+    app.quit();
+    return { proc: null, script };
+  }
+
   const args = [
     nextBin,
     script,
@@ -160,16 +208,19 @@ function startFrontend() {
     String(FRONTEND_PORT),
   ];
 
-  log(`Starting frontend with ${process.execPath} ${args.join(' ')}`);
-  const proc = spawn(process.execPath, args, {
+  log(`Starting frontend with ${nodeCmd} ${args.join(' ')}`);
+
+  const env = {
+    ...process.env,
+    PATH: DEFAULT_PATH,
+    NODE_ENV: useDevServer ? 'development' : 'production',
+  };
+  delete env.ELECTRON_RUN_AS_NODE;
+
+  const proc = spawn(nodeCmd, args, {
     cwd: frontendDir,
     stdio: ['ignore', 'pipe', 'pipe'],
-    env: {
-      ...process.env,
-      PATH: DEFAULT_PATH,
-      NODE_ENV: useDevServer ? 'development' : 'production',
-      ELECTRON_RUN_AS_NODE: '1',
-    },
+    env,
   });
 
   proc.stdout.on('data', (data) => log(`[frontend] ${data.toString().trim()}`));
@@ -196,6 +247,7 @@ function startFrontend() {
 function waitForServer(port, label) {
   const timeoutMs = 60000;
   const start = Date.now();
+  log(`[waitForServer] begin wait for ${label} on port ${port}`);
 
   return new Promise((resolve, reject) => {
     const attempt = () => {
@@ -222,6 +274,7 @@ function waitForServer(port, label) {
 }
 
 async function createWindow() {
+  log('[createWindow] starting window creation');
   try {
     await waitForServer(BACKEND_PORT, 'Backend');
   } catch (err) {
@@ -252,6 +305,7 @@ async function createWindow() {
   }
 
   try {
+    log(`[createWindow] loading URL http://${HOST}:${FRONTEND_PORT}`);
     await win.loadURL(`http://${HOST}:${FRONTEND_PORT}`);
   } catch (err) {
     log(`Failed to load frontend: ${err.message}`);
@@ -262,15 +316,18 @@ async function createWindow() {
 
 function cleanUp() {
   if (frontendProcess && !frontendProcess.killed) {
+    log('[cleanup] killing frontend process');
     frontendProcess.kill();
   }
 
   if (backendProcess && !backendProcess.killed) {
+    log('[cleanup] killing backend process');
     backendProcess.kill();
   }
 }
 
 app.whenReady().then(() => {
+  log('[lifecycle] app ready');
   backendProcess = startBackend();
   ({ proc: frontendProcess } = startFrontend());
   // Load window immediately; Next.js will come up shortly after on the same port
@@ -278,6 +335,7 @@ app.whenReady().then(() => {
 });
 
 app.on('second-instance', () => {
+  log('[lifecycle] second-instance detected');
   const [win] = BrowserWindow.getAllWindows();
   if (win) {
     if (win.isMinimized()) win.restore();
@@ -286,12 +344,14 @@ app.on('second-instance', () => {
 });
 
 app.on('window-all-closed', () => {
+  log('[lifecycle] window-all-closed');
   if (process.platform !== 'darwin') {
     app.quit();
   }
 });
 
 app.on('activate', () => {
+  log('[lifecycle] activate');
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
   }
@@ -299,10 +359,12 @@ app.on('activate', () => {
 
 app.on('before-quit', cleanUp);
 process.on('SIGINT', () => {
+  log('[signal] SIGINT received');
   cleanUp();
   app.quit();
 });
 process.on('SIGTERM', () => {
+  log('[signal] SIGTERM received');
   cleanUp();
   app.quit();
 });

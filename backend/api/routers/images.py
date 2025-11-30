@@ -205,6 +205,8 @@ async def get_image_results_endpoint(image_id: int, run_id: int) -> ImageDetailR
         )
 
 
+
+
 @router.patch("/{image_id}/results/{run_id}/polygons/{polygon_index}", response_model=Dict)
 async def update_polygon_classification(
     image_id: int, 
@@ -307,8 +309,8 @@ async def update_polygon_classification(
         """, (run_id,))
         
         totals = await run_cursor.fetchone()
-        total_live = totals['total_live'] or 0
-        total_dead = totals['total_dead'] or 0
+        total_live = totals['total_live'] or 0 # type: ignore
+        total_dead = totals['total_dead'] or 0 # type: ignore
         
         await db.execute("""
             UPDATE run

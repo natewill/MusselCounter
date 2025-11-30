@@ -85,7 +85,7 @@ def load_rcnn_model(weights_path: str, model_type: str):
     # Create the model architecture
     # pretrained=False: Don't use ImageNet weights, we have custom weights
     # num_classes=3: Background, live mussel, dead mussel
-    model = fasterrcnn_resnet50_fpn(pretrained=False, num_classes=3)
+    model = fasterrcnn_resnet50_fpn(pretrained=False, weights_backbone=None, num_classes=3)
     
     # Load the trained weights from file
     try:

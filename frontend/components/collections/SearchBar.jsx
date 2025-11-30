@@ -11,12 +11,13 @@ export default function SearchBar() {
           <span 
           className="text-zinc-500 text-xl">🔍
           </span>
+
           <input 
             type="text" 
             placeholder="Search Collection Name..." 
             className ="bg-transparent border-none outline-none text-zinc-600 dark:text-zinc-400"
             value={input}
-            onChange={(tx) => setInput(tx.target.value)}
+            onChange={(e) => setInput(e.target.value)}
           />
       </div>
       

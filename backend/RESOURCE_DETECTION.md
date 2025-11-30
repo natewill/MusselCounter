@@ -110,7 +110,7 @@ async def lifespan(app: FastAPI):
 ```python
 # backend/utils/model_utils/loader.py
 def load_rcnn_model(weights_path: str, model_type: str):
-    model = fasterrcnn_resnet50_fpn(pretrained=False, num_classes=3)
+    model = fasterrcnn_resnet50_fpn(pretrained=False, weights_backbone=None, num_classes=3)
     model.load_state_dict(checkpoint)
     model.to(device)
     model.eval()

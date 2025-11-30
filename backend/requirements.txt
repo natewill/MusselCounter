@@ -7,6 +7,7 @@ aiosqlite>=0.19.0
 # Security libraries
 slowapi>=0.1.9
 secure>=0.3.0
+certifi>=2023.0.0  # SSL certificates for macOS compatibility
 pathvalidate>=3.2.0  # Filename and path validation/sanitization
 python-magic>=0.4.27  # Optional: better file type detection
 filetype>=1.2.0  # Optional: lightweight alternative

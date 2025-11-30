@@ -104,6 +104,7 @@ export default function RunResultsPage() {
           greenHueImageIds={greenHueImageIds}
           isRunning={isRunning}
           currentThreshold={threshold}
+          latestRun={latestRun}
         />
       </div>
     </div>

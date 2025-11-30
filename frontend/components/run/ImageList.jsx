@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
+import Link from 'next/link';
 
-export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, flashingImageIds, greenHueImageIds, isRunning, currentThreshold }) {
+export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, flashingImageIds, greenHueImageIds, isRunning, currentThreshold, latestRun }) {
   // Sort images so recently processed ones (with green hue) appear at the top during a run
   const sortedImages = useMemo(() => {
     if (!isRunning || !greenHueImageIds || greenHueImageIds.size === 0) {
@@ -113,10 +114,14 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
               ? `http://127.0.0.1:8000/uploads/${image.stored_path.split('/').pop()}`
               : null;
             
+            // Get run_id for the link (use latest run if available, otherwise image might not have results)
+            const runIdForLink = latestRun?.run_id || null;
+            
             return (
-              <div
+              <Link
                 key={image.image_id}
-                className={`border rounded-lg overflow-hidden hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors relative ${
+                href={runIdForLink ? `/edit/${image.image_id}?runId=${runIdForLink}` : '#'}
+                className={`block border rounded-lg overflow-hidden hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors relative ${
                   isFlashing
                     ? 'green-flash'
                     : hasGreenHue
@@ -124,11 +129,21 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                     : needsProcessing
                     ? 'border-amber-300 dark:border-amber-700 bg-amber-50/20 dark:bg-amber-900/15 ring-2 ring-amber-300/20 dark:ring-amber-700/20'
                     : 'border-zinc-200 dark:border-zinc-800'
-                }`}
+                } ${!runIdForLink ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                onClick={(e) => {
+                  // Prevent navigation if no run_id available
+                  if (!runIdForLink) {
+                    e.preventDefault();
+                  }
+                }}
               >
                 {onDeleteImage && (
                   <button
-                    onClick={() => onDeleteImage(image.image_id)}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      onDeleteImage(image.image_id);
+                    }}
                     disabled={deletingImageId === image.image_id}
                     className="absolute top-2 right-2 p-1 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-sm rounded text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed z-10"
                     title="Remove image from collection"
@@ -182,7 +197,7 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                     </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

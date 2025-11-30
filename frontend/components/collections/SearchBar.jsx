@@ -1,7 +1,9 @@
 import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
 export default function SearchBar() {
-  const router = useRouter();
+
+  const [input, setInput] = useState("")
 
   return(
     <div>
@@ -13,6 +15,8 @@ export default function SearchBar() {
             type="text" 
             placeholder="Search Collection Name..." 
             className ="bg-transparent border-none outline-none text-zinc-600 dark:text-zinc-400"
+            value={input}
+            onChange={(tx) => setInput(tx.target.value)}
           />
       </div>
       

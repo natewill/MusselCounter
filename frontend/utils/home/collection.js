@@ -1,12 +1,7 @@
 import { createCollection } from '@/lib/api';
-import { safeSetItem } from '@/utils/storage';
 
-export async function createQuickProcessCollection(setActiveCollectionId) {
+export async function createQuickProcessCollection() {
   const name = `Quick Process - ${new Date().toLocaleString()}`;
   const response = await createCollection(name, null);
-  const collectionId = response.collection_id;
-  setActiveCollectionId(collectionId);
-  await safeSetItem('quickProcessCollectionId', collectionId.toString());
-  console.log('Quick Process collection created:', collectionId);
-  return collectionId;
+  return response.collection_id;
 }

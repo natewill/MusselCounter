@@ -27,7 +27,6 @@ CREATE TABLE IF NOT EXISTS collection_image (
   collection_id      INTEGER NOT NULL,
   image_id      INTEGER NOT NULL,
   added_at      TEXT NOT NULL,            -- When this image was added to this collection
-  is_duplicate  INTEGER DEFAULT 0,        -- 1 if this image was already in collection when uploaded
   PRIMARY KEY (collection_id, image_id),
   FOREIGN KEY (collection_id) REFERENCES collection(collection_id),
   FOREIGN KEY (image_id) REFERENCES image(image_id)
@@ -84,6 +83,32 @@ CREATE TABLE IF NOT EXISTS image_result (
 CREATE INDEX IF NOT EXISTS idx_image_result_run ON image_result(run_id);
 -- Index for faster lookups of results by image
 CREATE INDEX IF NOT EXISTS idx_image_result_image ON image_result(image_id);
+
+-- DETECTION: stores individual mussel detections with confidence scores
+-- Enables threshold recalculation without re-running model
+CREATE TABLE IF NOT EXISTS detection (
+  detection_id    INTEGER PRIMARY KEY AUTOINCREMENT,
+  run_id          INTEGER NOT NULL,
+  image_id        INTEGER NOT NULL,
+  confidence      REAL NOT NULL,                     -- Model confidence score (0.0 - 1.0)
+  original_class  TEXT NOT NULL CHECK(original_class IN ('live', 'dead')), -- Model's original prediction
+  class           TEXT CHECK(class IN ('live', 'dead')),  -- NULL = auto mode, 'live'/'dead' = manual override
+  bbox_x1         REAL,                              -- Bounding box top-left x
+  bbox_y1         REAL,                              -- Bounding box top-left y
+  bbox_x2         REAL,                              -- Bounding box bottom-right x
+  bbox_y2         REAL,                              -- Bounding box bottom-right y
+  polygon_coords  TEXT,                              -- JSON array of polygon coordinates
+  created_at      TEXT NOT NULL,                     -- When detection was created
+  FOREIGN KEY (run_id) REFERENCES run(run_id) ON DELETE CASCADE,
+  FOREIGN KEY (image_id) REFERENCES image(image_id) ON DELETE CASCADE
+);
+
+-- Index for faster lookups of detections by image and run
+CREATE INDEX IF NOT EXISTS idx_detection_image_run ON detection(image_id, run_id);
+-- Index for faster lookups by run and image (used for recalculation)
+CREATE INDEX IF NOT EXISTS idx_detection_run_image ON detection(run_id, image_id);
+-- Index for confidence-based filtering
+CREATE INDEX IF NOT EXISTS idx_detection_confidence ON detection(confidence);
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_image_hash   ON image(file_hash);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_collection_image ON collection_image(collection_id, image_id);

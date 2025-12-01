@@ -4,6 +4,7 @@ import {
   resultsChanged,
   shouldFlashImage,
   getProcessedImageIds,
+  findDuplicateImageIds,
   type ImageResult
 } from '@/utils/run/runUtils';
 
@@ -13,7 +14,7 @@ interface Image {
   dead_mussel_count: number | null;
   processed_at: string | null;
   result_threshold: number | null;
-  is_duplicate: number | boolean;
+  file_hash: string | null;
   processed_model_ids: number[];
 }
 
@@ -24,13 +25,13 @@ interface LatestRun {
   threshold: number;
 }
 
-interface BatchData {
+interface CollectionData {
   images: Image[];
   latest_run: LatestRun | null;
 }
 
 export function useRunState(
-  batchData: BatchData | undefined,
+  collectionData: CollectionData | undefined,
   recentlyUploadedImageIds: Set<number>,
   setRecentlyUploadedImageIds: (ids: Set<number> | ((prev: Set<number>) => Set<number>)) => void
 ) {
@@ -44,12 +45,12 @@ export function useRunState(
 
   // Detect when new images are processed and trigger green flash
   useEffect(() => {
-    const currentStatus = batchData?.latest_run?.status;
-    const latestRunId = batchData?.latest_run?.run_id;
-    const latestModelId = batchData?.latest_run?.model_id;
-    const latestThreshold = batchData?.latest_run?.threshold;
+    const currentStatus = collectionData?.latest_run?.status;
+    const latestRunId = collectionData?.latest_run?.run_id;
+    const latestModelId = collectionData?.latest_run?.model_id;
+    const latestThreshold = collectionData?.latest_run?.threshold;
     
-    if (!batchData?.images || !latestRunId || !latestModelId) {
+    if (!collectionData?.images || !latestRunId || !latestModelId) {
       return;
     }
     
@@ -68,12 +69,15 @@ export function useRunState(
     const isDifferentThreshold = previousRunThreshold !== null && previousRunThreshold !== latestThreshold;
     
     // Build a map of current image results
-    const currentImageResults = buildImageResultsMap(batchData.images);
+    const currentImageResults = buildImageResultsMap(collectionData.images);
+    
+    // Find duplicate images based on file_hash
+    const duplicateImageIds = findDuplicateImageIds(collectionData.images);
     
     // Find images that just got results (newly processed or reprocessed with new threshold)
     const newlyProcessedIds: number[] = [];
     
-    for (const img of batchData.images) {
+    for (const img of collectionData.images) {
       const imageId = img.image_id;
       
       // Skip if already flashed in this run
@@ -82,7 +86,7 @@ export function useRunState(
       }
       
       // Skip duplicates
-      if (img.is_duplicate === 1 || img.is_duplicate === true) {
+      if (duplicateImageIds.has(imageId)) {
         continue;
       }
       
@@ -111,7 +115,8 @@ export function useRunState(
           latestModelId,
           latestThreshold,
           currentStatus,
-          previousResult
+          previousResult,
+          duplicateImageIds
         );
         
         if (shouldFlash) {
@@ -149,7 +154,7 @@ export function useRunState(
     // When run completes or is cancelled, trigger final flash and remove green hue
     if ((currentStatus === 'completed' || currentStatus === 'cancelled') && previousRunStatus && (previousRunStatus === 'running' || previousRunStatus === 'pending')) {
       // Get ALL images that were processed in this run
-      const processedInRun = getProcessedImageIds(batchData.images);
+      const processedInRun = getProcessedImageIds(collectionData.images);
       
       if (processedInRun.length > 0) {
         startTransition(() => {
@@ -174,11 +179,11 @@ export function useRunState(
       });
     }
   }, [
-    batchData?.latest_run?.status,
-    batchData?.latest_run?.run_id,
-    batchData?.latest_run?.model_id,
-    batchData?.latest_run?.threshold,
-    batchData?.images,
+    collectionData?.latest_run?.status,
+    collectionData?.latest_run?.run_id,
+    collectionData?.latest_run?.model_id,
+    collectionData?.latest_run?.threshold,
+    collectionData?.images,
     previousRunStatus,
     previousRunModelId,
     previousRunThreshold,
@@ -203,7 +208,7 @@ export function useRunState(
 
   // Remove green hue when run completes (after flash)
   useEffect(() => {
-    const currentStatus = batchData?.latest_run?.status;
+    const currentStatus = collectionData?.latest_run?.status;
     if (currentStatus === 'completed' && flashingImageIds.size === 0 && greenHueImageIds.size > 0) {
       const timeoutId = setTimeout(() => {
         startTransition(() => {
@@ -213,7 +218,7 @@ export function useRunState(
       
       return () => clearTimeout(timeoutId);
     }
-  }, [batchData?.latest_run?.status, flashingImageIds.size, greenHueImageIds.size]);
+  }, [collectionData?.latest_run?.status, flashingImageIds.size, greenHueImageIds.size]);
 
   return {
     flashingImageIds,

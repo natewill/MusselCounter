@@ -46,24 +46,15 @@ export default function RunStatus({ latestRun, isRunning, images, onStopRun, sto
   const processedImages = processedImagesCalc;
   const progress = progressCalc;
 
-  // Calculate duration
-  const getDuration = () => {
-    if (!latestRun.started_at) return null;
-    const startTime = new Date(latestRun.started_at);
-    const endTime = latestRun.finished_at ? new Date(latestRun.finished_at) : new Date();
-    const durationMs = endTime - startTime;
-    const durationSeconds = durationMs / 1000;
-    
-    if (durationSeconds < 60) {
-      return `${durationSeconds.toFixed(1)}s`;
-    } else if (durationSeconds < 3600) {
-      return `${(durationSeconds / 60).toFixed(1)}m`;
-    } else {
-      return `${(durationSeconds / 3600).toFixed(1)}h`;
+  const parseDate = (value) => {
+    if (!value) return null;
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
     }
+    // If timestamp is missing timezone information, assume UTC
+    return new Date(`${value}Z`);
   };
-
-  const duration = getDuration();
 
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg p-6 border border-zinc-200 dark:border-zinc-800 h-full">
@@ -79,11 +70,6 @@ export default function RunStatus({ latestRun, isRunning, images, onStopRun, sto
           }`}>
             {latestRun.status}
           </span>
-          {duration && (
-            <span className="text-sm text-zinc-600 dark:text-zinc-400">
-              ({duration})
-            </span>
-          )}
         </div>
 
         {/* Progress Bar - Show when running or pending */}
@@ -157,16 +143,21 @@ export default function RunStatus({ latestRun, isRunning, images, onStopRun, sto
         )}
         {latestRun.started_at && (
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            Started: {new Date(latestRun.started_at).toLocaleString()}
+            Started: {(() => {
+              const parsed = parseDate(latestRun.started_at);
+              return parsed && !Number.isNaN(parsed.getTime()) ? parsed.toLocaleString() : '—';
+            })()}
           </div>
         )}
         {latestRun.finished_at && (
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            Finished: {new Date(latestRun.finished_at).toLocaleString()}
+            Finished: {(() => {
+              const parsed = parseDate(latestRun.finished_at);
+              return parsed && !Number.isNaN(parsed.getTime()) ? parsed.toLocaleString() : '—';
+            })()}
           </div>
         )}
       </div>
     </div>
   );
 }
-

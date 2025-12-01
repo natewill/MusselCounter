@@ -2,7 +2,6 @@
  * File handling utilities for home page
  */
 import { uploadImagesToCollection } from '@/lib/api';
-import { safeSetItem, safeRemoveItem } from '@/utils/storage';
 import { validateImageFiles } from '@/utils/validation';
 
 /**
@@ -52,9 +51,6 @@ export async function handleDroppedItems(dataTransferItems) {
 
 export async function handleFileSelect(
   files,
-  activeCollectionId,
-  setActiveCollectionId,
-  selectedModelId,
   setLoading,
   setError,
   createQuickProcessCollection,
@@ -80,48 +76,25 @@ export async function handleFileSelect(
   setError(null);
 
   try {
-    let collectionId = activeCollectionId;
-
-    // Create collection if needed
-    if (!collectionId) {
-      try {
-        collectionId = await createQuickProcessCollection(setActiveCollectionId);
-      } catch (err) {
-        console.error('Failed to create collection:', err);
-        throw new Error('Failed to create collection. Is the backend running?');
-      }
+    // Always create a new collection
+    let collectionId;
+    try {
+      collectionId = await createQuickProcessCollection();
+    } catch (err) {
+      console.error('Failed to create collection:', err);
+      throw new Error('Failed to create collection. Is the backend running?');
     }
 
     // Upload files
     let uploadResult;
     try {
       uploadResult = await uploadImagesToCollection(collectionId, imageFiles);
-      console.log('Files uploaded successfully');
     } catch (err) {
       const errorMsg = err.message || '';
-      // If collection not found (404), clear stale collection_id and create new collection
-      if (errorMsg.includes('404') || errorMsg.includes('Collection not found') || errorMsg.includes('HTTP 404')) {
-        console.warn('Collection not found, clearing stale collection_id and creating new collection');
-        setActiveCollectionId(null);
-        await safeRemoveItem('quickProcessCollectionId');
-        
-        // Create new collection and retry upload
-        try {
-          collectionId = await createQuickProcessCollection(setActiveCollectionId);
-          uploadResult = await uploadImagesToCollection(collectionId, imageFiles);
-          console.log('Files uploaded successfully to new collection');
-        } catch (retryErr) {
-          throw new Error('Failed to create new collection and upload. ' + (retryErr.message || ''));
-        }
-      } else {
-        throw new Error('Failed to upload files. ' + errorMsg);
-      }
+      throw new Error('Failed to upload files. ' + errorMsg);
     }
 
-    // Store collection_id in localStorage for run page
-    await safeSetItem('currentCollectionId', collectionId.toString());
-    
-    // Store upload counts in localStorage to show success message
+    // Get upload counts for success message
     const addedCount = uploadResult?.added_count || 0;
     const duplicateCount = uploadResult?.duplicate_count || 0;
     const uploadedImageIds = uploadResult?.image_ids || [];
@@ -131,13 +104,17 @@ export async function handleFileSelect(
     const { filterNonDuplicateIds } = await import('@/utils/imageUtils');
     const nonDuplicateIds = filterNonDuplicateIds(uploadedImageIds, duplicateImageIds);
     
-    await safeSetItem('uploadedImageCount', addedCount.toString());
-    await safeSetItem('duplicateImageCount', duplicateCount.toString());
-    await safeSetItem('recentlyUploadedImageIds', nonDuplicateIds);
-    
-    // Navigate to run page with collection_id (don't start run yet)
-    // The run page will show "X images added!" and a button to start the run
-    router.push(`/run/${collectionId}`);
+    // Navigate to collection page with upload counts in URL query params
+    // The collection page will show "X images added!" and a button to start the run
+    const params = new URLSearchParams();
+    if (addedCount > 0) {
+      params.set('added', addedCount.toString());
+    }
+    if (duplicateCount > 0) {
+      params.set('duplicates', duplicateCount.toString());
+    }
+    const queryString = params.toString();
+    router.push(`/collection/${collectionId}${queryString ? `?${queryString}` : ''}`);
     
     // Don't set loading to false - let the run page handle its own loading state
   } catch (err) {
@@ -146,4 +123,3 @@ export async function handleFileSelect(
     throw err;
   }
 }
-

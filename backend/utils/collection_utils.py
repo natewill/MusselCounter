@@ -3,7 +3,7 @@ Collection utility functions for managing collections and their images.
 Handles collection creation, image retrieval with results, and collection operations.
 """
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 import aiosqlite
 
 
@@ -23,13 +23,14 @@ async def create_collection(
     Returns:
         Collection ID of the created collection
     """
-    now = datetime.now().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     cursor = await db.execute(
         """INSERT INTO collection (name, description, created_at, updated_at)
            VALUES (?, ?, ?, ?)""",
         (name, description, now, now)
     )
     await db.commit()
+
     return cursor.lastrowid
 
 
@@ -62,14 +63,16 @@ async def get_all_collections(db: aiosqlite.Connection):
     return await cursor.fetchall()
 
 
-async def _attach_processed_models(db: aiosqlite.Connection, rows):
+async def _attach_processed_models(db: aiosqlite.Connection, rows, collection_id: int):
     """
     Helper function to add processed_model_ids to a list of images.
-    For each image, finds all model IDs that have successfully processed it.
+    For each image, finds all model IDs that have successfully processed it
+    in runs belonging to the specified collection.
     
     Args:
         db: Database connection
         rows: List of image rows (dict-like objects)
+        collection_id: Collection ID to filter runs by
         
     Returns:
         List of images with processed_model_ids added
@@ -83,8 +86,9 @@ async def _attach_processed_models(db: aiosqlite.Connection, rows):
                FROM image_result ir
                JOIN run r ON ir.run_id = r.run_id
                WHERE r.status = 'completed'
+                 AND r.collection_id = ?
                  AND ir.image_id IN ({placeholders})""",
-        image_ids
+        (collection_id, *image_ids)
     )
     model_map = defaultdict(list)
     for row in await cursor.fetchall():
@@ -104,7 +108,7 @@ async def get_collection_images(db: aiosqlite.Connection, collection_id: int):
         List of image rows with processed_model_ids added
     """
     cursor = await db.execute(
-        """SELECT i.*, ci.added_at, ci.is_duplicate
+        """SELECT i.*, ci.added_at
                FROM image i
                JOIN collection_image ci ON i.image_id = ci.image_id
                WHERE ci.collection_id = ?
@@ -112,57 +116,89 @@ async def get_collection_images(db: aiosqlite.Connection, collection_id: int):
         (collection_id,)
     )
     images = await cursor.fetchall()
-    return await _attach_processed_models(db, images)
+    return await _attach_processed_models(db, images, collection_id)
 
 
 async def get_collection_images_with_results(
     db: aiosqlite.Connection,
     collection_id: int,
-    run_id: int,
-    current_threshold: float = None
+    run_id: int | None,
+    current_threshold: float | None = None
 ):
     """
-    Return images in a collection with their latest result (optionally constrained by threshold).
-    Latest is chosen by max(run.run_id) per image.
+    Return images in a collection with their inference results.
+    
+    If run_id is provided, results are scoped strictly to that run to avoid mixing
+    data from other runs. If run_id is None, falls back to selecting the latest
+    run per image (optionally filtered by threshold) for backwards compatibility.
     """
-    sql = """
-    WITH latest_key AS (
-        SELECT ir.image_id, MAX(r.run_id) AS max_run_id
-        FROM image_result ir
-        JOIN run r ON ir.run_id = r.run_id
-        WHERE r.collection_id = ?
-          AND (? IS NULL OR ABS(r.threshold - ?) < 0.001)
-        GROUP BY ir.image_id
-    )
-    SELECT
-        i.image_id,
-        i.filename,
-        i.stored_path,
-        i.file_hash,
-        i.width,
-        i.height,
-        i.created_at,
-        i.updated_at,
-        ci.added_at,
-        ci.is_duplicate,
-        l.live_mussel_count,
-        l.dead_mussel_count,
-        l.polygon_path,
-        l.processed_at,
-        l.error_msg,
-        lr.threshold AS result_threshold
-    FROM image i
-    JOIN collection_image ci ON i.image_id = ci.image_id
-    LEFT JOIN latest_key lk ON lk.image_id = i.image_id
-    LEFT JOIN image_result l ON l.image_id = lk.image_id AND l.run_id = lk.max_run_id
-    LEFT JOIN run lr ON lr.run_id = lk.max_run_id
-    WHERE ci.collection_id = ?
-    ORDER BY ci.added_at DESC,
-             COALESCE(l.processed_at, '1970-01-01T00:00:00Z') DESC
-    """
-    cur = await db.execute(sql, (collection_id, current_threshold, current_threshold, collection_id))
+    if run_id is not None:
+        sql = """
+        SELECT
+            i.image_id,
+            i.filename,
+            i.stored_path,
+            i.file_hash,
+            i.width,
+            i.height,
+            i.created_at,
+            i.updated_at,
+            ci.added_at,
+            l.live_mussel_count,
+            l.dead_mussel_count,
+            l.polygon_path,
+            l.processed_at,
+            l.error_msg,
+            lr.threshold AS result_threshold
+        FROM image i
+        JOIN collection_image ci ON i.image_id = ci.image_id
+        LEFT JOIN image_result l ON l.image_id = i.image_id AND l.run_id = ?
+        LEFT JOIN run lr ON lr.run_id = ?
+        WHERE ci.collection_id = ?
+        ORDER BY ci.added_at DESC,
+                 COALESCE(l.processed_at, '1970-01-01T00:00:00Z') DESC
+        """
+        params = (run_id, run_id, collection_id)
+    else:
+        sql = """
+        WITH latest_key AS (
+            SELECT ir.image_id, MAX(r.run_id) AS max_run_id
+            FROM image_result ir
+            JOIN run r ON ir.run_id = r.run_id
+            WHERE r.collection_id = ?
+              AND (? IS NULL OR ABS(r.threshold - ?) < 0.001)
+            GROUP BY ir.image_id
+        )
+        SELECT
+            i.image_id,
+            i.filename,
+            i.stored_path,
+            i.file_hash,
+            i.width,
+            i.height,
+            i.created_at,
+            i.updated_at,
+            ci.added_at,
+            l.live_mussel_count,
+            l.dead_mussel_count,
+            l.polygon_path,
+            l.processed_at,
+            l.error_msg,
+            lr.threshold AS result_threshold
+        FROM image i
+        JOIN collection_image ci ON i.image_id = ci.image_id
+        LEFT JOIN latest_key lk ON lk.image_id = i.image_id
+        LEFT JOIN image_result l ON l.image_id = lk.image_id AND l.run_id = lk.max_run_id
+        LEFT JOIN run lr ON lr.run_id = lk.max_run_id
+        WHERE ci.collection_id = ?
+        ORDER BY ci.added_at DESC,
+                 COALESCE(l.processed_at, '1970-01-01T00:00:00Z') DESC
+        """
+        params = (collection_id, current_threshold, current_threshold, collection_id)
+    
+    cur = await db.execute(sql, params)
     images = await cur.fetchall()
-    return await _attach_processed_models(db, images)
+    return await _attach_processed_models(db, images, collection_id)
 
 
 async def remove_image_from_collection(
@@ -203,6 +239,25 @@ async def get_latest_run(db: aiosqlite.Connection, collection_id: int):
     cursor = await db.execute(
         "SELECT * FROM run WHERE collection_id = ? ORDER BY run_id DESC LIMIT 1",
         (collection_id,)
+    )
+    return await cursor.fetchone()
+
+
+async def get_latest_run_by_model(db: aiosqlite.Connection, collection_id: int, model_id: int):
+    """
+    Get the most recent run for a collection with a specific model.
+    
+    Args:
+        db: Database connection
+        collection_id: Collection ID
+        model_id: Model ID to filter by
+        
+    Returns:
+        Row with run data, or None if no runs exist for that model
+    """
+    cursor = await db.execute(
+        "SELECT * FROM run WHERE collection_id = ? AND model_id = ? ORDER BY run_id DESC LIMIT 1",
+        (collection_id, model_id)
     )
     return await cursor.fetchone()
 
@@ -250,7 +305,7 @@ async def update_collection(
         values.append(description)
     if updates:
         updates.append("updated_at = ?")
-        values.append(datetime.now().isoformat())
+        values.append(datetime.now(timezone.utc).isoformat())
         values.append(collection_id)
         query = f"UPDATE collection SET {', '.join(updates)} WHERE collection_id = ?"
         await db.execute(query, values)

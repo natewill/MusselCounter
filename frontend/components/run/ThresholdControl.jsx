@@ -1,9 +1,21 @@
 'use client';
 
-export default function ThresholdControl({ threshold, onThresholdChange, onStartNewRun, disabled, models, selectedModelId, onModelChange }) {
+export default function ThresholdControl({ threshold, onThresholdChange, onStartNewRun, disabled, models, selectedModelId, onModelChange, imageCount, isRecalculating, hasRecalculatedData, isRunning }) {
   return (
     <div className="bg-white dark:bg-zinc-900 rounded-lg p-6 border border-zinc-200 dark:border-zinc-800 h-full flex flex-col">
-      <h2 className="text-xl font-semibold mb-4 text-zinc-900 dark:text-zinc-100">Run Settings</h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">Run Settings</h2>
+        {isRecalculating && (
+          <span className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded">
+            Recalculating...
+          </span>
+        )}
+        {!isRecalculating && hasRecalculatedData && (
+          <span className="text-xs px-2 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded">
+            Using recalculated counts
+          </span>
+        )}
+      </div>
       <div className="space-y-4">
         {/* Model Picker */}
         <div className="flex items-center gap-4">
@@ -14,7 +26,7 @@ export default function ThresholdControl({ threshold, onThresholdChange, onStart
             id="model-select"
             value={selectedModelId || ''}
             onChange={(e) => onModelChange(parseInt(e.target.value, 10))}
-            disabled={disabled || models.length === 0}
+            disabled={models.length === 0}
             className="flex-1 px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-600 rounded hover:bg-zinc-50 dark:hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {models.length === 0 ? (
@@ -43,7 +55,7 @@ export default function ThresholdControl({ threshold, onThresholdChange, onStart
               step="0.01"
               value={threshold}
               onChange={(e) => onThresholdChange(parseFloat(e.target.value))}
-              disabled={disabled}
+              disabled={imageCount === 0 || isRunning}
               className="flex-1 h-2 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             />
             <input
@@ -58,7 +70,7 @@ export default function ThresholdControl({ threshold, onThresholdChange, onStart
                   onThresholdChange(value);
                 }
               }}
-              disabled={disabled}
+              disabled={imageCount === 0 || isRunning}
               className="w-20 px-2 py-1 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-600 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             />
           </div>
@@ -70,9 +82,15 @@ export default function ThresholdControl({ threshold, onThresholdChange, onStart
             onClick={onStartNewRun}
             disabled={disabled}
             className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
+            title={disabled && imageCount === 0 ? 'Upload images before starting a run' : undefined}
           >
             Start New Run with These Settings
           </button>
+          {disabled && imageCount === 0 && (
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 text-center">
+              Upload images to start a run
+            </p>
+          )}
         </div>
       </div>
     </div>

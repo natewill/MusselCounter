@@ -12,9 +12,7 @@ import aiosqlite
 import aiofiles
 from fastapi import UploadFile
 
-from utils.logger import logger
 from utils.security import sanitize_filename, validate_path_in_directory
-from utils.file_validation_lib import validate_image_content, validate_file_size
 from config import UPLOAD_DIR, MAX_FILE_SIZE
 
 
@@ -38,13 +36,16 @@ async def process_single_file(
         content = await file.read()
         if not content:
             return None
-        ok_size, _ = validate_file_size(content, MAX_FILE_SIZE)
-        if not ok_size:
+        if len(content) > MAX_FILE_SIZE:
             return None
 
-        # 3) content-type check (expects bytes + name)
-        ok_img, _ = validate_image_content(content, sanitized)
-        if not ok_img:
+        # 3) basic type check by extension and MIME
+        file_ext = Path(sanitized).suffix.lower()
+        allowed_exts = {'.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.tif'}
+        allowed_mimes = {'image/png', 'image/jpeg', 'image/jpg', 'image/gif', 'image/bmp', 'image/tiff', 'image/x-tiff'}
+        if file_ext not in allowed_exts:
+            return None
+        if file.content_type and file.content_type.lower() not in allowed_mimes:
             return None
 
         # 4) hash for dedupe
@@ -87,10 +88,8 @@ async def process_single_file(
             except FileExistsError:
                 counter += 1
                 continue
-            except Exception as e:
-                logger.exception("Failed to save upload: %s", e)
+            except Exception:
                 return None
 
-    except Exception as e:
-        logger.exception("process_single_file unexpected error: %s", e)
+    except Exception:
         return None

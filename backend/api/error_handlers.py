@@ -7,7 +7,6 @@ FastAPI automatically routes exceptions to the appropriate handler based on exce
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-from utils.logger import logger
 
 
 async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
@@ -28,11 +27,7 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
     Logs the full error with stack trace for debugging, but returns a simple
     error message to the client (for security - don't expose internal details).
     """
-    # Log full error details with stack trace for debugging
-    logger.error(f"Unexpected error: {exc} (path: {request.url.path})", exc_info=True)
-    # Return simple error message to client (don't expose internal details)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": str(exc)}
     )
-

@@ -8,11 +8,8 @@ This module handles:
 - Device selection (GPU if available, otherwise CPU)
 """
 
-import logging
 import torch
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
-
-logger = logging.getLogger(__name__)
 
 
 def _load_checkpoint(weights_path: str, device: torch.device):
@@ -77,7 +74,6 @@ def load_rcnn_model(weights_path: str, model_type: str):
     Returns:
         Tuple of (model, device, batch_size)
     """
-    from ..resource_detector import calculate_batch_size_from_model
     
     # Determine which device to use (GPU is faster if available)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -106,11 +102,8 @@ def load_rcnn_model(weights_path: str, model_type: str):
         # On CPU, disable CUDA backend to reduce overhead
         torch.backends.cudnn.enabled = False
     
-    logger.debug(f"[Model Loader] R-CNN model loaded on {device} with inference optimizations")
-    
-    # Calculate how many images we can process at once
-    # Based on model size and available memory
-    batch_size = calculate_batch_size_from_model(model, device)
+    # Fixed batch size for CPU-only use
+    batch_size = 1
     
     return model, device, batch_size
 
@@ -145,7 +138,6 @@ def load_yolo_model(weights_path: str, model_type: str):
     Returns:
         Tuple of (model, device, batch_size)
     """
-    from ..resource_detector import calculate_batch_size_from_model
     
     # Try to import YOLO library
     try:
@@ -174,7 +166,6 @@ def load_yolo_model(weights_path: str, model_type: str):
             except AttributeError as exc:
                 # Known PyTorch compatibility issue
                 if "'Conv' object has no attribute 'bn'" in str(exc):
-                    logger.warning("Model fusing skipped (PyTorch compatibility issue)")
                     return model.model
                 # Re-raise unexpected errors
                 raise
@@ -195,12 +186,8 @@ def load_yolo_model(weights_path: str, model_type: str):
         # On CPU, disable CUDA backend to reduce overhead
         torch.backends.cudnn.enabled = False
     
-    logger.debug(f"[Model Loader] YOLO model loaded on {device} with inference optimizations")
-    
-    # Calculate how many images we can process at once
-    # Note: YOLO wraps the actual PyTorch model in model.model
-    actual_model = model.model if hasattr(model, 'model') else model
-    batch_size = calculate_batch_size_from_model(actual_model, device)
+    # Fixed batch size for CPU-only use
+    batch_size = 2
     
     return model, device, batch_size
 

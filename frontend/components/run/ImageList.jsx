@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 
-export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, flashingImageIds, greenHueImageIds, isRunning, currentThreshold, latestRun }) {
+export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, flashingImageIds, greenHueImageIds, isRunning, currentThreshold, latestRun, recalculatedImages }) {
   // Sort images so recently processed ones (with green hue) appear at the top during a run
   const sortedImages = useMemo(() => {
     if (!isRunning || !greenHueImageIds || greenHueImageIds.size === 0) {
@@ -72,7 +72,7 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
         Images ({images.length})
       </h2>
       {sortedImages.length === 0 ? (
-        <div className="text-zinc-600 dark:text-zinc-400">No images in this batch yet.</div>
+        <div className="text-zinc-600 dark:text-zinc-400">No images in this collection yet.</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {sortedImages.map((image) => {
@@ -86,16 +86,10 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                               (image.dead_mussel_count !== null && image.dead_mussel_count !== undefined) ||
                               image.processed_at;
             
-            // Check if the image's result threshold matches the current threshold
-            // If threshold changed, image needs to be reprocessed
-            const resultThreshold = image.result_threshold;
-            const thresholdMatches = resultThreshold === null || resultThreshold === undefined || 
-                                    (currentThreshold !== null && currentThreshold !== undefined && 
-                                     Math.abs(resultThreshold - currentThreshold) < 0.001); // Allow small floating point differences
-            
-            // Check if results are valid for CURRENT model + threshold combination
-            // Results are only valid if: processed with selected model AND threshold matches
-            const hasValidResults = hasResults && isProcessedWithSelectedModel && thresholdMatches;
+            // Check if results are valid for CURRENT model
+            // With threshold recalculation, we only need to check if processed with selected model
+            // Threshold changes no longer require re-running the model
+            const hasValidResults = hasResults && isProcessedWithSelectedModel;
             
             // Check if this image should flash green (final flash on completion)
             const isFlashing = flashingImageIds && flashingImageIds.has(image.image_id);
@@ -110,17 +104,17 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
             
             // Extract filename from stored_path for thumbnail URL
             // stored_path format: "data/uploads/{hash}_{filename}"
-            const thumbnailUrl = image.stored_path 
+            const thumbnailUrl = image.stored_path
               ? `http://127.0.0.1:8000/uploads/${image.stored_path.split('/').pop()}`
               : null;
             
-            // Get run_id for the link (use latest run if available, otherwise image might not have results)
-            const runIdForLink = latestRun?.run_id || null;
+            // Use selected model if available; otherwise fall back to latest run
+            const modelIdForLink = selectedModelId ?? latestRun?.model_id ?? null;
             
             return (
               <Link
                 key={image.image_id}
-                href={runIdForLink ? `/edit/${image.image_id}?runId=${runIdForLink}` : '#'}
+                href={modelIdForLink ? `/edit/${image.image_id}?modelId=${modelIdForLink}` : '#'}
                 className={`block border rounded-lg overflow-hidden hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors relative ${
                   isFlashing
                     ? 'green-flash'
@@ -129,10 +123,10 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                     : needsProcessing
                     ? 'border-amber-300 dark:border-amber-700 bg-amber-50/20 dark:bg-amber-900/15 ring-2 ring-amber-300/20 dark:ring-amber-700/20'
                     : 'border-zinc-200 dark:border-zinc-800'
-                } ${!runIdForLink ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                } ${!modelIdForLink ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                 onClick={(e) => {
-                  // Prevent navigation if no run_id available
-                  if (!runIdForLink) {
+                  // Prevent navigation if no model_id available
+                  if (!modelIdForLink) {
                     e.preventDefault();
                   }
                 }}
@@ -142,11 +136,17 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      onDeleteImage(image.image_id);
+                      if (!isRunning) {
+                        onDeleteImage(image.image_id);
+                      }
                     }}
-                    disabled={deletingImageId === image.image_id}
-                    className="absolute top-2 right-2 p-1 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-sm rounded text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 disabled:opacity-50 disabled:cursor-not-allowed z-10"
-                    title="Remove image from collection"
+                    disabled={isRunning || deletingImageId === image.image_id}
+                    className={`absolute top-2 right-2 p-1 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-sm rounded z-10 ${
+                      isRunning || deletingImageId === image.image_id
+                        ? 'text-zinc-400 dark:text-zinc-600 cursor-not-allowed opacity-50'
+                        : 'text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300'
+                    }`}
+                    title={isRunning ? "Cannot delete images while a run is in progress" : "Remove image from collection"}
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -186,13 +186,17 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                     <div>
                       <span className="text-zinc-600 dark:text-zinc-400">Live: </span>
                       <span className="font-medium text-green-600 dark:text-green-400">
-                        {image.live_mussel_count || 0}
+                        {recalculatedImages && recalculatedImages[image.image_id]
+                          ? recalculatedImages[image.image_id].live_count
+                          : (image.live_mussel_count || 0)}
                       </span>
                     </div>
                     <div>
                       <span className="text-zinc-600 dark:text-zinc-400">Dead: </span>
                       <span className="font-medium text-red-600 dark:text-red-400">
-                        {image.dead_mussel_count || 0}
+                        {recalculatedImages && recalculatedImages[image.image_id]
+                          ? recalculatedImages[image.image_id].dead_count
+                          : (image.dead_mussel_count || 0)}
                       </span>
                     </div>
                   </div>
@@ -206,4 +210,3 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
     </>
   );
 }
-

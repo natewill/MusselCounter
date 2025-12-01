@@ -1,4 +1,4 @@
-export default function AddImagesButton({ fileInputRef, uploading, batchId, onFileChange }) {
+export default function AddImagesButton({ fileInputRef, uploading, collectionId, onFileChange }) {
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
@@ -16,7 +16,7 @@ export default function AddImagesButton({ fileInputRef, uploading, batchId, onFi
       />
       <button
         onClick={handleUploadClick}
-        disabled={uploading || !batchId}
+        disabled={uploading || !collectionId}
         className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm flex items-center gap-2"
       >
         {uploading ? (

@@ -1,7 +1,6 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import QueryProvider from "@/providers/QueryProvider";
-import DatabaseVersionChecker from "@/components/DatabaseVersionChecker";
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 const geistSans = Geist({
@@ -27,7 +26,6 @@ export default function RootLayout({ children }) {
       >
         <ErrorBoundary>
           <QueryProvider>
-            <DatabaseVersionChecker />
             {children}
           </QueryProvider>
         </ErrorBoundary>

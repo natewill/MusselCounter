@@ -15,12 +15,12 @@ export interface Image {
   dead_mussel_count: number | null;
   processed_at: string | null;
   result_threshold: number | null;
-  is_duplicate: number | boolean;
-  processed_model_ids: number[];
+  file_hash: string | null;
+  processed_model_ids: number[] | null;
 }
 
 /**
- * Build a map of current image results from batch images
+ * Build a map of current image results from collection images
  */
 export function buildImageResultsMap(images: Image[]): Map<number, ImageResult> {
   const resultsMap = new Map<number, ImageResult>();
@@ -98,10 +98,11 @@ export function shouldFlashImage(
   latestModelId: number,
   latestThreshold: number | null,
   currentStatus: string | null,
-  previousResult: ImageResult | null
+  previousResult: ImageResult | null,
+  duplicateImageIds: Set<number>
 ): boolean {
   // Skip duplicates
-  if (image.is_duplicate === 1 || image.is_duplicate === true) {
+  if (duplicateImageIds.has(imageId)) {
     return false;
   }
   
@@ -143,17 +144,103 @@ export function shouldFlashImage(
 }
 
 /**
- * Get all processed image IDs from a batch (excluding duplicates)
+ * Find duplicate images based on file_hash
+ * Returns a Set of image_ids that are duplicates (same hash appears more than once)
+ * For each duplicate hash, keeps the image with the lowest image_id
+ */
+export function findDuplicateImageIds(images: Image[]): Set<number> {
+  const hashToImages = new Map<string, Image[]>();
+  
+  // Group images by file_hash
+  images.forEach(img => {
+    if (img.file_hash) {
+      if (!hashToImages.has(img.file_hash)) {
+        hashToImages.set(img.file_hash, []);
+      }
+      hashToImages.get(img.file_hash)!.push(img);
+    }
+  });
+  
+  // Find hashes that appear more than once
+  const duplicateImageIds = new Set<number>();
+  hashToImages.forEach((imagesWithHash, hash) => {
+    if (imagesWithHash.length > 1) {
+      // Sort by image_id and keep the first one, mark others as duplicates
+      const sortedImages = [...imagesWithHash].sort((a, b) => a.image_id - b.image_id);
+      for (let i = 1; i < sortedImages.length; i++) {
+        duplicateImageIds.add(sortedImages[i].image_id);
+      }
+    }
+  });
+  
+  return duplicateImageIds;
+}
+
+/**
+ * Get all processed image IDs from a collection (excluding duplicates)
  */
 export function getProcessedImageIds(images: Image[]): number[] {
+  const duplicateIds = findDuplicateImageIds(images);
   return images
     .filter(img => {
-      const hasResults = 
+      const hasResults =
         (img.live_mussel_count !== null && img.live_mussel_count !== undefined) ||
         (img.dead_mussel_count !== null && img.dead_mussel_count !== undefined) ||
         img.processed_at;
-      return hasResults && !(img.is_duplicate === 1 || img.is_duplicate === true);
+      return hasResults && !duplicateIds.has(img.image_id);
     })
     .map(img => img.image_id);
+}
+
+/**
+ * Determine whether the "Start New Run" button should be enabled.
+ */
+export function shouldEnableStartRunButton(
+  images: Image[],
+  selectedModelId: number | null,
+  latestRun: { model_id: number | null } | null,
+  recentlyUploadedImageIds: Set<number>
+): boolean {
+  if (!selectedModelId || images.length === 0) {
+    return false;
+  }
+
+  // Check if recently uploaded images are actually unprocessed with selected model
+  if (recentlyUploadedImageIds.size > 0) {
+    const duplicateIds = findDuplicateImageIds(images);
+    const hasUnprocessedRecentlyUploaded = Array.from(recentlyUploadedImageIds).some(imageId => {
+      const image = images.find(img => img.image_id === imageId);
+      if (!image || duplicateIds.has(imageId)) return false;
+      const processedModelIds = image.processed_model_ids ?? [];
+      return processedModelIds.length === 0 || !processedModelIds.includes(selectedModelId);
+    });
+    
+    if (hasUnprocessedRecentlyUploaded) {
+      return true;
+    }
+  }
+
+  const duplicateIds = findDuplicateImageIds(images);
+  const hasUnprocessedImages = images.some(image => {
+    if (duplicateIds.has(image.image_id)) return false;
+    const processedModelIds = image.processed_model_ids ?? [];
+    return processedModelIds.length === 0 || !processedModelIds.includes(selectedModelId);
+  });
+
+  if (hasUnprocessedImages) {
+    return true;
+  }
+
+  // If no latest run exists at all, enable button
+  if (!latestRun) {
+    return true;
+  }
+
+  // Note: We don't check latestRun.model_id !== selectedModelId here because
+  // that would incorrectly enable the button when switching back to a model
+  // that has already processed all images. The hasUnprocessedImages check
+  // above already handles whether a new run is needed.
+
+  return false;
 }
 

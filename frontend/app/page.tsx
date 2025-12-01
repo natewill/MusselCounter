@@ -1,14 +1,12 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/home/TopBar';
 import UploadArea from '@/components/home/UploadArea';
 import ErrorDisplay from '@/components/home/ErrorDisplay';
-import { loadModels } from '@/utils/home/models';
 import { createQuickProcessCollection } from '@/utils/home/collection';
 import { handleFileSelect, handleDroppedItems } from '@/utils/home/files';
-import { safeGetNumber } from '@/utils/storage';
 
 export default function Home() {
   const router = useRouter();
@@ -17,24 +15,7 @@ export default function Home() {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [activeCollectionId, setActiveCollectionId] = useState(null);
-  
-  // Load activeCollectionId from storage on mount
-  useEffect(() => {
-    safeGetNumber('quickProcessCollectionId').then((storedCollectionId) => {
-      if (storedCollectionId) {
-        setActiveCollectionId(storedCollectionId);
-      }
-    });
-  }, []);
-  const [models, setModels] = useState([]);
-  const [selectedModelId, setSelectedModelId] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
-
-  // Load models on mount
-  useEffect(() => {
-    loadModels(setModels, setSelectedModelId);
-  }, []);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -54,32 +35,14 @@ export default function Home() {
     if (e.dataTransfer.items) {
       const files = await handleDroppedItems(e.dataTransfer.items);
       if (files.length > 0) {
-        handleFileSelect(
-          files,
-          activeCollectionId,
-          setActiveCollectionId,
-          selectedModelId,
-          setLoading,
-          setError,
-          createQuickProcessCollection,
-          router
-        ).catch(() => {
+        handleFileSelect(files, setLoading, setError, createQuickProcessCollection, router).catch(() => {
           // Error already handled in handleFileSelect
         });
       }
     } else {
       // Fallback for older browsers
       const files = e.dataTransfer.files;
-      handleFileSelect(
-        files,
-        activeCollectionId,
-        setActiveCollectionId,
-        selectedModelId,
-        setLoading,
-        setError,
-        createQuickProcessCollection,
-        router
-      ).catch(() => {
+      handleFileSelect(files, setLoading, setError, createQuickProcessCollection, router).catch(() => {
         // Error already handled in handleFileSelect
       });
     }
@@ -87,16 +50,7 @@ export default function Home() {
 
   const handleFileInputChange = (e) => {
     const files = e.target.files;
-    handleFileSelect(
-      files,
-      activeCollectionId,
-      setActiveCollectionId,
-      selectedModelId,
-      setLoading,
-      setError,
-      createQuickProcessCollection,
-      router
-    ).catch(() => {
+    handleFileSelect(files, setLoading, setError, createQuickProcessCollection, router).catch(() => {
       // Error already handled in handleFileSelect
     });
   };
@@ -114,37 +68,35 @@ export default function Home() {
   const handleFolderInputChange = (e) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      handleFileSelect(
-        files,
-        activeCollectionId,
-        setActiveCollectionId,
-        selectedModelId,
-        setLoading,
-        setError,
-        createQuickProcessCollection,
-        router
-      ).catch(() => {
+      handleFileSelect(files, setLoading, setError, createQuickProcessCollection, router).catch(() => {
         // Error already handled in handleFileSelect
       });
     }
   };
 
-  const handleCreateCollection = () => {
-    // Navigate to collections page (or show form - keeping it simple for now)
+  const handleCreateCollection = async () => {
+    if (loading) return;
+    
+    setLoading(true);
+    setError(null);
+    
     try {
-      router.push('/collections');
+      // Always create a fresh collection for a new run
+      const collectionId = await createQuickProcessCollection();
+
+      // Navigate to collection page
+      router.push(`/collection/${collectionId}`);
+      setLoading(false);
     } catch (err) {
-      console.warn('Navigation failed (page may not exist yet):', err);
-      setError('Collections page not available yet');
+      console.error('Failed to create collection or navigate:', err);
+      setError(err.message || 'Failed to create run. Please try again.');
+      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black relative">
       <TopBar
-        models={models}
-        selectedModelId={selectedModelId}
-        onModelChange={setSelectedModelId}
         onCreateCollection={handleCreateCollection}
         loading={loading}
       />

@@ -145,7 +145,6 @@ backend/
 │   ├── collection_utils.py  # Collection database operations
 │   ├── image_utils.py        # Image database operations
 │   ├── file_processing.py    # File validation and saving
-│   ├── resource_detector.py  # CPU/batch size optimization
 │   └── validation.py         # Input validation
 │
 └── data/
@@ -262,7 +261,6 @@ results = model.detect(image, threshold=0.5)
 - collection_id
 - image_id
 - added_at
-- is_duplicate (boolean)
 ```
 
 **model**
@@ -327,27 +325,11 @@ This means:
 
 ## Performance Optimizations
 
-### 1. CPU Threading
-**File**: `utils/resource_detector.py::pick_threads()`
-
-**Problem**: PyTorch uses ALL CPU cores by default, causing UI lag
-
-**Solution**: Use only 1/3 of cores
-```python
-# 12 CPU cores → Use 4 threads
-# Leaves cores for UI and other programs
-```
-
-### 2. Batch Size Calculation
-**File**: `utils/resource_detector.py::calculate_batch_size_from_model()`
-
-**Problem**: Wrong batch size → too slow or out of memory
-
-**Solution**: Count model parameters, assign batch size by tier
-```python
-# Small model (YOLOv8n, 3M params) → batch_size = 4
-# Large model (YOLOv8x, 68M params) → batch_size = 1
-```
+### Fixed CPU Defaults
+CPU threading and batch sizing are now fixed for single-machine use:
+- Threads: torch uses 2 threads and 1 interop thread (set in loaders/startup).
+- Batch sizes: R-CNN loads with batch_size=1; YOLO loads with batch_size=2.
+This keeps behavior consistent without dynamic detection.
 
 ### 3. Inference Optimizations
 **File**: `utils/model_utils/loader.py`
@@ -479,4 +461,3 @@ pytest tests/test_specific.py  # Run specific test file
 - **PyTorch Docs**: https://pytorch.org/docs/
 - **Resource Detection Details**: See `RESOURCE_DETECTION.md`
 - **API Documentation**: Run backend and visit `http://127.0.0.1:8000/docs`
-

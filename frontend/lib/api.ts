@@ -11,12 +11,18 @@ const apiClient = axios.create({
   },
 });
 
-// Request interceptor for uploads (longer timeout)
+// Request interceptor for uploads (longer timeout and FormData handling)
 apiClient.interceptors.request.use((config) => {
   // Upload requests get longer timeout
-  if (config.url?.includes('/upload-images')) {
+  if (config.url?.includes('/upload-images') || config.url?.includes('/models')) {
     config.timeout = 60000; // 60 seconds for uploads
   }
+  
+  // Remove Content-Type header for FormData - browser will set it with boundary
+  if (config.data instanceof FormData) {
+    delete config.headers['Content-Type'];
+  }
+  
   return config;
 });
 
@@ -218,11 +224,48 @@ export async function getModels() {
 }
 
 /**
+ * Upload a new model file
+ */
+export async function uploadModel(
+  file: File,
+  name?: string,
+  modelType?: string,
+  description?: string
+) {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (name) formData.append('name', name);
+  if (modelType) formData.append('model_type', modelType);
+  if (description) formData.append('description', description);
+  
+  try {
+    // Don't set Content-Type header - axios will set it automatically with boundary
+    const response = await apiClient.post('/api/models', formData);
+    return response.data;
+  } catch (error) {
+    console.error('[uploadModel] Request failed:', {
+      error,
+      response: error.response,
+      status: error.response?.status,
+      data: error.response?.data,
+      headers: error.response?.headers
+    });
+    throw error;
+  }
+}
+
+/**
  * Get collection details including images and latest run
  */
-export async function getCollection(collectionId: number) {
+export async function getCollection(collectionId: number, modelId?: number | null) {
   const validatedCollectionId = validateCollectionId(collectionId);
-  const response = await apiClient.get(`/api/collections/${validatedCollectionId}`);
+  const params = new URLSearchParams();
+  if (modelId !== null && modelId !== undefined) {
+    params.set('model_id', modelId.toString());
+  }
+  const queryString = params.toString();
+  const url = `/api/collections/${validatedCollectionId}${queryString ? `?${queryString}` : ''}`;
+  const response = await apiClient.get(url);
   return response.data;
 }
 
@@ -303,27 +346,15 @@ function validateImageId(imageId: unknown): number {
 }
 
 /**
- * Validate run ID
- */
-function validateRunId(runId: unknown): number {
-  if (runId === null || runId === undefined) {
-    throw new Error('Run ID is required');
-  }
-  const rid = Number(runId);
-  if (isNaN(rid) || rid <= 0 || !Number.isInteger(rid)) {
-    throw new Error('Invalid run ID');
-  }
-  return rid
-}
-
-/**
  * gets image details from a specific run
  */
-export async function getImageDetails(imageId: number, runId: number) {
+export async function getImageDetails(imageId: number, modelId: number) {
   const validatedImageId = validateImageId(imageId);
-  const validatedRunId = validateRunId(runId);
+  const validatedModelId = validateModelId(modelId);
   
-  const response = await apiClient.get(`/api/images/${validatedImageId}/results/${validatedRunId}`);
+  const response = await apiClient.get(`/api/images/${validatedImageId}/results`, {
+    params: { model_id: validatedModelId },
+  });
   return response.data;
 }
 
@@ -331,22 +362,51 @@ export async function getImageDetails(imageId: number, runId: number) {
  * change the label of a polygon/mussel
  */
 export async function updatePolygonClassification(
-  imageId: number, 
-  runId: number, 
-  polygonIndex: number, 
+  imageId: number,
+  modelId: number,
+  polygonIndex: number,
   newClass: 'live' | 'dead'
 ) {
   const validatedImageId = validateImageId(imageId);
-  const validatedRunId = validateRunId(runId);
-  
+  const validatedModelId = validateModelId(modelId);
+
   if (newClass !== 'live' && newClass !== 'dead') {
     throw new Error('Classification must be "live" or "dead"');
   }
-  
+
   const response = await apiClient.patch(
-    `/api/images/${validatedImageId}/results/${validatedRunId}/polygons/${polygonIndex}`,
+    `/api/images/${validatedImageId}/results/${validatedModelId}/polygons/${polygonIndex}`,
     { new_class: newClass }
   );
-  
+
+  return response.data;
+}
+
+/**
+ * Recalculate mussel counts for a collection with a new threshold
+ * without re-running the model. Uses stored detection data.
+ */
+export async function recalculateThreshold(
+  collectionId: number,
+  threshold: number,
+  modelId: number
+) {
+  const validatedCollectionId = validateCollectionId(collectionId);
+  const validatedModelId = validateModelId(modelId);
+
+  if (threshold < 0 || threshold > 1) {
+    throw new Error('Threshold must be between 0 and 1');
+  }
+
+  const response = await apiClient.get(
+    `/api/collections/${validatedCollectionId}/recalculate`,
+    {
+      params: {
+        threshold,
+        model_id: validatedModelId
+      }
+    }
+  );
+
   return response.data;
 }

@@ -101,7 +101,7 @@ def _result(live, dead, polygons, size):
     }
 
 
-def _run_rcnn(model_device_tuple, image_paths, threshold):
+def _run_rcnn(model_device_tuple, image_paths):
     """
     Run Faster R-CNN inference on a batch of images.
     
@@ -109,7 +109,7 @@ def _run_rcnn(model_device_tuple, image_paths, threshold):
     1. Load all images and convert to tensors (PyTorch format)
     2. Run model on all images at once (batch processing)
     3. For each image's predictions:
-       - Filter by confidence threshold
+       - Get ALL detections (no threshold filtering)
        - Count live vs dead detections
        - Convert bounding boxes to polygons
        - Save all detection metadata
@@ -122,13 +122,12 @@ def _run_rcnn(model_device_tuple, image_paths, threshold):
     Args:
         model_device_tuple: (model, device, batch_size) from loader
         image_paths: List of paths to image files
-        threshold: Minimum confidence to keep a detection (0.0 to 1.0)
         
     Returns:
         List of result dicts, one per image
         
     Example:
-        results = _run_rcnn(model_tuple, ["img1.jpg", "img2.jpg"], 0.5)
+        results = _run_rcnn(model_tuple, ["img1.jpg", "img2.jpg"])
         # Returns: [
         #   {"live_count": 5, "dead_count": 2, "polygons": [...], ...},
         #   {"live_count": 3, "dead_count": 1, "polygons": [...], ...}
@@ -165,11 +164,8 @@ def _run_rcnn(model_device_tuple, image_paths, threshold):
         labels = pred["labels"].cpu().numpy()  # Class IDs
         
         # Process each detection
+        # Note: We always get ALL detections (threshold filtering happens later for display)
         for box, score, label in zip(boxes, scores, labels):
-            # Skip low-confidence detections
-            if score < threshold:
-                continue
-            
             # Convert class ID to label string (1→"live", 2→"dead")
             cls = RCNN_LABELS.get(int(label))
             
@@ -201,38 +197,43 @@ def _run_rcnn(model_device_tuple, image_paths, threshold):
     return results
 
 
-def run_rcnn_inference_batch(model_device_tuple, image_paths: list[str], threshold: float):
+def run_rcnn_inference_batch(model_device_tuple, image_paths: list[str]):
     """
     Run R-CNN on multiple images (batch processing).
     
     This is the main function called by collection_processor.py when processing
     multiple images. It's more efficient than processing one-by-one.
     
+    Always returns ALL detections (no threshold filtering).
+    Threshold filtering happens later when querying the database.
+    
     Public API for batch processing.
     """
-    return _run_rcnn(model_device_tuple, image_paths, threshold)
+    return _run_rcnn(model_device_tuple, image_paths)
 
 
-def run_rcnn_inference(model_device_tuple, image_path: str, threshold: float):
+def run_rcnn_inference(model_device_tuple, image_path: str):
     """
     Run R-CNN on a single image.
     
     This is a convenience wrapper that calls the batch function with one image.
     Used by image_processor.py for single-image processing (fallback path).
     
+    Always returns ALL detections (no threshold filtering).
+    Threshold filtering happens later when querying the database.
+    
     Public API for single image processing.
     """
-    return _run_rcnn(model_device_tuple, [image_path], threshold)[0]
+    return _run_rcnn(model_device_tuple, [image_path])[0]
 
 
-def _run_yolo(model_device_tuple, image_paths, threshold):
+def _run_yolo(model_device_tuple, image_paths):
     """
     Run YOLO inference on images.
     
     YOLO is Different from R-CNN:
     - Faster (processes entire image in one pass)
     - Returns results in a different format
-    - Has its own confidence filtering built-in
     - Generally more efficient for real-time detection
     
     YOLO Output Format:
@@ -244,13 +245,12 @@ def _run_yolo(model_device_tuple, image_paths, threshold):
     Args:
         model_device_tuple: (model, device, batch_size) from loader
         image_paths: Single path or list of paths
-        threshold: Minimum confidence to keep a detection
         
     Returns:
         List of result dicts, one per image
         
     Example:
-        results = _run_yolo(model_tuple, ["img1.jpg"], 0.5)
+        results = _run_yolo(model_tuple, ["img1.jpg"])
         # Returns: [{"live_count": 3, "dead_count": 1, ...}]
     """
     # Unpack model (YOLO doesn't need explicit device handling)
@@ -260,9 +260,9 @@ def _run_yolo(model_device_tuple, image_paths, threshold):
     paths = image_paths if isinstance(image_paths, list) else [image_paths]
     
     # Run YOLO inference
-    # conf=threshold: Only return detections above this confidence
+    # conf=0.01: Minimum confidence threshold for YOLO detections (filters out very low confidence detections)
     # verbose=False: Don't print progress to console
-    detections = model(paths, conf=threshold, verbose=False)
+    detections = model(paths, conf=0.01, verbose=False)
     
     # Process results for each image
     outputs = []
@@ -278,10 +278,7 @@ def _run_yolo(model_device_tuple, image_paths, threshold):
             # Get confidence score
             confidence = float(box.conf[0].cpu().numpy())
             
-            # Double-check threshold (YOLO already filtered, but be safe)
-            if confidence < threshold:
-                continue
-            
+            # Note: We always get ALL detections (threshold filtering happens later for display)
             # Get class label (0=live, 1=dead)
             cls = YOLO_LABELS.get(int(box.cls[0].cpu().numpy()))
             
@@ -313,37 +310,43 @@ def _run_yolo(model_device_tuple, image_paths, threshold):
     return outputs
 
 
-def run_yolo_inference(model_device_tuple, image_path: str, threshold: float):
+def run_yolo_inference(model_device_tuple, image_path: str):
     """
     Run YOLO on a single image.
     
     Convenience wrapper for single-image processing.
+    Always returns ALL detections (no threshold filtering).
+    Threshold filtering happens later when querying the database.
+    
     Public API - called by image_processor.py
     """
-    return _run_yolo(model_device_tuple, image_path, threshold)[0]
+    return _run_yolo(model_device_tuple, [image_path])[0]
 
 
-def run_yolo_inference_batch(model_device_tuple, image_paths: list[str], threshold: float):
+def run_yolo_inference_batch(model_device_tuple, image_paths: list[str]):
     """
     Run YOLO on multiple images (batch processing).
     
     Main function for batch processing with YOLO.
+    Always returns ALL detections (no threshold filtering).
+    Threshold filtering happens later when querying the database.
+    
     Public API - called by collection_processor.py
     """
-    return _run_yolo(model_device_tuple, image_paths, threshold)
+    return _run_yolo(model_device_tuple, image_paths)
 
 
-def run_ssd_inference(model_device_tuple, image_path: str, threshold: float):
+def run_ssd_inference(model_device_tuple, image_path: str):
     """SSD (Single Shot Detector) inference - not yet implemented."""
     raise NotImplementedError("SSD inference not implemented.")
 
 
-def run_cnn_inference(model_device_tuple, image_path: str, threshold: float):
+def run_cnn_inference(model_device_tuple, image_path: str):
     """CNN detection inference - not yet implemented."""
     raise NotImplementedError("CNN detection inference not implemented.")
 
 
-def run_inference_on_image(model_device_tuple, image_path: str, threshold: float, model_type: str):
+def run_inference_on_image(model_device_tuple, image_path: str, model_type: str):
     """
     Main entry point for running inference on a single image.
     
@@ -361,17 +364,18 @@ def run_inference_on_image(model_device_tuple, image_path: str, threshold: float
     Args:
         model_device_tuple: (model, device, batch_size) from loader
         image_path: Path to the image file
-        threshold: Confidence threshold (0.0 to 1.0)
         model_type: Type of model as string (e.g., "YOLO", "Faster R-CNN")
         
     Returns:
         Result dict with counts, polygons, and image dimensions
+        Always returns ALL detections (no threshold filtering).
+        Threshold filtering happens later when querying the database.
         
     Raises:
         ValueError: If model_type is not supported
         
     Example:
-        result = run_inference_on_image(model_tuple, "mussel.jpg", 0.5, "YOLO")
+        result = run_inference_on_image(model_tuple, "mussel.jpg", "YOLO")
         # Returns: {"live_count": 5, "dead_count": 2, "polygons": [...], ...}
     """
     # Convert to lowercase for case-insensitive matching
@@ -380,13 +384,13 @@ def run_inference_on_image(model_device_tuple, image_path: str, threshold: float
     # Route to appropriate inference function
     # Uses partial string matching for flexibility
     if "rcnn" in model_type_lower or "faster" in model_type_lower:
-        return run_rcnn_inference(model_device_tuple, image_path, threshold)
+        return run_rcnn_inference(model_device_tuple, image_path)
     if "yolo" in model_type_lower:
-        return run_yolo_inference(model_device_tuple, image_path, threshold)
+        return run_yolo_inference(model_device_tuple, image_path)
     if "ssd" in model_type_lower:
-        return run_ssd_inference(model_device_tuple, image_path, threshold)
+        return run_ssd_inference(model_device_tuple, image_path)
     if "cnn" in model_type_lower and "rcnn" not in model_type_lower:
-        return run_cnn_inference(model_device_tuple, image_path, threshold)
+        return run_cnn_inference(model_device_tuple, image_path)
     
     # Model type not recognized
     raise ValueError(

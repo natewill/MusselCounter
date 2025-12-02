@@ -236,7 +236,7 @@ def load_model(weights_path: str, model_type: str):
     model_type_lower = model_type.lower()
     
     # Route to appropriate loader based on model type
-    if "rcnn" in model_type_lower or "faster" in model_type_lower:
+    if "cnn" in model_type_lower or "faster" in model_type_lower:
         return load_rcnn_model(weights_path, model_type)
     if "yolo" in model_type_lower:
         return load_yolo_model(weights_path, model_type)

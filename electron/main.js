@@ -303,30 +303,15 @@ function resolveNextBinary() {
 }
 
 function startFrontend() {
+  // Check for standalone server first (production build)
+  const standaloneServer = path.join(frontendDir, 'server.js');
+  const hasStandalone = fs.existsSync(standaloneServer);
+
+  // Fallback to regular .next build
   const hasBuild = fs.existsSync(path.join(frontendDir, '.next'));
-  const useDevServer = process.env.NEXT_DEV === 'true' || !hasBuild;
-  const script = useDevServer ? 'dev' : 'start';
-  log(`[frontend] hasBuild=${hasBuild} useDevServer=${useDevServer} script=${script}`);
+  const useDevServer = process.env.NEXT_DEV === 'true' || (!hasStandalone && !hasBuild);
 
-  const nextBin = resolveNextBinary();
-  if (!nextBin) {
-    dialog.showErrorBox(
-      'Missing Next.js binary',
-      'Could not find Next.js in frontend/node_modules. Please run "npm install" in the frontend directory before packaging.'
-    );
-    app.quit();
-    return { proc: null, script };
-  }
-
-  if (!useDevServer && !hasBuild) {
-    dialog.showErrorBox(
-      'Frontend build missing',
-      'No .next build found. Run "npm run build" in the frontend directory before packaging, or set NEXT_DEV=true to run the dev server.'
-    );
-    log('Frontend build missing (.next not found)');
-    app.quit();
-    return { proc: null, script };
-  }
+  log(`[frontend] hasStandalone=${hasStandalone} hasBuild=${hasBuild} useDevServer=${useDevServer}`);
 
   const nodeCmd = resolveNodePath();
   if (!nodeCmd) {
@@ -336,17 +321,50 @@ function startFrontend() {
       'Could not find a Node.js runtime to start the frontend. Install Node.js, or set NODE_BINARY/NEXT_NODE_BINARY to the Node path, or bundle Node with the app.'
     );
     app.quit();
-    return { proc: null, script };
+    return { proc: null, script: 'none' };
   }
 
-  const args = [
-    nextBin,
-    script,
-    '--hostname',
-    HOST,
-    '--port',
-    String(FRONTEND_PORT),
-  ];
+  let args;
+  let script;
+
+  if (hasStandalone && !useDevServer) {
+    // Use standalone server (most efficient for packaged apps)
+    args = [standaloneServer];
+    script = 'standalone';
+    log(`[frontend] Using standalone server at ${standaloneServer}`);
+  } else {
+    // Use regular Next.js dev/start
+    const nextBin = resolveNextBinary();
+    if (!nextBin) {
+      dialog.showErrorBox(
+        'Missing Next.js binary',
+        'Could not find Next.js in frontend/node_modules. Please run "npm install" in the frontend directory before packaging.'
+      );
+      app.quit();
+      return { proc: null, script: 'none' };
+    }
+
+    if (!useDevServer && !hasBuild) {
+      dialog.showErrorBox(
+        'Frontend build missing',
+        'No .next build found. Run "npm run build" in the frontend directory before packaging, or set NEXT_DEV=true to run the dev server.'
+      );
+      log('Frontend build missing (.next not found)');
+      app.quit();
+      return { proc: null, script: 'none' };
+    }
+
+    script = useDevServer ? 'dev' : 'start';
+    args = [
+      nextBin,
+      script,
+      '--hostname',
+      HOST,
+      '--port',
+      String(FRONTEND_PORT),
+    ];
+    log(`[frontend] Using Next.js ${script} mode`);
+  }
 
   log(`Starting frontend with ${nodeCmd} ${args.join(' ')}`);
 
@@ -354,6 +372,8 @@ function startFrontend() {
     ...process.env,
     PATH: DEFAULT_PATH,
     NODE_ENV: useDevServer ? 'development' : 'production',
+    HOSTNAME: HOST,
+    PORT: String(FRONTEND_PORT),
   };
   delete env.ELECTRON_RUN_AS_NODE;
 

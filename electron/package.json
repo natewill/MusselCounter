@@ -48,12 +48,24 @@
         ]
       },
       {
-        "from": "../frontend",
+        "from": "../frontend/.next/standalone",
         "to": "frontend",
         "filter": [
-          "**/*",
-          "!.next/cache/**",
-          "!node_modules/.cache/**"
+          "**/*"
+        ]
+      },
+      {
+        "from": "../frontend/.next/static",
+        "to": "frontend/.next/static",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "../frontend/public",
+        "to": "frontend/public",
+        "filter": [
+          "**/*"
         ]
       },
       {

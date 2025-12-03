@@ -270,7 +270,25 @@ function startBackend() {
     ? `${bundledRuntimeDir}${path.delimiter}${DEFAULT_PATH}`
     : DEFAULT_PATH;
 
+  // Set up writable data directories in userData
+  const userDataPath = app.getPath('userData');
+  const dataDir = path.join(userDataPath, 'data');
+  const uploadsDir = path.join(dataDir, 'uploads');
+  const modelsDir = path.join(dataDir, 'models');
+  const polygonsDir = path.join(dataDir, 'polygons');
+  const dbPath = path.join(userDataPath, 'mussel_counter.db');
+
+  // Create directories if they don't exist
+  [dataDir, uploadsDir, modelsDir, polygonsDir].forEach((dir) => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+      log(`[startBackend] Created directory: ${dir}`);
+    }
+  });
+
   log(`[startBackend] PATH: ${pathEnv}`);
+  log(`[startBackend] Data directory: ${dataDir}`);
+  log(`[startBackend] DB path: ${dbPath}`);
   log(`[startBackend] Starting backend with: ${pythonCmd} ${args.join(' ')}`);
 
   const proc = spawn(pythonCmd, args, {
@@ -279,6 +297,10 @@ function startBackend() {
     env: {
       ...process.env,
       PATH: pathEnv,
+      // Configure backend to use writable directories
+      UPLOAD_DIR: uploadsDir,
+      MODELS_DIR: modelsDir,
+      DB_PATH: dbPath,
     },
   });
 

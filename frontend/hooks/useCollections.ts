@@ -9,6 +9,7 @@ export interface CollectionSummary {
   live_mussel_count?: number;
   created_at: string;
   updated_at?: string;
+  first_image_path?: string | null;
 }
 
 export function useCollections() {

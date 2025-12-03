@@ -59,7 +59,22 @@ async def get_all_collections(db: aiosqlite.Connection):
     Returns:
         List of collection rows
     """
-    cursor = await db.execute("SELECT * FROM collection ORDER BY created_at DESC")
+    cursor = await db.execute(
+        """
+        SELECT
+            c.*,
+            (
+                SELECT i.stored_path
+                FROM collection_image ci
+                JOIN image i ON i.image_id = ci.image_id
+                WHERE ci.collection_id = c.collection_id
+                ORDER BY ci.added_at ASC
+                LIMIT 1
+            ) AS first_image_path
+        FROM collection c
+        ORDER BY c.created_at DESC
+        """
+    )
     return await cursor.fetchall()
 
 

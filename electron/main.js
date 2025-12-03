@@ -79,6 +79,9 @@ function resolveNodePath() {
 }
 
 function resolvePythonPath() {
+  log(`[resolvePythonPath] Starting Python resolution`);
+  log(`[resolvePythonPath] PYTHON_PATH env var: ${process.env.PYTHON_PATH || 'not set'}`);
+
   if (process.env.PYTHON_PATH) {
     log(`[resolvePythonPath] Using PYTHON_PATH=${process.env.PYTHON_PATH}`);
     return process.env.PYTHON_PATH;
@@ -89,22 +92,30 @@ function resolvePythonPath() {
     ? path.join(bundledRuntime, 'Scripts', 'python.exe')
     : path.join(bundledRuntime, 'bin', 'python3');
 
+  log(`[resolvePythonPath] Checking bundled runtime: ${bundledPython}`);
   if (fs.existsSync(bundledPython)) {
     log(`[resolvePythonPath] Using bundled runtime at ${bundledPython}`);
     return bundledPython;
+  } else {
+    log(`[resolvePythonPath] Bundled runtime not found`);
   }
 
   const posixVenv = path.join(backendDir, 'venv', 'bin', 'python');
   const windowsVenv = path.join(backendDir, 'venv', 'Scripts', 'python.exe');
 
+  log(`[resolvePythonPath] Checking venv: ${posixVenv}`);
   if (fs.existsSync(posixVenv)) {
     log(`[resolvePythonPath] Using backend venv at ${posixVenv}`);
     return posixVenv;
   }
+
+  log(`[resolvePythonPath] Checking venv: ${windowsVenv}`);
   if (fs.existsSync(windowsVenv)) {
     log(`[resolvePythonPath] Using backend venv at ${windowsVenv}`);
     return windowsVenv;
   }
+
+  log(`[resolvePythonPath] No venv found`);
 
   const candidates = [
     process.platform === 'win32' ? 'python' : 'python3',
@@ -113,13 +124,14 @@ function resolvePythonPath() {
     '/usr/local/bin/python3',
   ];
 
+  log(`[resolvePythonPath] Checking system Python candidates: ${candidates.join(', ')}`);
   for (const candidate of candidates) {
     try {
       fs.accessSync(candidate, fs.constants.X_OK);
       log(`[resolvePythonPath] Using system python at ${candidate}`);
       return candidate;
     } catch (e) {
-      continue;
+      log(`[resolvePythonPath] Candidate ${candidate} not accessible: ${e.message}`);
     }
   }
 
@@ -127,31 +139,159 @@ function resolvePythonPath() {
   return process.platform === 'win32' ? 'python' : 'python3';
 }
 
+function killProcessOnPort(port) {
+  return new Promise((resolve) => {
+    const platform = process.platform;
+    let command;
+    let args;
+
+    if (platform === 'win32') {
+      // Windows: find PID using netstat, then kill with taskkill
+      command = 'netstat';
+      args = ['-ano'];
+    } else {
+      // macOS/Linux: use lsof to find and kill
+      command = 'lsof';
+      args = ['-ti', `:${port}`];
+    }
+
+    const proc = spawn(command, args, {
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: platform === 'win32', // Use shell on Windows for better compatibility
+    });
+
+    let output = '';
+    proc.stdout.on('data', (data) => {
+      output += data.toString();
+    });
+
+    proc.on('close', (code) => {
+      if (platform === 'win32') {
+        // Parse netstat output to find PID
+        // netstat -ano output format: PROTO  LOCAL_ADDRESS  FOREIGN_ADDRESS  STATE  PID
+        const lines = output.split('\n');
+        const pids = new Set();
+        
+        for (const line of lines) {
+          // Match lines with LISTENING state and our port
+          if (line.includes('LISTENING') && line.includes(`:${port}`)) {
+            // Extract PID (last column)
+            const parts = line.trim().split(/\s+/);
+            const pid = parts[parts.length - 1];
+            if (pid && !isNaN(pid) && pid !== '0') {
+              pids.add(pid);
+            }
+          }
+        }
+        
+        if (pids.size > 0) {
+          log(`[killProcessOnPort] Found ${pids.size} process(es) on port ${port}, killing...`);
+          const killPromises = Array.from(pids).map((pid) => {
+            return new Promise((killResolve) => {
+              const killProc = spawn('taskkill', ['/F', '/PID', pid], {
+                stdio: ['ignore', 'pipe', 'pipe'],
+                shell: true, // Use shell on Windows for better compatibility
+              });
+              killProc.on('close', (killCode) => {
+                if (killCode === 0) {
+                  log(`[killProcessOnPort] Killed process ${pid} on port ${port}`);
+                  killResolve(true);
+                } else {
+                  log(`[killProcessOnPort] Failed to kill process ${pid} (exit code ${killCode})`);
+                  killResolve(false);
+                }
+              });
+              killProc.on('error', (err) => {
+                log(`[killProcessOnPort] Error killing process ${pid}: ${err.message}`);
+                killResolve(false);
+              });
+            });
+          });
+          Promise.all(killPromises).then(() => resolve(true));
+        } else {
+          resolve(false);
+        }
+      } else {
+        // macOS/Linux: lsof -ti returns PIDs directly
+        const pids = output.trim().split('\n').filter(Boolean);
+        if (pids.length > 0) {
+          log(`[killProcessOnPort] Found ${pids.length} process(es) on port ${port}, killing...`);
+          const killPromises = pids.map((pid) => {
+            return new Promise((killResolve) => {
+              const killProc = spawn('kill', ['-9', pid], {
+                stdio: ['ignore', 'pipe', 'pipe'],
+              });
+              killProc.on('close', () => {
+                log(`[killProcessOnPort] Killed process ${pid} on port ${port}`);
+                killResolve(true);
+              });
+              killProc.on('error', () => killResolve(false));
+            });
+          });
+          Promise.all(killPromises).then(() => resolve(true));
+        } else {
+          resolve(false);
+        }
+      }
+    });
+
+    proc.on('error', (err) => {
+      log(`[killProcessOnPort] Error checking port ${port}: ${err.message}`);
+      resolve(false);
+    });
+  });
+}
+
+async function ensurePortsFree() {
+  log('[ensurePortsFree] Checking and freeing ports...');
+  await Promise.all([
+    killProcessOnPort(BACKEND_PORT),
+    killProcessOnPort(FRONTEND_PORT),
+  ]);
+  // Give processes a moment to fully terminate
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  log('[ensurePortsFree] Ports should be free now');
+}
+
 function startBackend() {
   const pythonCmd = resolvePythonPath();
   const args = ['-m', 'uvicorn', 'main:app', '--host', HOST, '--port', String(BACKEND_PORT)];
 
-  log(`Starting backend with ${pythonCmd} ${args.join(' ')}`);
+  log(`[startBackend] Python command: ${pythonCmd}`);
+  log(`[startBackend] Backend directory: ${backendDir}`);
+  log(`[startBackend] Backend directory exists: ${fs.existsSync(backendDir)}`);
+  log(`[startBackend] Bundled runtime directory: ${bundledRuntimeDir}`);
+  log(`[startBackend] Bundled runtime exists: ${fs.existsSync(bundledRuntimeDir)}`);
+  log(`[startBackend] Python binary exists: ${fs.existsSync(pythonCmd)}`);
+  log(`[startBackend] App is packaged: ${app.isPackaged}`);
+  log(`[startBackend] Resources path: ${process.resourcesPath}`);
+
+  const pathEnv = fs.existsSync(bundledRuntimeDir)
+    ? `${bundledRuntimeDir}${path.delimiter}${DEFAULT_PATH}`
+    : DEFAULT_PATH;
+
+  log(`[startBackend] PATH: ${pathEnv}`);
+  log(`[startBackend] Starting backend with: ${pythonCmd} ${args.join(' ')}`);
+
   const proc = spawn(pythonCmd, args, {
     cwd: backendDir,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
-      PATH: fs.existsSync(bundledRuntimeDir)
-        ? `${bundledRuntimeDir}${path.delimiter}${DEFAULT_PATH}`
-        : DEFAULT_PATH,
+      PATH: pathEnv,
     },
   });
 
-  proc.stdout.on('data', (data) => log(`[backend] ${data.toString().trim()}`));
-  proc.stderr.on('data', (data) => log(`[backend] ${data.toString().trim()}`));
+  proc.stdout.on('data', (data) => log(`[backend stdout] ${data.toString().trim()}`));
+  proc.stderr.on('data', (data) => log(`[backend stderr] ${data.toString().trim()}`));
 
-  proc.on('exit', (code) => {
-    log(`[backend] exited with code ${code ?? 'unknown'}`);
+  proc.on('exit', (code, signal) => {
+    log(`[backend] exited with code ${code ?? 'unknown'}, signal ${signal ?? 'none'}`);
   });
 
   proc.on('error', (err) => {
     log(`[backend] failed to start: ${err.message}`);
+    log(`[backend] error stack: ${err.stack}`);
   });
 
   return proc;
@@ -275,10 +415,17 @@ function waitForServer(port, label) {
 
 async function createWindow() {
   log('[createWindow] starting window creation');
+  log(`[createWindow] Backend process alive: ${backendProcess && !backendProcess.killed}`);
+  log(`[createWindow] Backend process PID: ${backendProcess?.pid || 'none'}`);
+
   try {
     await waitForServer(BACKEND_PORT, 'Backend');
   } catch (err) {
-    dialog.showErrorBox('Startup error', err.message);
+    log(`[createWindow] Backend failed to start: ${err.message}`);
+    log(`[createWindow] Backend process state - killed: ${backendProcess?.killed}, exitCode: ${backendProcess?.exitCode}, signalCode: ${backendProcess?.signalCode}`);
+
+    const errorMsg = `Backend failed to start on port ${BACKEND_PORT}.\n\nCheck log at:\n${logFile}\n\nError: ${err.message}`;
+    dialog.showErrorBox('Backend Startup Error', errorMsg);
     log(`Startup error: ${err.message}`);
     app.quit();
     return;
@@ -326,11 +473,25 @@ function cleanUp() {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   log('[lifecycle] app ready');
+  log(`[lifecycle] Platform: ${process.platform}`);
+  log(`[lifecycle] Electron version: ${process.versions.electron}`);
+  log(`[lifecycle] Node version: ${process.versions.node}`);
+  log(`[lifecycle] App path: ${app.getAppPath()}`);
+  log(`[lifecycle] User data path: ${app.getPath('userData')}`);
+  log(`[lifecycle] Log file: ${logFile}`);
+
+  await ensurePortsFree();
+
+  log('[lifecycle] Starting backend...');
   backendProcess = startBackend();
+
+  log('[lifecycle] Starting frontend...');
   ({ proc: frontendProcess } = startFrontend());
+
   // Load window immediately; Next.js will come up shortly after on the same port
+  log('[lifecycle] Creating window...');
   createWindow();
 });
 

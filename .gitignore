@@ -8,6 +8,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 venv/
+python-runtime/
 .env
 .env.local
 .env.*.local

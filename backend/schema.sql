@@ -3,7 +3,6 @@ CREATE TABLE IF NOT EXISTS collection (
   collection_id      INTEGER PRIMARY KEY AUTOINCREMENT,
   name          TEXT,
   description   TEXT,
-  folder_path   TEXT,                      -- where the folder containing the images is stored
   created_at    TEXT NOT NULL,             -- SQLite uses TEXT for dates (ISO format)
   updated_at    TEXT NOT NULL,
   image_count   INTEGER DEFAULT 0,         -- Calculated field, not a foreign key

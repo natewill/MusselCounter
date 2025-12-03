@@ -208,12 +208,12 @@ async def remove_image_from_collection(
 ) -> bool:
     """
     Remove an image from a collection (does not delete the image itself).
-    
+
     Args:
         db: Database connection
         collection_id: Collection ID
         image_id: Image ID to remove
-        
+
     Returns:
         True if image was removed, False if it wasn't in the collection
     """
@@ -221,6 +221,21 @@ async def remove_image_from_collection(
         "DELETE FROM collection_image WHERE collection_id = ? AND image_id = ?",
         (collection_id, image_id)
     )
+
+    # Update collection's image_count
+    now = datetime.now(timezone.utc).isoformat()
+    await db.execute(
+        """UPDATE collection
+           SET image_count = (
+               SELECT COUNT(*)
+               FROM collection_image
+               WHERE collection_id = ?
+           ),
+           updated_at = ?
+           WHERE collection_id = ?""",
+        (collection_id, now, collection_id)
+    )
+
     await db.commit()
     return cursor.rowcount > 0
 

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import QueryProvider from "@/providers/QueryProvider";
@@ -13,9 +14,20 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Mussel Counter",
   description: "AI-powered mussel detection and counting application",
+  icons: {
+    icon: [
+      { url: "/icon.png", type: "image/png" },
+      { url: "/favicon.ico", type: "image/x-icon" },
+    ],
+    shortcut: ["/favicon.ico"],
+    apple: [
+      { url: "/icon.png", type: "image/png" },
+      { url: "/favicon-256.png", type: "image/png" },
+    ],
+  },
 };
 
 export default function RootLayout({ children }) {

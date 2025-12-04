@@ -81,6 +81,172 @@ npm run dev
 - **API Docs**: http://127.0.0.1:8000/docs (auto-generated Swagger UI)
 - **Image Uploads**: http://127.0.0.1:8000/uploads/{filename}
 
+### Desktop (Electron) App
+Launch the backend and frontend together in a desktop window.
+
+#### Running in Development Mode
+
+1) **Install dependencies** (one time):
+```bash
+cd frontend && npm install       # Next.js deps
+cd ../backend && python3 -m venv venv && source venv/bin/activate && pip install -r requirements.txt
+cd ../electron && npm install    # Electron shell
+```
+
+2) **(Optional) Build frontend** for faster startup:
+```bash
+cd frontend
+npm run build
+```
+
+3) **Start the desktop app** (spawns backend + frontend automatically):
+```bash
+cd electron
+npm start
+```
+
+**Development Notes:**
+- Uses `backend/venv` if present; otherwise falls back to system `python3`
+- Defaults to `next start` when `.next` build exists; otherwise runs `next dev`
+- Force dev mode: `NEXT_DEV=true npm start`
+- Uses ports `8000` (backend) and `3000` (frontend) - ensure they're free
+- Check ports: `cd electron && npm run check-ports`
+
+---
+
+#### Building Installers for Distribution
+
+**Important:** To create standalone installers that work on machines without Python installed, you must bundle a Python runtime with all dependencies.
+
+##### Step 1: Create Bundled Python Runtime
+
+**On the build machine**, create a self-contained Python environment:
+
+```bash
+cd backend
+python3 -m venv python-runtime
+source python-runtime/bin/activate  # Windows: python-runtime\Scripts\activate
+pip install -r requirements.txt
+deactivate
+```
+
+**⚠️ Important Notes:**
+- `python-runtime/` is **excluded from git** (in `.gitignore`)
+- Must be recreated on each build machine
+- Each platform (Mac/Windows/Linux) needs its own runtime built on that platform
+- The runtime is large (~500MB-1GB due to PyTorch) but necessary for standalone installers
+
+##### Step 2: Add ML Models (Optional but Recommended)
+
+Place your model files in `backend/data/models/`:
+```bash
+cp your-model.pt backend/data/models/
+```
+
+**Note:** Models are **excluded from the packaged app** to keep installer size reasonable. Users can:
+- Add models to `backend/data/models/` after installation, OR
+- You can include them by removing `!data/models/**` from `electron/package.json` build filters
+
+##### Step 3: Build Frontend
+
+```bash
+cd frontend
+npm install  # if not already done
+npm run build
+```
+
+##### Step 4: Package the App
+
+```bash
+cd electron
+npm install  # if not already done
+npm run dist
+```
+
+This creates installers in `dist/`:
+- **macOS**: `MusselCounter-{version}-arm64.dmg`
+- **Windows**: `MusselCounter Setup {version}.exe`
+- **Linux**: `MusselCounter-{version}.AppImage`, `.deb`
+
+**Build Output:**
+- The packaged app includes `backend/python-runtime/` with all dependencies
+- Users don't need Python or pip installed
+- The app is fully self-contained (except models if you excluded them)
+
+##### Step 5: Test the Packaged App
+
+```bash
+# macOS - run from terminal to see logs
+open dist/mac-arm64/MusselCounter.app
+
+# Or double-click the .app in Finder
+```
+
+Check logs if issues occur:
+```bash
+# macOS
+cat ~/Library/Application\ Support/MusselCounter/mussel-electron.log
+
+# Windows
+# Check %APPDATA%\MusselCounter\mussel-electron.log
+
+# Linux
+# Check ~/.config/MusselCounter/mussel-electron.log
+```
+
+---
+
+#### Customizing App Icon
+
+The app uses the icon from `frontend/app/icon.svg`.
+
+**Generate platform-specific icons:**
+```bash
+cd electron
+npm run icons
+```
+
+This creates:
+- `icon.icns` (macOS)
+- `icon.ico` (Windows)
+- `icon.png` (Linux)
+
+in `frontend/public/`. The build process automatically uses these.
+
+---
+
+#### Distributing Installers
+
+**Create a GitHub Release:**
+1. Build on each platform (macOS, Windows, Linux)
+2. Upload artifacts from `dist/` to a GitHub Release
+3. Share download links:
+
+```markdown
+- macOS (Apple Silicon): https://github.com/yourusername/MusselCounter/releases/download/v0.1.0/MusselCounter-0.1.0-arm64.dmg
+- Windows: https://github.com/yourusername/MusselCounter/releases/download/v0.1.0/MusselCounter.Setup.0.1.0.exe
+- Linux: https://github.com/yourusername/MusselCounter/releases/download/v0.1.0/MusselCounter-0.1.0.AppImage
+```
+
+Update version numbers to match your release tag and actual filenames in `dist/`.
+
+---
+
+#### Troubleshooting Packaged Apps
+
+**"Backend wasn't able to open" error:**
+- Check if `python-runtime/` exists in `backend/` before building
+- View logs (see "Test the Packaged App" section above)
+- Ensure `python-runtime/` was created on the same platform you're building for
+
+**App size is huge (>2GB):**
+- This is normal with PyTorch and ML dependencies
+- Consider excluding models and having users download them separately
+
+**Models not detected:**
+- Models are excluded by default - users must add them to `backend/data/models/` after installation
+- Or modify `electron/package.json` to include models in the build (increases installer size significantly)
+
 ---
 
 ## File Structure

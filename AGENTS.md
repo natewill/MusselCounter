@@ -18,11 +18,6 @@
 - TypeScript/React: Follow ESLint defaults; favor functional components, hooks, and `tsx/ts` extensions. Use camelCase for vars/functions, PascalCase for components, and kebab-case for filenames in `components/` and `hooks/` folders.
 - Paths: avoid hardcoding absolute paths; use `data/` subfolders for persisted artifacts and `public/` for static assets.
 
-## Testing Guidelines
-- Backend: Pytest with markers like `-m unit` or `-m integration`; name files `test_*.py`. Keep fixtures in `tests/conftest.py`. Aim for coverage reports in `htmlcov/` via `pytest --cov`.
-- Frontend: Vitest + React Testing Library; name files `*.test.ts(x)` under `__tests__/`. Prefer user-facing assertions over implementation details; keep DOM queries accessible-first.
-- Add regression tests alongside new features (e.g., `__tests__/run/...` or `tests/test_runs.py`) and ensure they pass before pushing.
-
 ## Commit & Pull Request Guidelines
 - Commits are short, imperative, and scoped (repo history favors concise messages like `clean` or `added tests`); keep related changes together.
 - Pull requests should include: purpose/summary, linked issue or context, key screenshots for UI updates, and test evidence (`pytest`/`npm test`/coverage flags). Call out migrations, schema touches (`schema.sql`), or model file expectations (`data/models/`) explicitly.

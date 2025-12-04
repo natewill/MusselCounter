@@ -15,6 +15,16 @@ export default function CollectionsPage() {
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState<string>('');
+  const [sortBy, setSortBy] = useState<string>('last_opened');
+  const [lastOpenedMap, setLastOpenedMap] = useState<Record<number, number>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const stored = localStorage.getItem('collections-last-opened');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
   const filteredCollections = useMemo(() => {
     if (!searchTerm.trim()) return collections;
     const q = searchTerm.trim().toLowerCase();
@@ -31,6 +41,23 @@ export default function CollectionsPage() {
     };
     return collections.filter((c) => fuzzyMatch(c.name || 'untitled collection', q));
   }, [collections, searchTerm]);
+
+  const sortedCollections = useMemo(() => {
+    const withSort = [...filteredCollections];
+    if (sortBy === 'last_opened') {
+      withSort.sort((a, b) => {
+        const aTime = lastOpenedMap[a.collection_id] || 0;
+        const bTime = lastOpenedMap[b.collection_id] || 0;
+        if (aTime === bTime) {
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+        return bTime - aTime;
+      });
+    } else if (sortBy === 'created_at') {
+      withSort.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    }
+    return withSort;
+  }, [filteredCollections, sortBy, lastOpenedMap]);
 
   const handleCreate = async () => {
     try {
@@ -81,6 +108,16 @@ export default function CollectionsPage() {
     setRenameValue('');
   };
 
+  const handleCardOpen = (id: number) => {
+    const updated = { ...lastOpenedMap, [id]: Date.now() };
+    setLastOpenedMap(updated);
+    try {
+      localStorage.setItem('collections-last-opened', JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+  };
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
       <div className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
@@ -111,22 +148,36 @@ export default function CollectionsPage() {
                 Pick a collection to view its images and past runs.
               </p>
             </div>
-            <div className="w-full sm:w-72">
-              <label className="sr-only" htmlFor="collection-search">Search collections</label>
-              <div className="relative">
-                <span className="absolute inset-y-0 left-3 flex items-center text-zinc-400">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </span>
-                <input
-                  id="collection-search"
-                  type="search"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search by name"
-                  className="w-full pl-9 pr-3 py-2 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+            <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2 sm:items-center">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Sort by</span>
+                <select
+                  id="collection-sort"
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value)}
+                  className="w-40 sm:w-44 px-3 py-1.5 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="last_opened">Last Opened</option>
+                  <option value="created_at">Date Created</option>
+                </select>
+              </div>
+              <div className="w-full sm:w-80">
+                <label className="sr-only" htmlFor="collection-search">Search collections</label>
+                <div className="relative">
+                  <span className="absolute inset-y-0 left-3 flex items-center text-zinc-400">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </span>
+                  <input
+                    id="collection-search"
+                    type="search"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Search by name"
+                    className="w-full pl-9 pr-3 py-2 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
               </div>
             </div>
           </div>
@@ -173,9 +224,9 @@ export default function CollectionsPage() {
           </div>
         )}
 
-        {!isLoading && !isError && filteredCollections.length > 0 && (
+        {!isLoading && !isError && sortedCollections.length > 0 && (
           <div className="grid gap-5 sm:grid-cols-2">
-            {filteredCollections.map((collection) => (
+            {sortedCollections.map((collection) => (
               <CollectionCard
                 key={collection.collection_id}
                 collection={collection}
@@ -187,6 +238,7 @@ export default function CollectionsPage() {
                 onRenameChange={setRenameValue}
                 onRenameSave={handleRenameSave}
                 onRenameCancel={handleRenameCancel}
+                onOpen={handleCardOpen}
               />
             ))}
           </div>

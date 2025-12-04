@@ -60,6 +60,7 @@ export default function CollectionCard({
   onRenameChange,
   onRenameSave,
   onRenameCancel,
+  onOpen,
 }: Props) {
   const imageUrl = getImageUrl(collection.first_image_path);
   return (
@@ -67,6 +68,7 @@ export default function CollectionCard({
       href={`/collection/${collection.collection_id}`}
       className="relative block rounded-lg border border-zinc-200 dark:border-zinc-800 p-7 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md transition-all h-full hover:border-blue-200 dark:hover:border-blue-800 hover:shadow-lg"
       id={`image-card-${collection.collection_id}`}
+      onClick={() => onOpen?.(collection.collection_id)}
     >
       {onDelete && (
         <button

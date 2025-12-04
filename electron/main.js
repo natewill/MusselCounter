@@ -301,6 +301,8 @@ function startBackend() {
       UPLOAD_DIR: uploadsDir,
       MODELS_DIR: modelsDir,
       DB_PATH: dbPath,
+      BACKEND_DATA_DIR: dataDir,
+      POLYGON_DIR: polygonsDir,
     },
   });
 

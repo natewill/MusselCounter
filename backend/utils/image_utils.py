@@ -147,6 +147,20 @@ async def add_multiple_images_optimized(
             )
         added_count = len(to_link)
 
+        # Update collection's image_count
+        if added_count > 0:
+            await db.execute(
+                """UPDATE collection
+                   SET image_count = (
+                       SELECT COUNT(*)
+                       FROM collection_image
+                       WHERE collection_id = ?
+                   ),
+                   updated_at = ?
+                   WHERE collection_id = ?""",
+                (collection_id, now, collection_id)
+            )
+
         await db.commit()
         return (image_ids, added_count, duplicate_count, duplicate_image_ids)
     except Exception:

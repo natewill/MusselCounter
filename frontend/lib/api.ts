@@ -169,6 +169,14 @@ export async function createCollection(name?: string, description?: string) {
 }
 
 /**
+ * Get all collections
+ */
+export async function getCollections() {
+  const response = await apiClient.get('/api/collections');
+  return response.data;
+}
+
+/**
  * Upload image files to a collection
  */
 export async function uploadImagesToCollection(collectionId: number, files: File[]) {

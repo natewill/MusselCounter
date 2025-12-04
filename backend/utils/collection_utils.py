@@ -59,7 +59,22 @@ async def get_all_collections(db: aiosqlite.Connection):
     Returns:
         List of collection rows
     """
-    cursor = await db.execute("SELECT * FROM collection ORDER BY created_at DESC")
+    cursor = await db.execute(
+        """
+        SELECT
+            c.*,
+            (
+                SELECT i.stored_path
+                FROM collection_image ci
+                JOIN image i ON i.image_id = ci.image_id
+                WHERE ci.collection_id = c.collection_id
+                ORDER BY ci.added_at ASC
+                LIMIT 1
+            ) AS first_image_path
+        FROM collection c
+        ORDER BY c.created_at DESC
+        """
+    )
     return await cursor.fetchall()
 
 
@@ -208,12 +223,12 @@ async def remove_image_from_collection(
 ) -> bool:
     """
     Remove an image from a collection (does not delete the image itself).
-    
+
     Args:
         db: Database connection
         collection_id: Collection ID
         image_id: Image ID to remove
-        
+
     Returns:
         True if image was removed, False if it wasn't in the collection
     """
@@ -221,6 +236,21 @@ async def remove_image_from_collection(
         "DELETE FROM collection_image WHERE collection_id = ? AND image_id = ?",
         (collection_id, image_id)
     )
+
+    # Update collection's image_count
+    now = datetime.now(timezone.utc).isoformat()
+    await db.execute(
+        """UPDATE collection
+           SET image_count = (
+               SELECT COUNT(*)
+               FROM collection_image
+               WHERE collection_id = ?
+           ),
+           updated_at = ?
+           WHERE collection_id = ?""",
+        (collection_id, now, collection_id)
+    )
+
     await db.commit()
     return cursor.rowcount > 0
 

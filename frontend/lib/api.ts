@@ -197,6 +197,15 @@ export async function updateCollection(
 }
 
 /**
+ * Delete a collection
+ */
+export async function deleteCollection(collectionId: number) {
+  const validatedCollectionId = validateCollectionId(collectionId);
+  const response = await apiClient.delete(`/api/collections/${validatedCollectionId}`);
+  return response.data;
+}
+
+/**
  * Upload image files to a collection
  */
 export async function uploadImagesToCollection(collectionId: number, files: File[]) {

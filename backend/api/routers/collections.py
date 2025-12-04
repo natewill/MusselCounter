@@ -117,6 +117,63 @@ async def get_all_collections_endpoint() -> List[CollectionListResponse]:
         ]
 
 
+@router.delete("/{collection_id}", response_model=Dict[str, Any])
+async def delete_collection_endpoint(collection_id: int) -> Dict[str, Any]:
+    """
+    Delete a collection and its associated runs/results.
+
+    Images remain in the database; only the collection links and run data are removed.
+    """
+    collection_id = validate_integer_id(collection_id)
+
+    async with get_db() as db:
+        collection = await get_collection(db, collection_id)
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Find runs for this collection
+        runs_cursor = await db.execute(
+            "SELECT run_id FROM run WHERE collection_id = ?",
+            (collection_id,)
+        )
+        run_rows = await runs_cursor.fetchall()
+        run_ids = [row["run_id"] for row in run_rows] if run_rows else []
+
+        if run_ids:
+            placeholders = ",".join(["?"] * len(run_ids))
+            # Delete detections for runs
+            await db.execute(
+                f"DELETE FROM detection WHERE run_id IN ({placeholders})",
+                run_ids
+            )
+            # Delete image_results for runs
+            await db.execute(
+                f"DELETE FROM image_result WHERE run_id IN ({placeholders})",
+                run_ids
+            )
+            # Delete runs
+            await db.execute(
+                f"DELETE FROM run WHERE run_id IN ({placeholders})",
+                run_ids
+            )
+
+        # Delete collection-image links
+        await db.execute(
+            "DELETE FROM collection_image WHERE collection_id = ?",
+            (collection_id,)
+        )
+
+        # Finally delete the collection
+        await db.execute(
+            "DELETE FROM collection WHERE collection_id = ?",
+            (collection_id,)
+        )
+
+        await db.commit()
+
+        return {"status": "deleted", "collection_id": collection_id}
+
+
 @router.get("/{collection_id}", response_model=Dict)
 async def get_collection_endpoint(
     collection_id: int,

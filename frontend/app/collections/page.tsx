@@ -6,11 +6,15 @@ import { useMemo, useState } from 'react';
 import CollectionCard from '@/components/collections/CollectionCard';
 import { useCollections } from '@/hooks/useCollections';
 import { createQuickProcessCollection } from '@/utils/home/collection';
+import { deleteCollection, updateCollection } from '@/lib/api';
 
 export default function CollectionsPage() {
   const router = useRouter();
   const { collections, isLoading, isError, error, refetch } = useCollections();
   const [searchTerm, setSearchTerm] = useState('');
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [renamingId, setRenamingId] = useState<number | null>(null);
+  const [renameValue, setRenameValue] = useState<string>('');
   const filteredCollections = useMemo(() => {
     if (!searchTerm.trim()) return collections;
     const q = searchTerm.trim().toLowerCase();
@@ -35,6 +39,46 @@ export default function CollectionsPage() {
     } catch (err) {
       console.error('Failed to create collection', err);
     }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (deletingId) return;
+    setDeletingId(id);
+    try {
+      await deleteCollection(id);
+      await refetch();
+    } catch (err) {
+      console.error('Failed to delete collection', err);
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
+  const handleStartRename = (id: number) => {
+    if (deletingId) return;
+    const current = collections.find((c) => c.collection_id === id);
+    setRenameValue(current?.name || '');
+    setRenamingId(id);
+  };
+
+  const handleRenameSave = async () => {
+    if (renamingId === null) return;
+    const trimmed = renameValue.trim();
+    if (!trimmed) return;
+    try {
+      await updateCollection(renamingId, { name: trimmed });
+      await refetch();
+    } catch (err) {
+      console.error('Failed to rename collection', err);
+    } finally {
+      setRenamingId(null);
+      setRenameValue('');
+    }
+  };
+
+  const handleRenameCancel = () => {
+    setRenamingId(null);
+    setRenameValue('');
   };
 
   return (
@@ -135,6 +179,14 @@ export default function CollectionsPage() {
               <CollectionCard
                 key={collection.collection_id}
                 collection={collection}
+                onDelete={handleDelete}
+                deleting={deletingId === collection.collection_id}
+                onEditName={handleStartRename}
+                renaming={renamingId === collection.collection_id}
+                renameValue={renamingId === collection.collection_id ? renameValue : ''}
+                onRenameChange={setRenameValue}
+                onRenameSave={handleRenameSave}
+                onRenameCancel={handleRenameCancel}
               />
             ))}
           </div>

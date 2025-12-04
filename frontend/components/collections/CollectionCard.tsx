@@ -48,6 +48,7 @@ export default function CollectionCard({ collection }: Props) {
     <Link
       href={`/collection/${collection.collection_id}`}
       className="block rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md transition-shadow h-full"
+      id={`image-card-${collection.collection_id}`}
     >
       <div className="flex flex-col gap-3 h-full">
         <div className="flex items-start gap-4">

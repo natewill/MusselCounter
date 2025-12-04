@@ -46,6 +46,7 @@ export default function ImageDetailPage() {
   const imageId = parseInt(Array.isArray(params.imageId) ? params.imageId[0] : params.imageId || '0', 10);
   const modelIdFromQuery = parseInt(searchParams.get('modelId') || '0', 10);
   const collectionIdFromQuery = parseInt(searchParams.get('collectionId') || '0', 10);
+  const sortFromQuery = searchParams.get('sort') || '';
   
   const [imageData, setImageData] = useState<ImageData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -140,7 +141,7 @@ export default function ImageDetailPage() {
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
             <p className="text-red-800 dark:text-red-200">{error || 'Image not found'}</p>
             <Link
-              href={`/collection/${imageData?.collection_id ?? ''}?modelId=${imageData?.model_id ?? modelIdFromQuery ?? ''}`}
+              href={`/collection/${imageData?.collection_id ?? ''}?modelId=${imageData?.model_id ?? modelIdFromQuery ?? ''}${sortFromQuery ? `&sort=${encodeURIComponent(sortFromQuery)}` : ''}#image-card-${imageData?.image_id ?? ''}`}
               className="text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block"
             >
               ← Back to collection
@@ -179,7 +180,9 @@ export default function ImageDetailPage() {
         <ImageHeader
           filename={imageData.filename}
           collectionId={imageData.collection_id}
+          imageId={imageData.image_id}
           modelId={modelIdFromQuery || imageData.model_id}
+          sortBy={sortFromQuery}
           hasResults={hasResults}
           isEditMode={isEditMode}
           onToggleEditMode={() => setIsEditMode(!isEditMode)}

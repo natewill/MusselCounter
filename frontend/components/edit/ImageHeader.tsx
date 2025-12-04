@@ -5,8 +5,10 @@ import Link from 'next/link';
 interface ImageHeaderProps {
   filename: string;
   collectionId: number;
+  imageId: number;
   modelId?: number | null;
   hasResults?: boolean;
+  sortBy?: string;
   isEditMode: boolean;
   onToggleEditMode: () => void;
   visiblePolygons: boolean;
@@ -16,16 +18,21 @@ interface ImageHeaderProps {
 export default function ImageHeader({
   filename,
   collectionId,
+  imageId,
   modelId,
+  sortBy,
   hasResults = true,
   isEditMode,
   onToggleEditMode,
   visiblePolygons,
   onToggleVisiblePolygons,
 }: ImageHeaderProps) {
-  const backUrl = modelId
+  const backUrlBase = modelId
     ? `/collection/${collectionId}?modelId=${modelId}`
     : `/collection/${collectionId}`;
+  const backUrl = sortBy
+    ? `${backUrlBase}&sort=${encodeURIComponent(sortBy)}#image-card-${imageId}`
+    : `${backUrlBase}#image-card-${imageId}`;
 
   return (
     <div className="mb-6">

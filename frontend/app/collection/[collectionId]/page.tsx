@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState, useMemo } from 'react';
 import { useParams, useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useModels } from '@/hooks/useModels';
 import { useCollectionData } from '@/hooks/useCollectionData';
@@ -35,6 +35,7 @@ export default function RunResultsPage() {
   // Parse initial model from URL for first render
   const urlModelId = searchParams.get('modelId');
   const initialModelId = urlModelId ? parseInt(urlModelId, 10) : null;
+  const initialSortFromUrl = searchParams.get('sort');
   
   const fileInputRef = useRef(null);
   const [sortBy, setSortBy] = useState('');
@@ -75,6 +76,7 @@ export default function RunResultsPage() {
 
   const lastUrlModelIdRef = useRef<string | null>(null);
   const initializedFromUrlRef = useRef(false);
+  const searchParamsString = useMemo(() => searchParams.toString(), [searchParams]);
 
   // One-time sync from ?modelId= in URL to picker
   useEffect(() => {
@@ -91,6 +93,69 @@ export default function RunResultsPage() {
       }
     }
   }, [searchParams, setSelectedModelId]);
+
+  // Load persisted sort from sessionStorage and URL
+  useEffect(() => {
+    const stored = typeof window !== 'undefined'
+      ? sessionStorage.getItem(`collection-view-${collectionId}`)
+      : null;
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (!initialSortFromUrl && parsed.sortBy) {
+          setSortBy(parsed.sortBy);
+        }
+      } catch {
+        // ignore malformed storage
+      }
+    }
+    if (initialSortFromUrl) {
+      setSortBy(initialSortFromUrl);
+    }
+  }, [collectionId, initialSortFromUrl]);
+
+  // Persist sort change to URL + sessionStorage
+  useEffect(() => {
+    const params = new URLSearchParams(searchParamsString);
+    if (sortBy) {
+      params.set('sort', sortBy);
+    } else {
+      params.delete('sort');
+    }
+    const targetQuery = params.toString();
+    const currentQuery = searchParamsString;
+    if (targetQuery !== currentQuery) {
+      const hash = typeof window !== 'undefined' ? window.location.hash : '';
+      router.replace(`${pathname}?${targetQuery}${hash}`);
+    }
+
+    if (typeof window !== 'undefined') {
+      const stored = sessionStorage.getItem(`collection-view-${collectionId}`);
+      const existing = stored ? (() => { try { return JSON.parse(stored); } catch { return {}; } })() : {};
+      sessionStorage.setItem(
+        `collection-view-${collectionId}`,
+        JSON.stringify({
+          ...existing,
+          sortBy,
+        })
+      );
+    }
+  }, [sortBy, collectionId, pathname, router, searchParamsString]);
+
+  // Scroll to hash anchor (for back from edit)
+  useEffect(() => {
+    if (!images || images.length === 0) return;
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    if (hash && hash.startsWith('#')) {
+      const targetId = hash.slice(1);
+      requestAnimationFrame(() => {
+        const el = document.getElementById(targetId);
+        if (el) {
+          el.scrollIntoView({ block: 'start' });
+        }
+      });
+    }
+  }, [images]);
 
   // Keep URL in sync when picker changes
   useEffect(() => {

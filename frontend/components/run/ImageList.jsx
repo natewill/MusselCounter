@@ -144,11 +144,13 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
             // Always allow navigation; edit mode can be disabled downstream if no results
             const modelIdForLink = selectedModelId ?? latestRun?.model_id ?? null;
             const collectionIdForLink = collectionId ?? latestRun?.collection_id ?? null;
+            const sortParam = sortBy || null;
             
             return (
               <Link
                 key={image.image_id}
-                href={modelIdForLink && collectionIdForLink ? `/edit/${image.image_id}?modelId=${modelIdForLink}&collectionId=${collectionIdForLink}` : '#'}
+                id={`image-card-${image.image_id}`}
+                href={modelIdForLink && collectionIdForLink ? `/edit/${image.image_id}?modelId=${modelIdForLink}&collectionId=${collectionIdForLink}${sortParam ? `&sort=${encodeURIComponent(sortParam)}` : ''}` : '#'}
                 className={`block border rounded-lg overflow-hidden hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors relative ${
                   isFlashing
                     ? 'green-flash'

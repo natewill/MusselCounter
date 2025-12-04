@@ -46,14 +46,20 @@ export default function CollectionsPage() {
     const withSort = [...filteredCollections];
     if (sortBy === 'last_opened') {
       withSort.sort((a, b) => {
-        const aTime = lastOpenedMap[a.collection_id] || 0;
-        const bTime = lastOpenedMap[b.collection_id] || 0;
-        if (aTime === bTime) {
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        const aTime = lastOpenedMap[a.collection_id];
+        const bTime = lastOpenedMap[b.collection_id];
+        // If both have timestamps, sort by last opened desc
+        if (aTime && bTime) {
+          return bTime - aTime;
         }
-        return bTime - aTime;
+        // If only one has a timestamp, it goes first
+        if (aTime && !bTime) return -1;
+        if (!aTime && bTime) return 1;
+        // Neither opened yet: fall back to created_at (newest first)
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
     } else if (sortBy === 'created_at') {
+      // Newest first (created_at desc)
       withSort.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
     return withSort;

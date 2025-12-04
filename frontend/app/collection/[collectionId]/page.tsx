@@ -114,7 +114,7 @@ export default function RunResultsPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
-      <PageHeader collectionName={collection.name} onModelSuccess={setSuccessMessage}>
+      <PageHeader collectionName={collection.name} onModelSuccess={setSuccessMessage} onModelError={setError}>
           <AddImagesButton
             fileInputRef={fileInputRef}
             uploading={uploading}

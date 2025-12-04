@@ -90,6 +90,11 @@ function getUserFriendlyError(error: AxiosError, status?: number): string {
   }
   
   if (status === 400) {
+    // Try to get specific error message from backend first
+    const errorDetail = (error.response?.data as { detail?: string })?.detail;
+    if (errorDetail && typeof errorDetail === 'string' && errorDetail.length < 200) {
+      return errorDetail;
+    }
     return 'Invalid request. Please check your input and try again.';
   }
   
@@ -251,13 +256,7 @@ export async function uploadModel(
     const response = await apiClient.post('/api/models', formData);
     return response.data;
   } catch (error) {
-    console.error('[uploadModel] Request failed:', {
-      error,
-      response: error.response,
-      status: error.response?.status,
-      data: error.response?.data,
-      headers: error.response?.headers
-    });
+    console.error('[uploadModel] Request failed');
     throw error;
   }
 }

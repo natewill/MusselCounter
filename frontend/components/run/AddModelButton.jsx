@@ -4,10 +4,9 @@ import { useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { uploadModel } from '@/lib/api';
 
-export default function AddModelButton({ onSuccess }) {
+export default function AddModelButton({ onSuccess, onError }) {
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState(null);
   const queryClient = useQueryClient();
 
   const handleFileChange = async (e) => {
@@ -23,12 +22,12 @@ export default function AddModelButton({ onSuccess }) {
     if (!validExtensions.includes(fileExt)) {
       const errorMsg = `Invalid file type. Supported: ${validExtensions.join(', ')}`;
       console.error('[AddModelButton] Validation failed:', errorMsg);
-      setError(errorMsg);
+      onError?.(errorMsg);
       return;
     }
 
     setUploading(true);
-    setError(null);
+    onError?.(null);
     onSuccess?.(null);
 
     try {
@@ -40,26 +39,27 @@ export default function AddModelButton({ onSuccess }) {
       // Dispatch custom event to trigger refresh in useModels hook
       window.dispatchEvent(new CustomEvent('modelsUpdated'));
       
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      
       // Show success message
       onSuccess?.(`Model "${result.name}" uploaded successfully!`);
     } catch (err) {
-      console.error('[AddModelButton] Upload failed:', {
-        error: err,
-        message: err.message,
-        response: err.response,
-        responseData: err.response?.data,
-        status: err.response?.status,
-        statusText: err.response?.statusText
-      });
-      const errorMsg = err.response?.data?.detail || err.response?.data?.message || err.message || 'Failed to upload model';
-      setError(errorMsg);
+      let errorMsg = 'Failed to upload model';
+      if (err?.response?.data?.detail) {
+        errorMsg = err.response.data.detail;
+      } else if (err?.response?.data?.message) {
+        errorMsg = err.response.data.message;
+      } else if (err?.message) {
+        errorMsg = err.message;
+      }
+      console.error('[AddModelButton] Upload failed:', errorMsg);
+      if (onError) {
+        onError(errorMsg);
+      }
     } finally {
       setUploading(false);
+      // Always reset file input so selecting the same file triggers onChange again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
@@ -90,11 +90,6 @@ export default function AddModelButton({ onSuccess }) {
           '+ Add Model'
         )}
       </button>
-      {error && (
-        <div className="absolute top-full mt-1 right-0 text-red-600 dark:text-red-400 text-sm whitespace-nowrap bg-white dark:bg-zinc-900 px-2 py-1 rounded shadow z-10">
-          {error}
-        </div>
-      )}
     </div>
   );
 }

@@ -42,7 +42,7 @@ export default function UploadArea({
         }
       }}
       className={`
-        border-2 border-dashed rounded-lg p-16 text-center cursor-pointer transition-colors
+        border-2 border-dashed rounded-lg p-64 text-center cursor-pointer transition-colors
         ${isDragging 
           ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' 
           : 'border-zinc-300 dark:border-zinc-700 hover:border-zinc-400 dark:hover:border-zinc-600'
@@ -115,4 +115,3 @@ export default function UploadArea({
     </div>
   );
 }
-

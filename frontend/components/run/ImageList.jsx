@@ -151,14 +151,14 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                 key={image.image_id}
                 id={`image-card-${image.image_id}`}
                 href={modelIdForLink && collectionIdForLink ? `/edit/${image.image_id}?modelId=${modelIdForLink}&collectionId=${collectionIdForLink}${sortParam ? `&sort=${encodeURIComponent(sortParam)}` : ''}` : '#'}
-                className={`block border rounded-lg overflow-hidden hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-all relative ${
+                className={`block border rounded-lg overflow-hidden hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors relative ${
                   isFlashing
                     ? 'green-flash'
                     : hasGreenHue
                     ? 'green-hue'
                     : needsProcessing
                     ? 'border-amber-300 dark:border-amber-700 bg-amber-50/20 dark:bg-amber-900/15 ring-2 ring-amber-300/20 dark:ring-amber-700/20'
-                    : 'border-zinc-200 dark:border-zinc-800 hover:border-blue-200 dark:hover:border-blue-800 hover:shadow-lg'
+                    : 'border-zinc-200 dark:border-zinc-800 hover:shadow-md'
                 } ${!modelIdForLink || !collectionIdForLink ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                 onClick={(e) => {
                   // Prevent navigation if no model/collection available

@@ -66,7 +66,7 @@ export default function CollectionCard({
   return (
     <Link
       href={`/collection/${collection.collection_id}`}
-      className="relative block rounded-lg border border-zinc-200 dark:border-zinc-800 p-7 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md transition-all h-full hover:border-blue-200 dark:hover:border-blue-800 hover:shadow-lg"
+      className="relative block rounded-lg border border-zinc-200 dark:border-zinc-800 p-7 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors transition-shadow h-full"
       id={`image-card-${collection.collection_id}`}
       onClick={() => onOpen?.(collection.collection_id)}
     >

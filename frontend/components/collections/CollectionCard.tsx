@@ -11,6 +11,7 @@ interface Props {
   onRenameChange?: (value: string) => void;
   onRenameSave?: () => void;
   onRenameCancel?: () => void;
+  onOpen?: (id: number) => void;
 }
 
 function getImageUrl(storedPath?: string | null) {

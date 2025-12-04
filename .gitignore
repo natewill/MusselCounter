@@ -49,6 +49,7 @@ pnpm-lock.yaml
 *.sln
 
 # Build artifacts
+dist/
 frontend/.turbo/
 frontend/.next/
 frontend/out/

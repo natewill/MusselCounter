@@ -76,6 +76,8 @@ export default function CollectionsPage() {
 
   const handleDelete = async (id: number) => {
     if (deletingId) return;
+    const confirmed = window.confirm('Are you sure you want to delete this collection?');
+    if (!confirmed) return;
     setDeletingId(id);
     try {
       await deleteCollection(id);

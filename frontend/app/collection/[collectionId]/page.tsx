@@ -42,6 +42,7 @@ export default function RunResultsPage() {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [savingName, setSavingName] = useState(false);
+  const [runErrorDismissed, setRunErrorDismissed] = useState(false);
 
   // Custom hooks
   const { models, selectedModelId, setSelectedModelId } = useModels(initialModelId);
@@ -73,6 +74,7 @@ export default function RunResultsPage() {
     latestRun?.model_id,
     isRunning
   );
+  const runFailureMsg = latestRun?.status === 'failed' ? (latestRun.error_msg || 'Run failed') : null;
 
   const lastUrlModelIdRef = useRef<string | null>(null);
   const initializedFromUrlRef = useRef(false);
@@ -141,6 +143,11 @@ export default function RunResultsPage() {
       );
     }
   }, [sortBy, collectionId, pathname, router, searchParamsString]);
+
+  // Reset run error dismissal when run changes
+  useEffect(() => {
+    setRunErrorDismissed(false);
+  }, [latestRun?.run_id]);
 
   // Scroll to hash anchor (for back from edit)
   useEffect(() => {
@@ -211,6 +218,8 @@ export default function RunResultsPage() {
     return <ErrorState error={error} />;
   }
 
+  const displayError = error || (!runErrorDismissed ? runFailureMsg : null);
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
       <PageHeader collectionName={collection.name} onModelSuccess={setSuccessMessage} onModelError={setError}>
@@ -277,7 +286,16 @@ export default function RunResultsPage() {
           </div>
         </div>
 
-        <ErrorDisplay error={error} onDismiss={() => setError(null)} />
+        <ErrorDisplay
+          error={displayError}
+          onDismiss={() => {
+            if (error) {
+              setError(null);
+            } else {
+              setRunErrorDismissed(true);
+            }
+          }}
+        />
 
         <CollectionTotals
           collection={collection}

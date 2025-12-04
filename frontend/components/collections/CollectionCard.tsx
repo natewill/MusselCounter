@@ -47,47 +47,58 @@ export default function CollectionCard({ collection }: Props) {
   return (
     <Link
       href={`/collection/${collection.collection_id}`}
-      className="block rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md transition-shadow"
+      className="block rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md transition-shadow h-full"
     >
-      <div className="flex items-start gap-4">
-        <div className="flex-1 min-w-0 space-y-2">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <div className="text-sm text-zinc-500 dark:text-zinc-400">
-                  #{collection.collection_id}
+      <div className="flex flex-col gap-3 h-full">
+        <div className="flex items-start gap-4">
+          <div className="flex-1 min-w-0 space-y-2">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                    #{collection.collection_id}
+                  </div>
+                  {getStatusBadge(collection.latest_run_status)}
                 </div>
-                {getStatusBadge(collection.latest_run_status)}
+                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                  {collection.name || 'Untitled collection'}
+                </h3>
+                {collection.description && (
+                  <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
+                    {collection.description}
+                  </p>
+                )}
               </div>
-              <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 truncate">
-                {collection.name || 'Untitled collection'}
-              </h3>
-              {collection.description && (
-                <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
-                  {collection.description}
-                </p>
-              )}
-            </div>
-            <div className="text-right text-sm text-zinc-600 dark:text-zinc-400">
-              <div>{collection.image_count} images</div>
-              {collection.live_mussel_count !== undefined && collection.live_mussel_count !== null && (
-                <div>{collection.live_mussel_count} live mussels</div>
-              )}
-              <div className="text-xs text-zinc-500 dark:text-zinc-500">
-                Created {formatDate(collection.created_at)}
+              <div className="text-right text-sm text-zinc-600 dark:text-zinc-400">
+                <div>{collection.image_count} images</div>
+                {collection.live_mussel_count !== undefined && collection.live_mussel_count !== null && (
+                  <div>{collection.live_mussel_count} live mussels</div>
+                )}
+                <div className="text-xs text-zinc-500 dark:text-zinc-500">
+                  Created {formatDate(collection.created_at)}
+                </div>
               </div>
             </div>
           </div>
-          {imageUrl && (
-            <div className="overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800">
+        </div>
+        <div className="mt-auto">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0" />
+          </div>
+          <div className="overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-800 h-40 flex items-center justify-center">
+            {imageUrl ? (
               <img
                 src={imageUrl}
                 alt={collection.name || 'Collection preview'}
                 className="h-40 w-full object-cover"
                 loading="lazy"
               />
-            </div>
-          )}
+            ) : (
+              <svg className="w-10 h-10 text-zinc-400 dark:text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            )}
+          </div>
         </div>
       </div>
     </Link>

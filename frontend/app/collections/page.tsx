@@ -22,7 +22,7 @@ export default function CollectionsPage() {
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
       <div className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-8 py-3 flex items-center justify-between">
           <Link
             href="/"
             className="px-3 py-2 text-sm rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-300 dark:hover:bg-zinc-600"
@@ -38,18 +38,18 @@ export default function CollectionsPage() {
           </button>
         </div>
       </div>
-      <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
+      <main className="max-w-6xl mx-auto px-8 pt-12 pb-10 space-y-7">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
             Collections
           </h1>
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+          <p className="text-base text-zinc-600 dark:text-zinc-400">
             Pick a collection to view its images and past runs.
           </p>
         </div>
 
         {isLoading && (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2">
             {[1, 2, 3, 4].map((key) => (
               <div
                 key={key}
@@ -90,7 +90,7 @@ export default function CollectionsPage() {
         )}
 
         {!isLoading && !isError && collections.length > 0 && (
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-5 sm:grid-cols-2">
             {collections.map((collection) => (
               <CollectionCard
                 key={collection.collection_id}

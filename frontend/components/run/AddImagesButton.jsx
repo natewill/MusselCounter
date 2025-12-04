@@ -17,7 +17,7 @@ export default function AddImagesButton({ fileInputRef, uploading, collectionId,
       <button
         onClick={handleUploadClick}
         disabled={uploading || !collectionId}
-        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm flex items-center gap-2"
+        className="px-3 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium text-sm flex items-center gap-2"
       >
         {uploading ? (
           <>
@@ -34,4 +34,3 @@ export default function AddImagesButton({ fileInputRef, uploading, collectionId,
     </>
   );
 }
-

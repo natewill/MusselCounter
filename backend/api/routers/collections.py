@@ -424,16 +424,35 @@ async def delete_image_from_collection_endpoint(
         
         # Update collection's live_mussel_count from latest run (if exists)
         latest_run = await get_latest_run(db, collection_id)
+        now = datetime.now(timezone.utc).isoformat()
         if latest_run:
             collection_live_count = latest_run['live_mussel_count'] or 0
             await db.execute(
-                """UPDATE collection 
+                """UPDATE collection
                    SET live_mussel_count = ?,
+                       image_count = (
+                           SELECT COUNT(*)
+                           FROM collection_image
+                           WHERE collection_id = ?
+                       ),
                        updated_at = ?
                    WHERE collection_id = ?""",
-                (collection_live_count, datetime.now(timezone.utc).isoformat(), collection_id)
+                (collection_live_count, collection_id, now, collection_id)
             )
-        
+        else:
+            # No runs exist, just update image_count
+            await db.execute(
+                """UPDATE collection
+                   SET image_count = (
+                       SELECT COUNT(*)
+                       FROM collection_image
+                       WHERE collection_id = ?
+                   ),
+                   updated_at = ?
+                   WHERE collection_id = ?""",
+                (collection_id, now, collection_id)
+            )
+
         await db.commit()
         
         return {"collection_id": collection_id, "image_id": image_id, "status": "removed"}

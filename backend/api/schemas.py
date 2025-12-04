@@ -49,6 +49,7 @@ class CollectionListResponse(BaseModel):
     created_at: str
     image_count: int = 0
     live_mussel_count: int = 0
+    first_image_path: Optional[str] = None
 
 
 class ModelResponse(BaseModel):
@@ -104,4 +105,3 @@ class UploadResponse(BaseModel):
     added_count: int
     duplicate_count: int
     duplicate_image_ids: List[int]
-

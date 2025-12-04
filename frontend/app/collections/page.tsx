@@ -207,26 +207,11 @@ export default function CollectionsPage() {
         )}
 
         {!isLoading && !isError && filteredCollections.length === 0 && (
-          <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center text-zinc-600 dark:text-zinc-400">
+          <div className="rounded-lg p-8 text-center text-zinc-600 dark:text-zinc-400">
             <p className="text-lg font-medium">No collections yet.</p>
             <p className="text-sm mt-1">
-              Create one to start uploading images and running models.
+              Start a run to create a collection.
             </p>
-            <div className="mt-4 flex justify-center gap-2">
-              <button
-                type="button"
-                onClick={handleCreate}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-              >
-                Create collection
-              </button>
-              <Link
-                href="/"
-                className="px-4 py-2 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-              >
-                Go to upload
-              </Link>
-            </div>
           </div>
         )}
 

@@ -151,7 +151,7 @@ export default function CollectionsPage() {
                 Collections
               </h1>
               <p className="text-base text-zinc-600 dark:text-zinc-400">
-                Pick a collection to view its images and past runs.
+                Pick a collection to view its images and past model runs.
               </p>
             </div>
             <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2 sm:items-center">

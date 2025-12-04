@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 
-export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, flashingImageIds, greenHueImageIds, isRunning, currentThreshold, latestRun, recalculatedImages, sortBy, onSortChange }) {
+export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, flashingImageIds, greenHueImageIds, isRunning, currentThreshold, latestRun, recalculatedImages, sortBy, onSortChange, collectionId }) {
   // Sort images based on sortBy prop or green hue during runs
   const sortedImages = useMemo(() => {
     let sorted = [...images];
@@ -143,11 +143,12 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
             
             // Use selected model if available; otherwise fall back to latest run
             const modelIdForLink = selectedModelId ?? latestRun?.model_id ?? null;
+            const collectionIdForLink = collectionId ?? latestRun?.collection_id ?? null;
             
             return (
               <Link
                 key={image.image_id}
-                href={modelIdForLink ? `/edit/${image.image_id}?modelId=${modelIdForLink}` : '#'}
+                href={modelIdForLink && collectionIdForLink ? `/edit/${image.image_id}?modelId=${modelIdForLink}&collectionId=${collectionIdForLink}` : '#'}
                 className={`block border rounded-lg overflow-hidden hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors relative ${
                   isFlashing
                     ? 'green-flash'
@@ -156,10 +157,10 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                     : needsProcessing
                     ? 'border-amber-300 dark:border-amber-700 bg-amber-50/20 dark:bg-amber-900/15 ring-2 ring-amber-300/20 dark:ring-amber-700/20'
                     : 'border-zinc-200 dark:border-zinc-800'
-                } ${!modelIdForLink ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                } ${!modelIdForLink || !collectionIdForLink ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                 onClick={(e) => {
                   // Prevent navigation if no model_id available
-                  if (!modelIdForLink) {
+                  if (!modelIdForLink || !collectionIdForLink) {
                     e.preventDefault();
                   }
                 }}

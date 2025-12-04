@@ -45,6 +45,7 @@ export default function ImageDetailPage() {
   const searchParams = useSearchParams();
   const imageId = parseInt(Array.isArray(params.imageId) ? params.imageId[0] : params.imageId || '0', 10);
   const modelIdFromQuery = parseInt(searchParams.get('modelId') || '0', 10);
+  const collectionIdFromQuery = parseInt(searchParams.get('collectionId') || '0', 10);
   
   const [imageData, setImageData] = useState<ImageData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,8 +76,8 @@ export default function ImageDetailPage() {
 
   // Fetch image data
   useEffect(() => {
-    if (!imageId || !modelIdFromQuery) {
-      setError('Image ID and model ID are required');
+    if (!imageId || !modelIdFromQuery || !collectionIdFromQuery) {
+      setError('Image ID, model ID, and collection ID are required');
       setLoading(false);
       return;
     }
@@ -84,7 +85,7 @@ export default function ImageDetailPage() {
     const fetchImageData = async () => {
       try {
         setLoading(true);
-        const data = await getImageDetails(imageId, modelIdFromQuery);
+        const data = await getImageDetails(imageId, modelIdFromQuery, collectionIdFromQuery);
         setImageData(data);
         setError(null);
       } catch (err) {
@@ -96,7 +97,7 @@ export default function ImageDetailPage() {
     };
 
     fetchImageData();
-  }, [imageId, modelIdFromQuery]);
+  }, [imageId, modelIdFromQuery, collectionIdFromQuery]);
 
   // Handle classification change for polygon/mussel
   const handleClassificationChange = async (originalIndex: number, newClass: 'live' | 'dead') => {
@@ -104,10 +105,10 @@ export default function ImageDetailPage() {
 
     setSaving(true);
     try {
-      await updatePolygonClassification(imageId, modelIdFromQuery, originalIndex, newClass);
+      await updatePolygonClassification(imageId, modelIdFromQuery, originalIndex, newClass, collectionIdFromQuery);
 
       // Refresh image data to show updated counts
-      const updatedData = await getImageDetails(imageId, modelIdFromQuery);
+      const updatedData = await getImageDetails(imageId, modelIdFromQuery, collectionIdFromQuery);
       setImageData(updatedData);
 
       // Close modal after successful update

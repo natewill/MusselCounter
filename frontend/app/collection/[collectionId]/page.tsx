@@ -270,6 +270,7 @@ export default function RunResultsPage() {
           currentThreshold={threshold}
           latestRun={latestRun}
           recalculatedImages={recalculatedImages}
+          collectionId={collectionId}
         />
       </div>
     </div>

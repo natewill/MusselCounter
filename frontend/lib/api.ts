@@ -370,12 +370,16 @@ function validateImageId(imageId: unknown): number {
 /**
  * gets image details from a specific run
  */
-export async function getImageDetails(imageId: number, modelId: number) {
+export async function getImageDetails(imageId: number, modelId: number, collectionId?: number) {
   const validatedImageId = validateImageId(imageId);
   const validatedModelId = validateModelId(modelId);
+  const validatedCollectionId = collectionId !== undefined ? validateCollectionId(collectionId) : undefined;
   
   const response = await apiClient.get(`/api/images/${validatedImageId}/results`, {
-    params: { model_id: validatedModelId },
+    params: { 
+      model_id: validatedModelId,
+      ...(validatedCollectionId ? { collection_id: validatedCollectionId } : {})
+    },
   });
   return response.data;
 }
@@ -387,10 +391,12 @@ export async function updatePolygonClassification(
   imageId: number,
   modelId: number,
   polygonIndex: number,
-  newClass: 'live' | 'dead'
+  newClass: 'live' | 'dead',
+  collectionId?: number
 ) {
   const validatedImageId = validateImageId(imageId);
   const validatedModelId = validateModelId(modelId);
+  const validatedCollectionId = collectionId !== undefined ? validateCollectionId(collectionId) : undefined;
 
   if (newClass !== 'live' && newClass !== 'dead') {
     throw new Error('Classification must be "live" or "dead"');
@@ -398,7 +404,10 @@ export async function updatePolygonClassification(
 
   const response = await apiClient.patch(
     `/api/images/${validatedImageId}/results/${validatedModelId}/polygons/${polygonIndex}`,
-    { new_class: newClass }
+    { new_class: newClass },
+    {
+      params: validatedCollectionId ? { collection_id: validatedCollectionId } : undefined,
+    }
   );
 
   return response.data;

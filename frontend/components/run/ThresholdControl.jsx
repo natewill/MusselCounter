@@ -27,7 +27,7 @@ export default function ThresholdControl({ threshold, onThresholdChange, onStart
             value={selectedModelId || ''}
             onChange={(e) => onModelChange(parseInt(e.target.value, 10))}
             disabled={models.length === 0}
-            className="flex-1 px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-600 rounded hover:bg-zinc-50 dark:hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 min-w-[200px] max-w-[360px] px-3 py-2 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 border border-zinc-300 dark:border-zinc-600 rounded hover:bg-zinc-50 dark:hover:bg-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden text-ellipsis whitespace-nowrap"
           >
             {models.length === 0 ? (
               <option value="">No models available</option>
@@ -96,4 +96,3 @@ export default function ThresholdControl({ threshold, onThresholdChange, onStart
     </div>
   );
 }
-

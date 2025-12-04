@@ -141,7 +141,7 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
               ? `http://127.0.0.1:8000/uploads/${image.stored_path.split('/').pop()}`
               : null;
             
-            // Use selected model if available; otherwise fall back to latest run
+            // Always allow navigation; edit mode can be disabled downstream if no results
             const modelIdForLink = selectedModelId ?? latestRun?.model_id ?? null;
             const collectionIdForLink = collectionId ?? latestRun?.collection_id ?? null;
             
@@ -159,7 +159,7 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                     : 'border-zinc-200 dark:border-zinc-800'
                 } ${!modelIdForLink || !collectionIdForLink ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                 onClick={(e) => {
-                  // Prevent navigation if no model_id available
+                  // Prevent navigation if no model/collection available
                   if (!modelIdForLink || !collectionIdForLink) {
                     e.preventDefault();
                   }

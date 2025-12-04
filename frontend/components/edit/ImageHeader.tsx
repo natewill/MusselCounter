@@ -6,6 +6,7 @@ interface ImageHeaderProps {
   filename: string;
   collectionId: number;
   modelId?: number | null;
+  hasResults?: boolean;
   isEditMode: boolean;
   onToggleEditMode: () => void;
   visiblePolygons: boolean;
@@ -16,6 +17,7 @@ export default function ImageHeader({
   filename,
   collectionId,
   modelId,
+  hasResults = true,
   isEditMode,
   onToggleEditMode,
   visiblePolygons,
@@ -40,12 +42,16 @@ export default function ImageHeader({
         <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{filename}</h1>
         <div className="flex items-center gap-2">
           <button
-            onClick={onToggleEditMode}
+            onClick={hasResults ? onToggleEditMode : undefined}
+            disabled={!hasResults}
             className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center gap-2 ${
-              isEditMode
+              !hasResults
+                ? 'bg-zinc-200 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-500 cursor-not-allowed opacity-60'
+                : isEditMode
                 ? 'bg-green-600 dark:bg-green-500 text-white hover:bg-green-700 dark:hover:bg-green-600'
                 : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-300 dark:hover:bg-zinc-600'
             }`}
+            title={!hasResults ? 'Run this image to enable editing' : undefined}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />

@@ -126,10 +126,66 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
         result = await cursor.fetchone()
         
         if not result:
-            scope_detail = f" and collection {collection_id}" if collection_id is not None else ""
-            raise HTTPException(
-                status_code=404, 
-                detail=f"No results found for image {image_id} with model {model_id}{scope_detail}"
+            # No run results found for this image/model (and optional collection)
+            # Return a placeholder response with zero counts so the image page can still render.
+            if collection_id is None:
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"No results found for image {image_id} with model {model_id}"
+                )
+
+            # Get basic image metadata scoped to the collection
+            image_cursor = await db.execute("""
+                SELECT i.image_id, i.filename, i.stored_path, i.file_hash, i.width, i.height, i.created_at,
+                       c.collection_id, c.name as collection_name
+                FROM image i
+                JOIN collection_image ci ON ci.image_id = i.image_id
+                JOIN collection c ON c.collection_id = ci.collection_id
+                WHERE i.image_id = ? AND c.collection_id = ?
+                LIMIT 1
+            """, (image_id, collection_id))
+            image_row = await image_cursor.fetchone()
+
+            if not image_row:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No image {image_id} found in collection {collection_id}"
+                )
+
+            # Get model metadata
+            model_cursor = await db.execute(
+                "SELECT name, type FROM model WHERE model_id = ?",
+                (model_id,)
+            )
+            model_row = await model_cursor.fetchone()
+            if not model_row:
+                raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
+
+            return ImageDetailResponse(
+                image_id=image_row['image_id'],
+                filename=image_row['filename'],
+                stored_path=image_row['stored_path'],
+                file_hash=image_row['file_hash'],
+                width=image_row['width'],
+                height=image_row['height'],
+                created_at=image_row['created_at'],
+                run_id=0,
+                model_id=model_id,
+                model_name=model_row['name'],
+                model_type=model_row['type'],
+                threshold=0.0,
+                live_mussel_count=0,
+                dead_mussel_count=0,
+                total_mussel_count=0,
+                live_percentage=None,
+                dead_percentage=None,
+                processed_at=image_row['created_at'],
+                error_msg="No results yet for this model in this collection",
+                polygons=[],
+                detection_count=0,
+                collection_id=image_row['collection_id'],
+                collection_name=image_row['collection_name'],
+                other_runs=[]
             )
         
         # Load polygon data from JSON file

@@ -170,6 +170,9 @@ export default function ImageDetailPage() {
   const selectedPolygon = selectedPolygonData?.polygon || null;
   const originalPolygonIndex = selectedPolygonData?.originalIndex ?? null;
 
+  // No results (e.g., image not processed by this model)
+  const hasResults = imageData.polygons && imageData.polygons.length > 0;
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black p-8">
       <div className="max-w-6xl mx-auto">
@@ -177,6 +180,7 @@ export default function ImageDetailPage() {
           filename={imageData.filename}
           collectionId={imageData.collection_id}
           modelId={modelIdFromQuery || imageData.model_id}
+          hasResults={hasResults}
           isEditMode={isEditMode}
           onToggleEditMode={() => setIsEditMode(!isEditMode)}
           visiblePolygons={visiblePolygons}
@@ -189,7 +193,7 @@ export default function ImageDetailPage() {
             filename={imageData.filename}
             polygons={filteredPolygons}
             scale={imageScale}
-            isEditMode={isEditMode}
+            isEditMode={isEditMode && hasResults}
             editingPolygonIndex={editingPolygonIndex}
             visiblePolygons={visiblePolygons}
             onFullscreen={() => setIsFullscreen(true)}
@@ -207,7 +211,7 @@ export default function ImageDetailPage() {
           filename={imageData.filename}
           polygons={filteredPolygons}
           scale={fullscreenScale}
-          isEditMode={isEditMode}
+          isEditMode={isEditMode && hasResults}
           editingPolygonIndex={editingPolygonIndex}
           visiblePolygons={visiblePolygons}
           onClose={() => setIsFullscreen(false)}

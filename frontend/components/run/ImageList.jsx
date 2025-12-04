@@ -100,7 +100,7 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
           >
             <option value="">Default</option>
             <option value="live_count">Live Mussel Count</option>
-            <option value="name">Image Name</option>
+            <option value="name">File Name</option>
           </select>
         </div>
       </div>

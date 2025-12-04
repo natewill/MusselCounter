@@ -4,7 +4,6 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import CollectionCard from '@/components/collections/CollectionCard';
 import { useCollections } from '@/hooks/useCollections';
-import TopBar from '@/components/home/TopBar';
 import { createQuickProcessCollection } from '@/utils/home/collection';
 
 export default function CollectionsPage() {
@@ -22,33 +21,31 @@ export default function CollectionsPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
-      <TopBar onCreateCollection={handleCreate} loading={false} />
+      <div className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+        <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Link
+            href="/"
+            className="px-3 py-2 text-sm rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+          >
+            Home
+          </Link>
+          <button
+            type="button"
+            onClick={handleCreate}
+            className="px-3 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
+          >
+            Start New Run
+          </button>
+        </div>
+      </div>
       <main className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100">
-              Collections
-            </h1>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              Pick a collection to view its images and past runs.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="px-3 py-2 text-sm rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-200 dark:hover:bg-zinc-700"
-            >
-              Refresh
-            </button>
-            <button
-              type="button"
-              onClick={handleCreate}
-              className="px-3 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
-            >
-              New collection
-            </button>
-          </div>
+        <div>
+          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
+            Collections
+          </h1>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            Pick a collection to view its images and past runs.
+          </p>
         </div>
 
         {isLoading && (

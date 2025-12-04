@@ -1,26 +1,42 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 
-export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, flashingImageIds, greenHueImageIds, isRunning, currentThreshold, latestRun, recalculatedImages }) {
-  // Sort images so recently processed ones (with green hue) appear at the top during a run
+export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, flashingImageIds, greenHueImageIds, isRunning, currentThreshold, latestRun, recalculatedImages, sortBy, onSortChange }) {
+  // Sort images based on sortBy prop or green hue during runs
   const sortedImages = useMemo(() => {
-    if (!isRunning || !greenHueImageIds || greenHueImageIds.size === 0) {
-      return images;
+    let sorted = [...images];
+
+    // Apply user-selected sort if provided
+    if (sortBy === 'live_count') {
+      sorted.sort((a, b) => {
+        const aCount = recalculatedImages?.[a.image_id]?.live_mussel_count ?? a.live_mussel_count ?? 0;
+        const bCount = recalculatedImages?.[b.image_id]?.live_mussel_count ?? b.live_mussel_count ?? 0;
+        return bCount - aCount; // Descending order (highest first)
+      });
+    } else if (sortBy === 'name') {
+      sorted.sort((a, b) => {
+        const aName = a.filename || '';
+        const bName = b.filename || '';
+        return aName.localeCompare(bName);
+      });
     }
-    
-    // During a run, sort processed images (green hue) to the top
-    return [...images].sort((a, b) => {
-      const aHasGreenHue = greenHueImageIds.has(a.image_id);
-      const bHasGreenHue = greenHueImageIds.has(b.image_id);
-      
-      // Images with green hue come first
-      if (aHasGreenHue && !bHasGreenHue) return -1;
-      if (!aHasGreenHue && bHasGreenHue) return 1;
-      
-      // If both have or both don't have green hue, maintain original order
-      return 0;
-    });
-  }, [images, greenHueImageIds, isRunning]);
+
+    // During a run, prioritize green hue images if no explicit sort is set
+    if (!sortBy && isRunning && greenHueImageIds && greenHueImageIds.size > 0) {
+      sorted.sort((a, b) => {
+        const aHasGreenHue = greenHueImageIds.has(a.image_id);
+        const bHasGreenHue = greenHueImageIds.has(b.image_id);
+
+        // Images with green hue come first
+        if (aHasGreenHue && !bHasGreenHue) return -1;
+        if (!aHasGreenHue && bHasGreenHue) return 1;
+
+        return 0;
+      });
+    }
+
+    return sorted;
+  }, [images, greenHueImageIds, isRunning, sortBy, recalculatedImages]);
 
   return (
     <>
@@ -68,9 +84,26 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
         }
       `}</style>
       <div className="bg-white dark:bg-zinc-900 rounded-lg p-6 border border-zinc-200 dark:border-zinc-800">
-      <h2 className="text-xl font-semibold mb-4 text-zinc-900 dark:text-zinc-100">
-        Images ({images.length})
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
+          Images ({images.length})
+        </h2>
+        <div className="flex items-center gap-3">
+          <label htmlFor="sort-select" className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
+            Sort by:
+          </label>
+          <select
+            id="sort-select"
+            value={sortBy}
+            onChange={(e) => onSortChange(e.target.value)}
+            className="px-3 py-1.5 text-sm rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="">Default</option>
+            <option value="live_count">Live Mussel Count</option>
+            <option value="name">Image Name</option>
+          </select>
+        </div>
+      </div>
       {sortedImages.length === 0 ? (
         <div className="text-zinc-600 dark:text-zinc-400">No images in this collection yet.</div>
       ) : (

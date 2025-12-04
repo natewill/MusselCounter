@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { useParams, useSearchParams, useRouter, usePathname } from 'next/navigation';
 import { useModels } from '@/hooks/useModels';
 import { useCollectionData } from '@/hooks/useCollectionData';
@@ -36,7 +36,8 @@ export default function RunResultsPage() {
   const initialModelId = urlModelId ? parseInt(urlModelId, 10) : null;
   
   const fileInputRef = useRef(null);
-  
+  const [sortBy, setSortBy] = useState('');
+
   // Custom hooks
   const { models, selectedModelId, setSelectedModelId } = useModels(initialModelId);
   const { collectionId: resolvedCollectionId, collectionData, collection, images, latestRun, isRunning, serverTime, threshold, setThreshold, loading, error, setError, setLoading } = useCollectionData(collectionId, selectedModelId);
@@ -112,9 +113,8 @@ export default function RunResultsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black p-8">
-      <div className="max-w-6xl mx-auto">
-        <PageHeader collectionName={collection.name} onModelSuccess={setSuccessMessage}>
+    <div className="min-h-screen bg-zinc-50 dark:bg-black">
+      <PageHeader collectionName={collection.name} onModelSuccess={setSuccessMessage}>
           <AddImagesButton
             fileInputRef={fileInputRef}
             uploading={uploading}
@@ -122,6 +122,16 @@ export default function RunResultsPage() {
             onFileChange={handleFileInputChange}
           />
         </PageHeader>
+
+      <div className="max-w-6xl mx-auto p-8">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
+            Run Results
+          </h1>
+          {collection.name && (
+            <p className="text-zinc-600 dark:text-zinc-400 mt-2">Collection: {collection.name}</p>
+          )}
+        </div>
 
         <ErrorDisplay error={error} onDismiss={() => setError(null)} />
 
@@ -174,6 +184,8 @@ export default function RunResultsPage() {
           selectedModelId={selectedModelId}
           flashingImageIds={flashingImageIds}
           greenHueImageIds={greenHueImageIds}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
           isRunning={isRunning}
           currentThreshold={threshold}
           latestRun={latestRun}

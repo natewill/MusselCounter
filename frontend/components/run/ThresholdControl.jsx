@@ -84,7 +84,7 @@ export default function ThresholdControl({ threshold, onThresholdChange, onStart
             className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
             title={disabled && imageCount === 0 ? 'Upload images before starting a run' : undefined}
           >
-            Start New Run with These Settings
+            Start Run
           </button>
           {disabled && imageCount === 0 && (
             <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2 text-center">

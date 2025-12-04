@@ -95,13 +95,13 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black relative">
+    <div className="min-h-screen bg-zinc-50 dark:bg-black">
       <TopBar
         onCreateCollection={handleCreateCollection}
         loading={loading}
       />
 
-      <div className="flex items-center justify-center min-h-screen p-8">
+      <div className="flex items-center justify-center p-8" style={{ minHeight: 'calc(100vh - 60px)' }}>
         <div className="w-full max-w-4xl">
           <UploadArea
             fileInputRef={fileInputRef}

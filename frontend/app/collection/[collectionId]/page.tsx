@@ -133,8 +133,6 @@ export default function RunResultsPage() {
           )}
         </div>
 
-        <ErrorDisplay error={error} onDismiss={() => setError(null)} />
-
         <CollectionTotals
           collection={collection}
           imageCount={images.length}
@@ -143,6 +141,8 @@ export default function RunResultsPage() {
         />
 
         {uploading && <UploadProgress />}
+
+        <ErrorDisplay error={error} onDismiss={() => setError(null)} />
 
         <SuccessMessage message={successMessage} onDismiss={() => setSuccessMessage(null)} />
 

@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useMemo, useState } from 'react';
 import CollectionCard from '@/components/collections/CollectionCard';
 import { useCollections } from '@/hooks/useCollections';
 import { createQuickProcessCollection } from '@/utils/home/collection';
@@ -9,6 +10,23 @@ import { createQuickProcessCollection } from '@/utils/home/collection';
 export default function CollectionsPage() {
   const router = useRouter();
   const { collections, isLoading, isError, error, refetch } = useCollections();
+  const [searchTerm, setSearchTerm] = useState('');
+  const filteredCollections = useMemo(() => {
+    if (!searchTerm.trim()) return collections;
+    const q = searchTerm.trim().toLowerCase();
+    const fuzzyMatch = (text: string, query: string) => {
+      const t = text.toLowerCase();
+      if (t.includes(query)) return true;
+      let ti = 0;
+      for (const char of query) {
+        ti = t.indexOf(char, ti);
+        if (ti === -1) return false;
+        ti += 1;
+      }
+      return true;
+    };
+    return collections.filter((c) => fuzzyMatch(c.name || 'untitled collection', q));
+  }, [collections, searchTerm]);
 
   const handleCreate = async () => {
     try {
@@ -39,13 +57,35 @@ export default function CollectionsPage() {
         </div>
       </div>
       <main className="max-w-6xl mx-auto px-8 pt-12 pb-10 space-y-7">
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
-            Collections
-          </h1>
-          <p className="text-base text-zinc-600 dark:text-zinc-400">
-            Pick a collection to view its images and past runs.
-          </p>
+        <div className="space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
+            <div>
+              <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
+                Collections
+              </h1>
+              <p className="text-base text-zinc-600 dark:text-zinc-400">
+                Pick a collection to view its images and past runs.
+              </p>
+            </div>
+            <div className="w-full sm:w-72">
+              <label className="sr-only" htmlFor="collection-search">Search collections</label>
+              <div className="relative">
+                <span className="absolute inset-y-0 left-3 flex items-center text-zinc-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </span>
+                <input
+                  id="collection-search"
+                  type="search"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Search by name"
+                  className="w-full pl-9 pr-3 py-2 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          </div>
         </div>
 
         {isLoading && (
@@ -65,7 +105,7 @@ export default function CollectionsPage() {
           </div>
         )}
 
-        {!isLoading && !isError && collections.length === 0 && (
+        {!isLoading && !isError && filteredCollections.length === 0 && (
           <div className="rounded-lg border border-dashed border-zinc-300 dark:border-zinc-700 p-8 text-center text-zinc-600 dark:text-zinc-400">
             <p className="text-lg font-medium">No collections yet.</p>
             <p className="text-sm mt-1">
@@ -89,9 +129,9 @@ export default function CollectionsPage() {
           </div>
         )}
 
-        {!isLoading && !isError && collections.length > 0 && (
+        {!isLoading && !isError && filteredCollections.length > 0 && (
           <div className="grid gap-5 sm:grid-cols-2">
-            {collections.map((collection) => (
+            {filteredCollections.map((collection) => (
               <CollectionCard
                 key={collection.collection_id}
                 collection={collection}

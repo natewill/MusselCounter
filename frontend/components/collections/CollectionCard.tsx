@@ -47,10 +47,10 @@ export default function CollectionCard({ collection }: Props) {
   return (
     <Link
       href={`/collection/${collection.collection_id}`}
-      className="block rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md transition-shadow h-full"
+      className="block rounded-lg border border-zinc-200 dark:border-zinc-800 p-5 bg-white dark:bg-zinc-900 shadow-sm hover:shadow-md transition-shadow h-full"
       id={`image-card-${collection.collection_id}`}
     >
-      <div className="flex flex-col gap-3 h-full">
+      <div className="flex flex-col gap-4 h-full">
         <div className="flex items-start gap-4">
           <div className="flex-1 min-w-0 space-y-2">
             <div className="flex items-start justify-between gap-3">
@@ -61,7 +61,7 @@ export default function CollectionCard({ collection }: Props) {
                   </div>
                   {getStatusBadge(collection.latest_run_status)}
                 </div>
-                <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 truncate">
+                <h3 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 truncate">
                   {collection.name || 'Untitled collection'}
                 </h3>
                 {collection.description && (
@@ -86,12 +86,12 @@ export default function CollectionCard({ collection }: Props) {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0" />
           </div>
-          <div className="overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-800 h-40 flex items-center justify-center">
+          <div className="overflow-hidden rounded-md border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-800 h-52 flex items-center justify-center">
             {imageUrl ? (
               <img
                 src={imageUrl}
                 alt={collection.name || 'Collection preview'}
-                className="h-40 w-full object-cover"
+                className="h-52 w-full object-cover"
                 loading="lazy"
               />
             ) : (

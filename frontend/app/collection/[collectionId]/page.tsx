@@ -23,6 +23,7 @@ import ErrorState from '@/components/run/ErrorState';
 import UploadProgress from '@/components/run/UploadProgress';
 import SuccessMessage from '@/components/run/SuccessMessage';
 import { shouldEnableStartRunButton } from '@/utils/run/runUtils';
+import { updateCollection } from '@/lib/api';
 
 export default function RunResultsPage() {
   const params = useParams();
@@ -37,10 +38,13 @@ export default function RunResultsPage() {
   
   const fileInputRef = useRef(null);
   const [sortBy, setSortBy] = useState('');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState('');
+  const [savingName, setSavingName] = useState(false);
 
   // Custom hooks
   const { models, selectedModelId, setSelectedModelId } = useModels(initialModelId);
-  const { collectionId: resolvedCollectionId, collectionData, collection, images, latestRun, isRunning, serverTime, threshold, setThreshold, loading, error, setError, setLoading } = useCollectionData(collectionId, selectedModelId);
+  const { collectionId: resolvedCollectionId, collectionData, collection, images, latestRun, isRunning, serverTime, threshold, setThreshold, loading, error, setError, setLoading, refetch } = useCollectionData(collectionId, selectedModelId);
   const { successMessage, setSuccessMessage, recentlyUploadedImageIds, setRecentlyUploadedImageIds } = useStorageData();
   const { uploading, handleFileInputChange } = useImageUpload(collectionId, setError, setLoading, setRecentlyUploadedImageIds, setSuccessMessage);
   const { deletingImageId, handleDeleteImage } = useImageDelete(collectionId, setError, isRunning);
@@ -102,6 +106,36 @@ export default function RunResultsPage() {
     router.replace(`${pathname}?${params.toString()}`);
   }, [selectedModelId, searchParams, router, pathname]);
 
+  // Collection name editing handlers
+  const handleStartEdit = () => {
+    setEditedName(collection.name || '');
+    setIsEditingName(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingName(false);
+    setEditedName('');
+  };
+
+  const handleSaveName = async () => {
+    if (!editedName.trim()) {
+      setError('Collection name cannot be empty');
+      return;
+    }
+
+    setSavingName(true);
+    try {
+      await updateCollection(collectionId, { name: editedName.trim() });
+      await refetch();
+      setIsEditingName(false);
+      setSuccessMessage('Collection name updated successfully');
+    } catch (err) {
+      setError((err as Error).message || 'Failed to update collection name');
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   // Loading state
   if (loading && !collectionId) {
     return <LoadingState />;
@@ -128,9 +162,55 @@ export default function RunResultsPage() {
           <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
             Run Results
           </h1>
-          {collection.name && (
-            <p className="text-zinc-600 dark:text-zinc-400 mt-2">Collection: {collection.name}</p>
-          )}
+          <div className="mt-2 flex items-center gap-2">
+            {isEditingName ? (
+              <>
+                <span className="text-zinc-600 dark:text-zinc-400">Collection:</span>
+                <input
+                  type="text"
+                  value={editedName}
+                  onChange={(e) => setEditedName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleSaveName();
+                    if (e.key === 'Escape') handleCancelEdit();
+                  }}
+                  className="px-2 py-1 text-sm border border-zinc-300 dark:border-zinc-600 rounded bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  autoFocus
+                  disabled={savingName}
+                />
+                <button
+                  onClick={handleSaveName}
+                  disabled={savingName}
+                  className="px-2 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {savingName ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  onClick={handleCancelEdit}
+                  disabled={savingName}
+                  className="px-2 py-1 text-sm bg-zinc-200 dark:bg-zinc-700 text-zinc-700 dark:text-zinc-300 rounded hover:bg-zinc-300 dark:hover:bg-zinc-600"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                {collection.name && (
+                  <p className="text-zinc-600 dark:text-zinc-400">Collection: {collection.name}</p>
+                )}
+                <button
+                  onClick={handleStartEdit}
+                  className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300"
+                  title="Edit collection name"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9"/>
+                    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                  </svg>
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         <ErrorDisplay error={error} onDismiss={() => setError(null)} />

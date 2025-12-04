@@ -182,6 +182,21 @@ export async function getCollections() {
 }
 
 /**
+ * Update a collection's name and/or description
+ */
+export async function updateCollection(
+  collectionId: number,
+  updates: { name?: string; description?: string }
+) {
+  const validatedCollectionId = validateCollectionId(collectionId);
+  const response = await apiClient.patch(
+    `/api/collections/${validatedCollectionId}`,
+    updates
+  );
+  return response.data;
+}
+
+/**
  * Upload image files to a collection
  */
 export async function uploadImagesToCollection(collectionId: number, files: File[]) {

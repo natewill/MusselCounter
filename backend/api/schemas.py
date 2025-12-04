@@ -13,6 +13,12 @@ class CreateCollectionRequest(BaseModel):
     description: Optional[str] = None
 
 
+class UpdateCollectionRequest(BaseModel):
+    """Request model for updating a collection"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
 class StartRunRequest(BaseModel):
     """Request model for starting a run"""
     model_id: int = Field(..., description="ID of the model to use")

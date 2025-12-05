@@ -45,6 +45,8 @@ export default function ImageDetailPage() {
   const searchParams = useSearchParams();
   const imageId = parseInt(Array.isArray(params.imageId) ? params.imageId[0] : params.imageId || '0', 10);
   const modelIdFromQuery = parseInt(searchParams.get('modelId') || '0', 10);
+  const collectionIdFromQuery = parseInt(searchParams.get('collectionId') || '0', 10);
+  const sortFromQuery = searchParams.get('sort') || '';
   
   const [imageData, setImageData] = useState<ImageData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -75,8 +77,8 @@ export default function ImageDetailPage() {
 
   // Fetch image data
   useEffect(() => {
-    if (!imageId || !modelIdFromQuery) {
-      setError('Image ID and model ID are required');
+    if (!imageId || !modelIdFromQuery || !collectionIdFromQuery) {
+      setError('Image ID, model ID, and collection ID are required');
       setLoading(false);
       return;
     }
@@ -84,7 +86,7 @@ export default function ImageDetailPage() {
     const fetchImageData = async () => {
       try {
         setLoading(true);
-        const data = await getImageDetails(imageId, modelIdFromQuery);
+        const data = await getImageDetails(imageId, modelIdFromQuery, collectionIdFromQuery);
         setImageData(data);
         setError(null);
       } catch (err) {
@@ -96,7 +98,7 @@ export default function ImageDetailPage() {
     };
 
     fetchImageData();
-  }, [imageId, modelIdFromQuery]);
+  }, [imageId, modelIdFromQuery, collectionIdFromQuery]);
 
   // Handle classification change for polygon/mussel
   const handleClassificationChange = async (originalIndex: number, newClass: 'live' | 'dead') => {
@@ -104,10 +106,10 @@ export default function ImageDetailPage() {
 
     setSaving(true);
     try {
-      await updatePolygonClassification(imageId, modelIdFromQuery, originalIndex, newClass);
+      await updatePolygonClassification(imageId, modelIdFromQuery, originalIndex, newClass, collectionIdFromQuery);
 
       // Refresh image data to show updated counts
-      const updatedData = await getImageDetails(imageId, modelIdFromQuery);
+      const updatedData = await getImageDetails(imageId, modelIdFromQuery, collectionIdFromQuery);
       setImageData(updatedData);
 
       // Close modal after successful update
@@ -139,7 +141,7 @@ export default function ImageDetailPage() {
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
             <p className="text-red-800 dark:text-red-200">{error || 'Image not found'}</p>
             <Link
-              href={`/collection/${imageData?.collection_id ?? ''}?modelId=${imageData?.model_id ?? modelIdFromQuery ?? ''}`}
+              href={`/collection/${imageData?.collection_id ?? ''}?modelId=${imageData?.model_id ?? modelIdFromQuery ?? ''}${sortFromQuery ? `&sort=${encodeURIComponent(sortFromQuery)}` : ''}#image-card-${imageData?.image_id ?? ''}`}
               className="text-blue-600 dark:text-blue-400 hover:underline mt-2 inline-block"
             >
               ← Back to collection
@@ -169,13 +171,19 @@ export default function ImageDetailPage() {
   const selectedPolygon = selectedPolygonData?.polygon || null;
   const originalPolygonIndex = selectedPolygonData?.originalIndex ?? null;
 
+  // No results (e.g., image not processed by this model)
+  const hasResults = imageData.polygons && imageData.polygons.length > 0;
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black p-8">
       <div className="max-w-6xl mx-auto">
         <ImageHeader
           filename={imageData.filename}
           collectionId={imageData.collection_id}
+          imageId={imageData.image_id}
           modelId={modelIdFromQuery || imageData.model_id}
+          sortBy={sortFromQuery}
+          hasResults={hasResults}
           isEditMode={isEditMode}
           onToggleEditMode={() => setIsEditMode(!isEditMode)}
           visiblePolygons={visiblePolygons}
@@ -188,7 +196,7 @@ export default function ImageDetailPage() {
             filename={imageData.filename}
             polygons={filteredPolygons}
             scale={imageScale}
-            isEditMode={isEditMode}
+            isEditMode={isEditMode && hasResults}
             editingPolygonIndex={editingPolygonIndex}
             visiblePolygons={visiblePolygons}
             onFullscreen={() => setIsFullscreen(true)}
@@ -206,7 +214,7 @@ export default function ImageDetailPage() {
           filename={imageData.filename}
           polygons={filteredPolygons}
           scale={fullscreenScale}
-          isEditMode={isEditMode}
+          isEditMode={isEditMode && hasResults}
           editingPolygonIndex={editingPolygonIndex}
           visiblePolygons={visiblePolygons}
           onClose={() => setIsFullscreen(false)}

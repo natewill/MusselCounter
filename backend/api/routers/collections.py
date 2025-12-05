@@ -30,7 +30,7 @@ from utils.collection_utils import (
 from utils.image_utils import add_multiple_images_optimized
 from utils.file_processing import process_single_file
 from utils.validation import validate_file_size, validate_collection_size
-from api.schemas import CreateCollectionRequest, CollectionListResponse, UploadResponse
+from api.schemas import CreateCollectionRequest, UpdateCollectionRequest, CollectionListResponse, UploadResponse
 from config import MAX_FILE_SIZE, MAX_COLLECTION_SIZE
 from utils.security import validate_integer_id
 
@@ -42,13 +42,61 @@ router = APIRouter(prefix="/api/collections", tags=["collections"])
 async def create_collection_endpoint(request: CreateCollectionRequest) -> Dict[str, int]:
     """
     Create a new collection.
-    
+
     A collection is a container for images that will be processed together.
     Returns the ID of the newly created collection.
     """
     async with get_db() as db:
         collection_id = await create_collection(db, request.name, request.description)
         return {"collection_id": collection_id}
+
+
+@router.patch("/{collection_id}", response_model=Dict)
+async def update_collection_endpoint(
+    collection_id: int,
+    request: UpdateCollectionRequest
+) -> Dict:
+    """
+    Update a collection's name and/or description.
+
+    Only provided fields will be updated.
+    """
+    collection_id = validate_integer_id(collection_id)
+    async with get_db() as db:
+        # Check collection exists
+        collection = await get_collection(db, collection_id)
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Build update query dynamically based on provided fields
+        updates = []
+        params = []
+
+        if request.name is not None:
+            updates.append("name = ?")
+            params.append(request.name)
+
+        if request.description is not None:
+            updates.append("description = ?")
+            params.append(request.description)
+
+        if not updates:
+            raise HTTPException(status_code=400, detail="No fields to update")
+
+        # Add updated_at timestamp
+        updates.append("updated_at = ?")
+        params.append(datetime.now(timezone.utc).isoformat())
+        params.append(collection_id)
+
+        await db.execute(
+            f"UPDATE collection SET {', '.join(updates)} WHERE collection_id = ?",
+            params
+        )
+        await db.commit()
+
+        # Return updated collection
+        updated = await get_collection(db, collection_id)
+        return dict(updated)
 
 
 @router.get("", response_model=List[CollectionListResponse])
@@ -67,6 +115,63 @@ async def get_all_collections_endpoint() -> List[CollectionListResponse]:
             CollectionListResponse.model_validate(dict[Any, Any](collection))
             for collection in collections
         ]
+
+
+@router.delete("/{collection_id}", response_model=Dict[str, Any])
+async def delete_collection_endpoint(collection_id: int) -> Dict[str, Any]:
+    """
+    Delete a collection and its associated runs/results.
+
+    Images remain in the database; only the collection links and run data are removed.
+    """
+    collection_id = validate_integer_id(collection_id)
+
+    async with get_db() as db:
+        collection = await get_collection(db, collection_id)
+        if not collection:
+            raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Find runs for this collection
+        runs_cursor = await db.execute(
+            "SELECT run_id FROM run WHERE collection_id = ?",
+            (collection_id,)
+        )
+        run_rows = await runs_cursor.fetchall()
+        run_ids = [row["run_id"] for row in run_rows] if run_rows else []
+
+        if run_ids:
+            placeholders = ",".join(["?"] * len(run_ids))
+            # Delete detections for runs
+            await db.execute(
+                f"DELETE FROM detection WHERE run_id IN ({placeholders})",
+                run_ids
+            )
+            # Delete image_results for runs
+            await db.execute(
+                f"DELETE FROM image_result WHERE run_id IN ({placeholders})",
+                run_ids
+            )
+            # Delete runs
+            await db.execute(
+                f"DELETE FROM run WHERE run_id IN ({placeholders})",
+                run_ids
+            )
+
+        # Delete collection-image links
+        await db.execute(
+            "DELETE FROM collection_image WHERE collection_id = ?",
+            (collection_id,)
+        )
+
+        # Finally delete the collection
+        await db.execute(
+            "DELETE FROM collection WHERE collection_id = ?",
+            (collection_id,)
+        )
+
+        await db.commit()
+
+        return {"status": "deleted", "collection_id": collection_id}
 
 
 @router.get("/{collection_id}", response_model=Dict)

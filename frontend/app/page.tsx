@@ -101,7 +101,7 @@ export default function Home() {
         loading={loading}
       />
 
-      <div className="flex items-center justify-center p-8" style={{ minHeight: 'calc(100vh - 60px)' }}>
+      <div className="flex items-start justify-center px-8 pt-24 pb-12" style={{ minHeight: 'calc(100vh - 180px)' }}>
         <div className="w-full max-w-4xl">
           <UploadArea
             fileInputRef={fileInputRef}
@@ -119,7 +119,11 @@ export default function Home() {
 
           <ErrorDisplay error={error} onDismiss={() => setError(null)} />
         </div>
-        </div>
+      </div>
+
+      <footer className="absolute bottom-4 left-0 right-0 text-center text-sm text-zinc-600 dark:text-zinc-400">
+        Made by Nate Williams, Austin Ashley, Fernando Gomez, Siddharth Rakshit
+      </footer>
     </div>
   );
 }

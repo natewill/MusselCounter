@@ -45,4 +45,3 @@ export default function CollectionTotals({ collection, imageCount, images, recal
     </div>
   );
 }
-

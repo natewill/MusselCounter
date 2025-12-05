@@ -18,6 +18,7 @@ export function useCollectionData(collectionIdParam: number, selectedModelId?: n
     data: collectionData,
     error: collectionError,
     isLoading: collectionLoading,
+    refetch,
   } = useQuery({
     queryKey: ['collection', collectionId, selectedModelId],
     queryFn: () => getCollection(collectionId!, selectedModelId ?? undefined),
@@ -104,5 +105,6 @@ export function useCollectionData(collectionIdParam: number, selectedModelId?: n
     error,
     setError,
     setLoading,
+    refetch,
   };
 }

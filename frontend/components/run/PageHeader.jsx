@@ -25,7 +25,7 @@ export default function PageHeader({ collectionName, children, onModelSuccess, o
           <div className="flex items-center gap-2">
             <AddModelButton onSuccess={onModelSuccess} onError={onModelError} />
             {children && (
-              <div>
+              <div className="flex items-center gap-2">
                 {children}
               </div>
             )}

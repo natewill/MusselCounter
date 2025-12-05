@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 
-export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, flashingImageIds, greenHueImageIds, isRunning, currentThreshold, latestRun, recalculatedImages, sortBy, onSortChange }) {
+export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, flashingImageIds, greenHueImageIds, isRunning, currentThreshold, latestRun, recalculatedImages, sortBy, onSortChange, collectionId }) {
   // Sort images based on sortBy prop or green hue during runs
   const sortedImages = useMemo(() => {
     let sorted = [...images];
@@ -100,7 +100,7 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
           >
             <option value="">Default</option>
             <option value="live_count">Live Mussel Count</option>
-            <option value="name">Image Name</option>
+            <option value="name">File Name</option>
           </select>
         </div>
       </div>
@@ -141,13 +141,16 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
               ? `http://127.0.0.1:8000/uploads/${image.stored_path.split('/').pop()}`
               : null;
             
-            // Use selected model if available; otherwise fall back to latest run
+            // Always allow navigation; edit mode can be disabled downstream if no results
             const modelIdForLink = selectedModelId ?? latestRun?.model_id ?? null;
+            const collectionIdForLink = collectionId ?? latestRun?.collection_id ?? null;
+            const sortParam = sortBy || null;
             
             return (
               <Link
                 key={image.image_id}
-                href={modelIdForLink ? `/edit/${image.image_id}?modelId=${modelIdForLink}` : '#'}
+                id={`image-card-${image.image_id}`}
+                href={modelIdForLink && collectionIdForLink ? `/edit/${image.image_id}?modelId=${modelIdForLink}&collectionId=${collectionIdForLink}${sortParam ? `&sort=${encodeURIComponent(sortParam)}` : ''}` : '#'}
                 className={`block border rounded-lg overflow-hidden hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors relative ${
                   isFlashing
                     ? 'green-flash'
@@ -155,11 +158,11 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                     ? 'green-hue'
                     : needsProcessing
                     ? 'border-amber-300 dark:border-amber-700 bg-amber-50/20 dark:bg-amber-900/15 ring-2 ring-amber-300/20 dark:ring-amber-700/20'
-                    : 'border-zinc-200 dark:border-zinc-800'
-                } ${!modelIdForLink ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
+                    : 'border-zinc-200 dark:border-zinc-800 hover:shadow-md'
+                } ${!modelIdForLink || !collectionIdForLink ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                 onClick={(e) => {
-                  // Prevent navigation if no model_id available
-                  if (!modelIdForLink) {
+                  // Prevent navigation if no model/collection available
+                  if (!modelIdForLink || !collectionIdForLink) {
                     e.preventDefault();
                   }
                 }}

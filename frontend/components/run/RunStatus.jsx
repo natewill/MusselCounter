@@ -136,11 +136,6 @@ export default function RunStatus({ latestRun, isRunning, images, onStopRun, sto
           </div>
         )}
 
-        {latestRun.threshold !== null && latestRun.threshold !== undefined && (
-          <div className="text-sm text-zinc-600 dark:text-zinc-400">
-            Threshold: {latestRun.threshold.toFixed(2)}
-          </div>
-        )}
         {latestRun.started_at && (
           <div className="text-sm text-zinc-600 dark:text-zinc-400">
             Started: {(() => {

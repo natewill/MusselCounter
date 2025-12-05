@@ -70,7 +70,19 @@ async def get_all_collections(db: aiosqlite.Connection):
                 WHERE ci.collection_id = c.collection_id
                 ORDER BY ci.added_at ASC
                 LIMIT 1
-            ) AS first_image_path
+            ) AS first_image_path,
+            (
+                SELECT r.status
+                FROM run r
+                WHERE r.collection_id = c.collection_id
+                ORDER BY r.run_id DESC
+                LIMIT 1
+            ) AS latest_run_status,
+            (
+                SELECT COUNT(*)
+                FROM run r
+                WHERE r.collection_id = c.collection_id
+            ) AS run_count
         FROM collection c
         ORDER BY c.created_at DESC
         """

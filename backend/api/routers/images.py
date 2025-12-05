@@ -57,7 +57,7 @@ class ImageDetailResponse(BaseModel):
 
 
 @router.get("/{image_id}/results", response_model=ImageDetailResponse)
-async def get_image_results_endpoint(image_id: int, model_id: int) -> ImageDetailResponse:
+async def get_image_results_endpoint(image_id: int, model_id: int, collection_id: Optional[int] = None) -> ImageDetailResponse:
     """
     Get detailed results for a specific image from a specific run.
     
@@ -83,9 +83,14 @@ async def get_image_results_endpoint(image_id: int, model_id: int) -> ImageDetai
     """
     image_id = validate_integer_id(image_id)
     model_id = validate_integer_id(model_id)
+    collection_id = validate_integer_id(collection_id) if collection_id is not None else None
     
     async with get_db() as db:
         # Get main image and result data
+        collection_filter = "AND r.collection_id = ?" if collection_id is not None else ""
+        params = [image_id, model_id]
+        if collection_id is not None:
+            params.append(collection_id)
         cursor = await db.execute("""
             SELECT 
                 i.image_id,
@@ -113,16 +118,74 @@ async def get_image_results_endpoint(image_id: int, model_id: int) -> ImageDetai
             JOIN model m ON r.model_id = m.model_id
             LEFT JOIN collection c ON r.collection_id = c.collection_id
             WHERE i.image_id = ? AND r.model_id = ?
+              {}
             ORDER BY r.run_id DESC
             LIMIT 1
-        """, (image_id, model_id))
+        """.format(collection_filter), params)
         
         result = await cursor.fetchone()
         
         if not result:
-            raise HTTPException(
-                status_code=404, 
-                detail=f"No results found for image {image_id} with model {model_id}"
+            # No run results found for this image/model (and optional collection)
+            # Return a placeholder response with zero counts so the image page can still render.
+            if collection_id is None:
+                raise HTTPException(
+                    status_code=404, 
+                    detail=f"No results found for image {image_id} with model {model_id}"
+                )
+
+            # Get basic image metadata scoped to the collection
+            image_cursor = await db.execute("""
+                SELECT i.image_id, i.filename, i.stored_path, i.file_hash, i.width, i.height, i.created_at,
+                       c.collection_id, c.name as collection_name
+                FROM image i
+                JOIN collection_image ci ON ci.image_id = i.image_id
+                JOIN collection c ON c.collection_id = ci.collection_id
+                WHERE i.image_id = ? AND c.collection_id = ?
+                LIMIT 1
+            """, (image_id, collection_id))
+            image_row = await image_cursor.fetchone()
+
+            if not image_row:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"No image {image_id} found in collection {collection_id}"
+                )
+
+            # Get model metadata
+            model_cursor = await db.execute(
+                "SELECT name, type FROM model WHERE model_id = ?",
+                (model_id,)
+            )
+            model_row = await model_cursor.fetchone()
+            if not model_row:
+                raise HTTPException(status_code=404, detail=f"Model {model_id} not found")
+
+            return ImageDetailResponse(
+                image_id=image_row['image_id'],
+                filename=image_row['filename'],
+                stored_path=image_row['stored_path'],
+                file_hash=image_row['file_hash'],
+                width=image_row['width'],
+                height=image_row['height'],
+                created_at=image_row['created_at'],
+                run_id=0,
+                model_id=model_id,
+                model_name=model_row['name'],
+                model_type=model_row['type'],
+                threshold=0.0,
+                live_mussel_count=0,
+                dead_mussel_count=0,
+                total_mussel_count=0,
+                live_percentage=None,
+                dead_percentage=None,
+                processed_at=image_row['created_at'],
+                error_msg="No results yet for this model in this collection",
+                polygons=[],
+                detection_count=0,
+                collection_id=image_row['collection_id'],
+                collection_name=image_row['collection_name'],
+                other_runs=[]
             )
         
         # Load polygon data from JSON file
@@ -212,7 +275,8 @@ async def update_polygon_classification(
     image_id: int,
     model_id: int,
     polygon_index: int,
-    new_class: str = Body(..., embed=True)
+    new_class: str = Body(..., embed=True),
+    collection_id: Optional[int] = None
 ) -> Dict:
     """
     Update the classification of a specific polygon (mussel detection).
@@ -234,21 +298,40 @@ async def update_polygon_classification(
 
     image_id = validate_integer_id(image_id)
     model_id = validate_integer_id(model_id)
+    collection_id = validate_integer_id(collection_id) if collection_id is not None else None
 
     if new_class not in ["live", "dead"]:
         raise HTTPException(status_code=400, detail="Classification must be 'live' or 'dead'")
 
     async with get_db() as db:
         # Get the detection by polygon_index (ORDER BY detection_id to match insertion order)
-        cursor = await db.execute("""
-            SELECT detection_id, original_class, class, run_id
-            FROM detection
-            WHERE image_id = ? AND run_id = (
-                SELECT run_id FROM run WHERE model_id = ? ORDER BY run_id DESC LIMIT 1
-            )
-            ORDER BY detection_id
+        collection_filter = "AND r.collection_id = ?" if collection_id is not None else ""
+        params = [image_id, model_id]
+        if collection_id is not None:
+            params.append(collection_id)
+        # Parameters for subquery reuse image/model (and collection if provided)
+        subquery_params = [image_id, model_id]
+        if collection_id is not None:
+            subquery_params.append(collection_id)
+
+        cursor = await db.execute(f"""
+            SELECT d.detection_id, d.original_class, d.class, d.run_id
+            FROM detection d
+            JOIN run r ON d.run_id = r.run_id
+            WHERE d.image_id = ? AND r.model_id = ?
+              {collection_filter}
+              AND d.run_id = (
+                  SELECT r2.run_id
+                  FROM run r2
+                  JOIN detection d2 ON d2.run_id = r2.run_id
+                  WHERE d2.image_id = ? AND r2.model_id = ?
+                    {collection_filter}
+                  ORDER BY r2.run_id DESC
+                  LIMIT 1
+              )
+            ORDER BY d.detection_id
             LIMIT 1 OFFSET ?
-        """, (image_id, model_id, polygon_index))
+        """, params + subquery_params + [polygon_index])
 
         detection = await cursor.fetchone()
         if not detection:

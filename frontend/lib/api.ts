@@ -90,6 +90,11 @@ function getUserFriendlyError(error: AxiosError, status?: number): string {
   }
   
   if (status === 400) {
+    // Try to get specific error message from backend first
+    const errorDetail = (error.response?.data as { detail?: string })?.detail;
+    if (errorDetail && typeof errorDetail === 'string' && errorDetail.length < 200) {
+      return errorDetail;
+    }
     return 'Invalid request. Please check your input and try again.';
   }
   
@@ -177,6 +182,30 @@ export async function getCollections() {
 }
 
 /**
+ * Update a collection's name and/or description
+ */
+export async function updateCollection(
+  collectionId: number,
+  updates: { name?: string; description?: string }
+) {
+  const validatedCollectionId = validateCollectionId(collectionId);
+  const response = await apiClient.patch(
+    `/api/collections/${validatedCollectionId}`,
+    updates
+  );
+  return response.data;
+}
+
+/**
+ * Delete a collection
+ */
+export async function deleteCollection(collectionId: number) {
+  const validatedCollectionId = validateCollectionId(collectionId);
+  const response = await apiClient.delete(`/api/collections/${validatedCollectionId}`);
+  return response.data;
+}
+
+/**
  * Upload image files to a collection
  */
 export async function uploadImagesToCollection(collectionId: number, files: File[]) {
@@ -251,13 +280,7 @@ export async function uploadModel(
     const response = await apiClient.post('/api/models', formData);
     return response.data;
   } catch (error) {
-    console.error('[uploadModel] Request failed:', {
-      error,
-      response: error.response,
-      status: error.response?.status,
-      data: error.response?.data,
-      headers: error.response?.headers
-    });
+    console.error('[uploadModel] Request failed');
     throw error;
   }
 }
@@ -356,12 +379,16 @@ function validateImageId(imageId: unknown): number {
 /**
  * gets image details from a specific run
  */
-export async function getImageDetails(imageId: number, modelId: number) {
+export async function getImageDetails(imageId: number, modelId: number, collectionId?: number) {
   const validatedImageId = validateImageId(imageId);
   const validatedModelId = validateModelId(modelId);
+  const validatedCollectionId = collectionId !== undefined ? validateCollectionId(collectionId) : undefined;
   
   const response = await apiClient.get(`/api/images/${validatedImageId}/results`, {
-    params: { model_id: validatedModelId },
+    params: { 
+      model_id: validatedModelId,
+      ...(validatedCollectionId ? { collection_id: validatedCollectionId } : {})
+    },
   });
   return response.data;
 }
@@ -373,10 +400,12 @@ export async function updatePolygonClassification(
   imageId: number,
   modelId: number,
   polygonIndex: number,
-  newClass: 'live' | 'dead'
+  newClass: 'live' | 'dead',
+  collectionId?: number
 ) {
   const validatedImageId = validateImageId(imageId);
   const validatedModelId = validateModelId(modelId);
+  const validatedCollectionId = collectionId !== undefined ? validateCollectionId(collectionId) : undefined;
 
   if (newClass !== 'live' && newClass !== 'dead') {
     throw new Error('Classification must be "live" or "dead"');
@@ -384,7 +413,10 @@ export async function updatePolygonClassification(
 
   const response = await apiClient.patch(
     `/api/images/${validatedImageId}/results/${validatedModelId}/polygons/${polygonIndex}`,
-    { new_class: newClass }
+    { new_class: newClass },
+    {
+      params: validatedCollectionId ? { collection_id: validatedCollectionId } : undefined,
+    }
   );
 
   return response.data;

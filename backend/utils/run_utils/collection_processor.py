@@ -67,6 +67,7 @@ import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
+from config import POLYGON_DIR
 
 import aiosqlite
 
@@ -269,8 +270,7 @@ async def _process_batch_inference(
                 return [], []
             image_paths = [path for _, _, path in image_data]
             results = await _batch_infer(model_type, model_device, image_paths)
-            polygon_dir = Path("data/polygons")
-            polygon_dir.mkdir(parents=True, exist_ok=True)
+            POLYGON_DIR.mkdir(parents=True, exist_ok=True)
             now = datetime.now(timezone.utc).isoformat()
             batch_results = []
             updates = []
@@ -294,7 +294,7 @@ async def _process_batch_inference(
                 
                 # Save polygon JSON with filtered counts
                 if result['polygons']:
-                    polygon_path = polygon_dir / f"{image_id}.json"
+                    polygon_path = POLYGON_DIR / f"{image_id}.json"
                     with open(polygon_path, 'w') as f:
                         json.dump({
                             'polygons': result['polygons'],  # All polygons saved

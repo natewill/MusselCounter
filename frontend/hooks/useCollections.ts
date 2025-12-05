@@ -10,6 +10,8 @@ export interface CollectionSummary {
   created_at: string;
   updated_at?: string;
   first_image_path?: string | null;
+  latest_run_status?: string | null;
+  run_count?: number;
 }
 
 export function useCollections() {
@@ -17,6 +19,7 @@ export function useCollections() {
     queryKey: ['collections'],
     queryFn: () => getCollections(),
     staleTime: 30_000,
+    refetchOnMount: 'always',
   });
 
   return {

@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Optional
 import aiosqlite
 from utils.model_utils import run_inference_on_image
+from config import POLYGON_DIR
 
 
 async def _record_error(db_path: str, run_id: int, image_id: int, message: str) -> tuple[int, bool, int, int]:
@@ -81,9 +82,8 @@ async def _run_inference(model_device, image_path: str, model_type: str):
 def _save_polygons(image_id: int, result: dict, threshold: float) -> Optional[str]:
     if not result.get("polygons"):
         return None
-    polygon_dir = Path("data/polygons")
-    polygon_dir.mkdir(parents=True, exist_ok=True)
-    polygon_path = polygon_dir / f"{image_id}.json"
+    POLYGON_DIR.mkdir(parents=True, exist_ok=True)
+    polygon_path = POLYGON_DIR / f"{image_id}.json"
     with open(polygon_path, "w") as handle:
         json.dump(
             {

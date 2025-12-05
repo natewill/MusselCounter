@@ -4,11 +4,14 @@ export default function SuccessMessage({ message, onDismiss }) {
   return (
     <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 mb-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <span className="text-green-800 dark:text-green-200 font-medium">
+          <span
+            className="text-green-800 dark:text-green-200 font-medium truncate max-w-[60vw] sm:max-w-lg"
+            title={message}
+          >
             {message}
           </span>
         </div>
@@ -24,4 +27,3 @@ export default function SuccessMessage({ message, onDismiss }) {
     </div>
   );
 }
-

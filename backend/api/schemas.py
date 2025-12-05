@@ -13,6 +13,12 @@ class CreateCollectionRequest(BaseModel):
     description: Optional[str] = None
 
 
+class UpdateCollectionRequest(BaseModel):
+    """Request model for updating a collection"""
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
 class StartRunRequest(BaseModel):
     """Request model for starting a run"""
     model_id: int = Field(..., description="ID of the model to use")
@@ -42,7 +48,7 @@ class CollectionResponse(BaseModel):
 class CollectionListResponse(BaseModel):
     """Simplified collection info for list view"""
     model_config = ConfigDict(from_attributes=True)
-    
+
     collection_id: int
     name: Optional[str] = None
     description: Optional[str] = None
@@ -50,6 +56,8 @@ class CollectionListResponse(BaseModel):
     image_count: int = 0
     live_mussel_count: int = 0
     first_image_path: Optional[str] = None
+    latest_run_status: Optional[str] = None
+    run_count: int = 0
 
 
 class ModelResponse(BaseModel):

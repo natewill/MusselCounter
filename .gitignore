@@ -8,6 +8,7 @@ __pycache__/
 *.py[cod]
 *$py.class
 venv/
+python-runtime/
 .env
 .env.local
 .env.*.local
@@ -39,6 +40,7 @@ yarn-debug.log*
 yarn-error.log*
 package-lock.json
 pnpm-lock.yaml
+dist/
 
 # IDE / Editor
 .idea/
@@ -49,6 +51,7 @@ pnpm-lock.yaml
 *.sln
 
 # Build artifacts
+dist/
 frontend/.turbo/
 frontend/.next/
 frontend/out/

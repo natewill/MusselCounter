@@ -1,35 +1,37 @@
 import { useRouter } from 'next/navigation';
 import AddModelButton from './AddModelButton';
 
-export default function PageHeader({ collectionName, children, onModelSuccess }) {
+export default function PageHeader({ collectionName, children, onModelSuccess, onModelError }) {
   const router = useRouter();
 
   return (
-    <div className="mb-6">
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <button
-            onClick={() => router.push('/')}
-            className="mb-2 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100"
-          >
-            ← Back to Home
-          </button>
-          <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">
-            Run Results
-          </h1>
-          {collectionName && (
-            <p className="text-zinc-600 dark:text-zinc-400 mt-2">Collection: {collectionName}</p>
-          )}
-        </div>
-        <div className="flex items-center gap-4">
-          <AddModelButton onSuccess={onModelSuccess} />
-          {children && (
-            <div>
-              {children}
-            </div>
-          )}
+    <>
+      <div className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 mb-6">
+        <div className="max-w-6xl mx-auto px-8 py-3 flex items-center justify-between">
+          <div className="flex gap-2">
+            <button
+              onClick={() => router.push('/')}
+              className="px-3 py-2 text-sm rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+            >
+              Home
+            </button>
+            <button
+              onClick={() => router.push('/collections')}
+              className="px-3 py-2 text-sm rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+            >
+              View Collections
+            </button>
+          </div>
+          <div className="flex items-center gap-2">
+            <AddModelButton onSuccess={onModelSuccess} onError={onModelError} />
+            {children && (
+              <div className="flex items-center gap-2">
+                {children}
+              </div>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

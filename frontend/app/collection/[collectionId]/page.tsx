@@ -333,8 +333,6 @@ export default function RunResultsPage() {
 
         {uploading && <UploadProgress />}
 
-        <ErrorDisplay error={error} onDismiss={() => setError(null)} />
-
         <SuccessMessage message={successMessage} onDismiss={() => setSuccessMessage(null)} />
 
         {/* Two-column layout for Run Status and Run Settings */}

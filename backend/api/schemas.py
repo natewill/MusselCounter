@@ -57,6 +57,7 @@ class CollectionListResponse(BaseModel):
     live_mussel_count: int = 0
     first_image_path: Optional[str] = None
     latest_run_status: Optional[str] = None
+    run_count: int = 0
 
 
 class ModelResponse(BaseModel):

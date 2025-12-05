@@ -80,6 +80,19 @@ export default function RunResultsPage() {
   const initializedFromUrlRef = useRef(false);
   const searchParamsString = useMemo(() => searchParams.toString(), [searchParams]);
 
+  // Extract unique models that have been run on this collection
+  const modelsUsed = useMemo(() => {
+    if (!collectionData?.all_runs || !models) return [];
+    
+    const uniqueModelIds = new Set(
+      collectionData.all_runs.map((run: any) => run.model_id)
+    );
+    
+    return models
+      .filter((model) => uniqueModelIds.has(model.model_id))
+      .map((model) => model.name);
+  }, [collectionData?.all_runs, models]);
+
   // One-time sync from ?modelId= in URL to picker
   useEffect(() => {
     if (initializedFromUrlRef.current) return;
@@ -285,6 +298,20 @@ export default function RunResultsPage() {
             )}
           </div>
         </div>
+
+        {modelsUsed.length > 0 && (
+          <div className="mt-2 p-3 flex flex-wrap items-center gap-2 bg-zinc-50 dark:bg-zinc-900/50">
+            <span className="text-sm text-zinc-600 dark:text-zinc-400">Models run:</span>
+            {modelsUsed.map((modelName, idx) => (
+              <span 
+                key={idx}
+                className="px-2 py-1 text-xs rounded bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+              >
+                {modelName}
+              </span>
+            ))}
+          </div>
+        )}
 
         <ErrorDisplay
           error={displayError}

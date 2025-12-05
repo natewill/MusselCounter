@@ -159,19 +159,29 @@ export default function CollectionCard({
                 {collection.description}
               </p>
             )}
-            <div className="flex flex-wrap items-center gap-2 pt-2 text-sm items-center">
-              <span className="px-3 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700">
-                {collection.image_count} images
-              </span>
-              {collection.live_mussel_count !== undefined && collection.live_mussel_count !== null && (
-                <span className="px-3 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 flex items-center gap-2">
-                  <span>{collection.live_mussel_count} live mussels</span>
-                  {getStatusBadge(collection.latest_run_status)}
+            <div className="space-y-2 pt-2">
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="px-3 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700">
+                  {collection.image_count} images
                 </span>
+                <span className="px-3 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700">
+                  {collection.run_count} {collection.run_count === 1 ? 'model run' : 'model runs'} 
+                </span>
+                <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-auto">
+                  Created {formatDate(collection.created_at)}
+                </span>
+              </div>
+              {collection.live_mussel_count > 0 && collection.live_mussel_count !== undefined && collection.live_mussel_count !== null && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="px-3 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-200 border border-zinc-200 dark:border-zinc-700 flex items-center gap-2">
+                    <span>{collection.live_mussel_count} live mussels</span>
+                    {collection.run_count > 1 && (
+                      <span className="text-xs text-zinc-500 dark:text-zinc-400">• latest</span>
+                    )}
+                    {getStatusBadge(collection.latest_run_status)}
+                  </span>
+                </div>
               )}
-              <span className="text-xs text-zinc-500 dark:text-zinc-400 ml-auto">
-                Created {formatDate(collection.created_at)}
-              </span>
             </div>
           </div>
         </div>

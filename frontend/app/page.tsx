@@ -122,6 +122,8 @@ export default function Home() {
       </div>
 
       <footer className="absolute bottom-4 left-0 right-0 text-center text-sm text-zinc-600 dark:text-zinc-400">
+        <span className="font-bold"> Disclaimer: This tool, and the model it was built for use with, were developed specifically for juvenile <em>lampsilis cardium</em> under controlled imaging conditions. </span><br />
+        <span className="font-bold">Use outside these conditions may yield inaccurate results and interpreted with caution.</span> <br />
         Made by Nate Williams, Austin Ashley, Fernando Gomez, Siddharth Rakshit
       </footer>
     </div>

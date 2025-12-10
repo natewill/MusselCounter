@@ -25,7 +25,7 @@ backend/mussel_counter*.db
 backend/logs/
 backend/data/uploads/
 backend/data/polygons/
-
+backend/data/*.db
 # Model weights (too large for git - use Git LFS or external storage)
 backend/data/models/*.ckpt
 backend/data/models/*.pth

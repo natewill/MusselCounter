@@ -25,8 +25,14 @@ export default function CollectionsPage() {
       return {};
     }
   });
+
+  const visibleCollections = useMemo(
+    () => collections.filter((collection) => collection.image_count > 0),
+    [collections],
+  );
+
   const filteredCollections = useMemo(() => {
-    if (!searchTerm.trim()) return collections;
+    if (!searchTerm.trim()) return visibleCollections;
     const q = searchTerm.trim().toLowerCase();
     const fuzzyMatch = (text: string, query: string) => {
       const t = text.toLowerCase();
@@ -39,8 +45,8 @@ export default function CollectionsPage() {
       }
       return true;
     };
-    return collections.filter((c) => fuzzyMatch(c.name || 'untitled collection', q));
-  }, [collections, searchTerm]);
+    return visibleCollections.filter((c) => fuzzyMatch(c.name || 'untitled collection', q));
+  }, [visibleCollections, searchTerm]);
 
   const sortedCollections = useMemo(() => {
     const withSort = [...filteredCollections];
@@ -210,9 +216,9 @@ export default function CollectionsPage() {
 
         {!isLoading && !isError && filteredCollections.length === 0 && (
           <div className="rounded-lg p-8 text-center text-zinc-600 dark:text-zinc-400">
-            <p className="text-lg font-medium">No collections yet.</p>
+            <p className="text-lg font-medium">No collections with images yet.</p>
             <p className="text-sm mt-1">
-              Start a run to create a collection.
+              Start a run and add images to see collections here.
             </p>
           </div>
         )}

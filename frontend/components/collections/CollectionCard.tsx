@@ -94,9 +94,6 @@ export default function CollectionCard({
       <div className="flex flex-col gap-6 h-full">
         <div className="flex items-start gap-4">
           <div className="flex-1 min-w-0 space-y-1.5">
-            <div className="text-sm text-zinc-500 dark:text-zinc-400">
-              #{collection.collection_id}
-            </div>
             <div className="flex items-center gap-2">
               {renaming ? (
                 <>

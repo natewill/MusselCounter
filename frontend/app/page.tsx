@@ -15,6 +15,7 @@ export default function Home() {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [showWarning, setShowWarning] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
 
   const handleDragOver = (e) => {
@@ -101,6 +102,27 @@ export default function Home() {
         loading={loading}
       />
 
+      {showWarning && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/10 dark:bg-zinc-900 dark:ring-white/10">
+            <p className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Disclaimer</p>
+            <p className="mt-3 text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
+              This tool, and the model it was built for use with, were developed specifically for juvenile <em>lampsilis cardium</em> under controlled imaging conditions.
+              Use outside these conditions may yield inaccurate results and should be interpreted with caution.
+            </p>
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                className="rounded-md bg-black px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black dark:bg-white dark:text-black dark:hover:bg-zinc-200 dark:focus-visible:outline-white"
+                onClick={() => setShowWarning(false)}
+              >
+                I understand
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-start justify-center px-8 pt-24 pb-12" style={{ minHeight: 'calc(100vh - 180px)' }}>
         <div className="w-full max-w-4xl">
           <UploadArea
@@ -122,8 +144,6 @@ export default function Home() {
       </div>
 
       <footer className="absolute bottom-4 left-0 right-0 text-center text-sm text-zinc-600 dark:text-zinc-400">
-        <span className="font-bold"> Disclaimer: This tool, and the model it was built for use with, were developed specifically for juvenile <em>lampsilis cardium</em> under controlled imaging conditions. </span><br />
-        <span className="font-bold">Use outside these conditions may yield inaccurate results and interpreted with caution.</span> <br />
         Made by Nate Williams, Austin Ashley, Fernando Gomez, Siddharth Rakshit
       </footer>
     </div>

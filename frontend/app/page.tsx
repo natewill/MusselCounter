@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/home/TopBar';
 import UploadArea from '@/components/home/UploadArea';
@@ -15,6 +15,7 @@ export default function Home() {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
   const [showWarning, setShowWarning] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
 
@@ -95,6 +96,25 @@ export default function Home() {
     }
   };
 
+  useEffect(() => {
+    const accepted = localStorage.getItem('disclaimerAccepted')
+    if (accepted === 'true') {
+      setDisclaimerAccepted(true)
+    }
+  }, [])
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      localStorage.removeItem('disclaimerAccepted');
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
       <TopBar
@@ -102,7 +122,7 @@ export default function Home() {
         loading={loading}
       />
 
-      {showWarning && (
+      {showWarning && !disclaimerAccepted && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl ring-1 ring-black/10 dark:bg-zinc-900 dark:ring-white/10">
             <p className="text-base font-semibold text-zinc-900 dark:text-zinc-100">Disclaimer</p>
@@ -114,7 +134,10 @@ export default function Home() {
               <button
                 type="button"
                 className="rounded-md bg-black px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black dark:bg-white dark:text-black dark:hover:bg-zinc-200 dark:focus-visible:outline-white"
-                onClick={() => setShowWarning(false)}
+                onClick={() => {
+                  localStorage.setItem('disclaimerAccepted', 'true')
+                  setShowWarning(false)
+                }}
               >
                 I understand
               </button>

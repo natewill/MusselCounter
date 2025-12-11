@@ -57,18 +57,77 @@ function resolveNodePath() {
   const candidates = [
     process.env.NODE_BINARY,
     process.env.NEXT_NODE_BINARY,
-    path.join(frontendDir, 'node_modules', '.bin', 'node'),
-    '/opt/homebrew/bin/node',
-    '/usr/local/bin/node',
-    '/usr/bin/node',
-    'node',
-  ].filter(Boolean);
+    path.join(frontendDir, 'node_modules', '.bin', process.platform === 'win32' ? 'node.exe' : 'node'),
+  ];
 
-  for (const candidate of candidates) {
+  // Add platform-specific paths
+  if (process.platform === 'win32') {
+    // Windows-specific paths
+    const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
+    const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+    const appData = process.env.APPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Roaming');
+    const localAppData = process.env.LOCALAPPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Local');
+    
+    candidates.push(
+      path.join(programFiles, 'nodejs', 'node.exe'),
+      path.join(programFilesX86, 'nodejs', 'node.exe'),
+      path.join(appData, 'npm', 'node.exe'),
+      path.join(localAppData, 'Programs', 'nodejs', 'node.exe'),
+      path.join(process.env.USERPROFILE || '', 'AppData', 'Roaming', 'npm', 'node.exe'),
+      path.join(process.env.USERPROFILE || '', 'AppData', 'Local', 'Programs', 'nodejs', 'node.exe')
+    );
+  } else {
+    // Unix/macOS paths
+    candidates.push(
+      '/opt/homebrew/bin/node',
+      '/usr/local/bin/node',
+      '/usr/bin/node'
+    );
+  }
+
+  // Add 'node' or 'node.exe' as fallback (will use PATH)
+  candidates.push(process.platform === 'win32' ? 'node.exe' : 'node');
+
+  // Filter out undefined/null values
+  const validCandidates = candidates.filter(Boolean);
+
+  // Try to find Node.js using system commands if direct paths fail
+  if (process.platform === 'win32') {
+    // On Windows, try using 'where' command to find node.exe in PATH
     try {
-      fs.accessSync(candidate, fs.constants.X_OK);
-      log(`[resolveNodePath] Using Node at ${candidate}`);
-      return candidate;
+      const { execSync } = require('child_process');
+      const nodePath = execSync('where node.exe', { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim().split('\n')[0];
+      if (nodePath && fs.existsSync(nodePath)) {
+        log(`[resolveNodePath] Found Node via 'where' command: ${nodePath}`);
+        return nodePath;
+      }
+    } catch (err) {
+      // 'where' command failed, continue with candidate list
+      log(`[resolveNodePath] 'where' command failed: ${err.message}`);
+    }
+  }
+
+  // Check each candidate
+  for (const candidate of validCandidates) {
+    try {
+      // If candidate is just 'node' or 'node.exe' (command name), return it as-is
+      // spawn will use PATH to find it
+      if (candidate === 'node' || candidate === 'node.exe') {
+        log(`[resolveNodePath] Using Node command from PATH: ${candidate}`);
+        return candidate;
+      }
+
+      // For full paths, check if file exists (Windows) or is executable (Unix)
+      if (process.platform === 'win32') {
+        if (fs.existsSync(candidate)) {
+          log(`[resolveNodePath] Using Node at ${candidate}`);
+          return candidate;
+        }
+      } else {
+        fs.accessSync(candidate, fs.constants.X_OK);
+        log(`[resolveNodePath] Using Node at ${candidate}`);
+        return candidate;
+      }
     } catch (err) {
       continue;
     }

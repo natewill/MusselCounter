@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import TopBar from '@/components/home/TopBar';
 import UploadArea from '@/components/home/UploadArea';
@@ -15,8 +15,15 @@ export default function Home() {
   
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [showWarning, setShowWarning] = useState(true);
+  const [showWarning, setShowWarning] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    const acknowledged = localStorage.getItem('disclaimerAcknowledged');
+    if (!acknowledged) {
+      setShowWarning(true);
+    }
+  }, []);
 
   const handleDragOver = (e) => {
     e.preventDefault();
@@ -95,6 +102,11 @@ export default function Home() {
     }
   };
 
+  const handleAcknowledge = () => {
+    localStorage.setItem('disclaimerAcknowledged', 'true');
+    setShowWarning(false);
+  };
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black">
       <TopBar
@@ -114,7 +126,7 @@ export default function Home() {
               <button
                 type="button"
                 className="rounded-md bg-black px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-zinc-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-black dark:bg-white dark:text-black dark:hover:bg-zinc-200 dark:focus-visible:outline-white"
-                onClick={() => setShowWarning(false)}
+                onClick={handleAcknowledge}
               >
                 I understand
               </button>

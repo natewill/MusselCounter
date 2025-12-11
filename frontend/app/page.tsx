@@ -19,10 +19,8 @@ export default function Home() {
   const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
-    const acknowledged = localStorage.getItem('disclaimerAcknowledged');
-    if (!acknowledged) {
-      setShowWarning(true);
-    }
+    const acknowledged = localStorage.getItem('disclaimerAccepted');
+    setShowWarning(!acknowledged);
   }, []);
 
   const handleDragOver = (e) => {
@@ -103,7 +101,7 @@ export default function Home() {
   };
 
   const handleAcknowledge = () => {
-    localStorage.setItem('disclaimerAcknowledged', 'true');
+    localStorage.setItem('disclaimerAccepted', 'true');
     setShowWarning(false);
   };
 

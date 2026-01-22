@@ -56,15 +56,16 @@ jobs:
           Copy-Item -Recurse -Force $serverDir $flat
 
       - name: Build backend (PyInstaller)
+        working-directory: backend
         shell: pwsh
         run: |
-          python -m venv backend/venv
-          .\backend\venv\Scripts\activate
-          pip install -r backend\requirements.txt
+          python -m venv venv
+          .\venv\Scripts\activate
+          pip install -r requirements.txt
           pip install pyinstaller
-          if (Test-Path backend\build) { Remove-Item -Recurse -Force backend\build }
-          if (Test-Path backend\dist) { Remove-Item -Recurse -Force backend\dist }
-          pyinstaller backend\mussel-backend.spec
+          if (Test-Path build) { Remove-Item -Recurse -Force build }
+          if (Test-Path dist) { Remove-Item -Recurse -Force dist }
+          pyinstaller mussel-backend.spec
 
       - name: Install electron deps
         working-directory: electron

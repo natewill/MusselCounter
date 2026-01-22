@@ -45,9 +45,16 @@ let frontendProcess;
 
 // Prefer a real Node.js binary; do NOT fall back to Electron
 function resolveNodePath() {
+  const bundledNodeDir = path.join(process.resourcesPath, 'node');
+  const bundledNode = process.platform === 'win32'
+    ? path.join(bundledNodeDir, 'node.exe')
+    : path.join(bundledNodeDir, 'bin', 'node');
+
   const candidates = [
     process.env.NODE_BINARY,
     process.env.NEXT_NODE_BINARY,
+    bundledNode,
+    path.join(process.resourcesPath, 'nodejs', 'node.exe'),
     path.join(frontendDir, 'node_modules', '.bin', process.platform === 'win32' ? 'node.exe' : 'node'),
   ];
 

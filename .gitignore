@@ -61,3 +61,4 @@ backend/build/
 backend/dist/
 backend/*.spec.bak
 electron/node-runtime/
+node-runtime/

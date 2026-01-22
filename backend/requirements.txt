@@ -33,3 +33,6 @@ numpy>=1.24.0
 bandit>=1.7.5  # Security linting
 safety>=2.3.5  # Dependency vulnerability scanning
 
+# Build tools
+pyinstaller>=6.0.0  # For building standalone backend executable
+

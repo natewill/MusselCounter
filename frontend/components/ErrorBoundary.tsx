@@ -7,6 +7,16 @@ import { useRouter } from 'next/navigation';
 function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
   const router = useRouter();
 
+  // Safely extract error message
+  const errorMessage = error instanceof Error 
+    ? error.message 
+    : typeof error === 'string' 
+    ? error 
+    : 'An unexpected error occurred';
+
+  // Safely extract error stack
+  const errorStack = error instanceof Error ? error.stack : String(error);
+
   return (
     <div className="min-h-screen bg-zinc-50 dark:bg-black flex items-center justify-center p-8">
       <div className="max-w-md w-full text-center">
@@ -15,7 +25,7 @@ function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
             Something went wrong
           </h2>
           <p className="text-red-600 dark:text-red-400 text-sm mb-4">
-            {error.message || 'An unexpected error occurred'}
+            {errorMessage}
           </p>
           <div className="flex gap-3 justify-center">
             <button
@@ -38,7 +48,7 @@ function ErrorFallback({ error, resetErrorBoundary }: FallbackProps) {
               Error details (dev only)
             </summary>
             <pre className="mt-2 p-4 bg-zinc-100 dark:bg-zinc-900 rounded text-xs overflow-auto max-h-64">
-              {error.stack}
+              {errorStack}
             </pre>
           </details>
         )}

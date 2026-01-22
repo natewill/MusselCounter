@@ -8,8 +8,12 @@
   "scripts": {
     "start": "electron .",
     "dev": "NODE_ENV=development electron .",
-    "pack": "npm run icons && electron-builder --dir",
-    "dist": "npm run icons && electron-builder",
+    "pack": "npm run icons && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir -c.mac.identity=-",
+    "dist": "npm run icons && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder -c.mac.identity=-",
+    "dist:win": "npm run icons && electron-builder --win",
+    "dist:linux": "npm run icons && electron-builder --linux",
+    "dist:all": "npm run icons && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --win --linux -c.mac.identity=-",
+    "dist:signed": "npm run icons && ulimit -n 4096 && electron-builder",
     "check-ports": "node scripts/check-ports.js",
     "icons": "node scripts/generate-icons.js"
   },
@@ -33,22 +37,7 @@
     ],
     "extraResources": [
       {
-        "from": "../backend",
-        "to": "backend",
-        "filter": [
-          "**/*",
-          "!venv/**",
-          "!.pytest_cache/**",
-          "!__pycache__/**",
-          "!*.db",
-          "!logs/**",
-          "!data/uploads/**",
-          "!data/polygons/**",
-          "!data/models/**"
-        ]
-      },
-      {
-        "from": "../frontend/.next/standalone",
+        "from": "../frontend/.next/standalone-flat",
         "to": "frontend",
         "filter": [
           "**/*"
@@ -76,14 +65,28 @@
     "mac": {
       "category": "public.app-category.utilities",
       "target": "dmg",
-      "icon": "../frontend/public/icon.icns"
+      "icon": "../frontend/public/icon.icns",
+      "gatekeeperAssess": false,
+      "identity": "-",
+      "extraResources": [
+        {
+          "from": "../backend/dist/mussel-backend",
+          "to": "backend/mussel-backend"
+        }
+      ]
     },
     "dmg": {
       "icon": "../frontend/public/icon.icns"
     },
     "win": {
       "target": "nsis",
-      "icon": "../frontend/public/icon.ico"
+      "icon": "../frontend/public/icon.ico",
+      "extraResources": [
+        {
+          "from": "../backend/dist/mussel-backend.exe",
+          "to": "backend/mussel-backend.exe"
+        }
+      ]
     },
     "linux": {
       "target": [
@@ -91,7 +94,13 @@
         "deb"
       ],
       "category": "Utility",
-      "icon": "../frontend/public"
+      "icon": "../frontend/public",
+      "extraResources": [
+        {
+          "from": "../backend/dist/mussel-backend",
+          "to": "backend/mussel-backend"
+        }
+      ]
     }
   }
 }

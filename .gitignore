@@ -55,3 +55,9 @@ dist/
 frontend/.turbo/
 frontend/.next/
 frontend/out/
+
+# PyInstaller
+backend/build/
+backend/dist/
+backend/*.spec.bak
+electron/node-runtime/

@@ -32,22 +32,13 @@ const baseDir = app.isPackaged ? process.resourcesPath : path.resolve(__dirname,
 const backendDir = path.join(baseDir, 'backend');
 const frontendDir = path.join(baseDir, 'frontend');
 
-const bundledRuntimeDir = path.join(
-  backendDir,
-  'python-runtime',
-  process.platform === 'win32' ? 'Scripts' : 'bin'
-);
-const bundledPython = path.join(
-  backendDir,
-  'python-runtime',
-  process.platform === 'win32' ? 'Scripts' : 'bin',
-  process.platform === 'win32' ? 'python.exe' : 'python3'
-);
+// Determine backend binary name based on platform
+const backendBinaryName = process.platform === 'win32' ? 'mussel-backend.exe' : 'mussel-backend';
 
-// Prefer bundled runtime automatically when present
-if (!process.env.PYTHON_PATH && fs.existsSync(bundledPython)) {
-  process.env.PYTHON_PATH = bundledPython;
-}
+// In packaged app, binary is in resources/backend; in dev, it's in backend/dist
+const backendBinary = app.isPackaged
+  ? path.join(process.resourcesPath, 'backend', backendBinaryName)
+  : path.join(__dirname, '..', 'backend', 'dist', backendBinaryName);
 
 let backendProcess;
 let frontendProcess;
@@ -137,66 +128,7 @@ function resolveNodePath() {
   return null;
 }
 
-function resolvePythonPath() {
-  log(`[resolvePythonPath] Starting Python resolution`);
-  log(`[resolvePythonPath] PYTHON_PATH env var: ${process.env.PYTHON_PATH || 'not set'}`);
-
-  if (process.env.PYTHON_PATH) {
-    log(`[resolvePythonPath] Using PYTHON_PATH=${process.env.PYTHON_PATH}`);
-    return process.env.PYTHON_PATH;
-  }
-
-  const bundledRuntime = path.join(backendDir, 'python-runtime');
-  const bundledPython = process.platform === 'win32'
-    ? path.join(bundledRuntime, 'Scripts', 'python.exe')
-    : path.join(bundledRuntime, 'bin', 'python3');
-
-  log(`[resolvePythonPath] Checking bundled runtime: ${bundledPython}`);
-  if (fs.existsSync(bundledPython)) {
-    log(`[resolvePythonPath] Using bundled runtime at ${bundledPython}`);
-    return bundledPython;
-  } else {
-    log(`[resolvePythonPath] Bundled runtime not found`);
-  }
-
-  const posixVenv = path.join(backendDir, 'venv', 'bin', 'python');
-  const windowsVenv = path.join(backendDir, 'venv', 'Scripts', 'python.exe');
-
-  log(`[resolvePythonPath] Checking venv: ${posixVenv}`);
-  if (fs.existsSync(posixVenv)) {
-    log(`[resolvePythonPath] Using backend venv at ${posixVenv}`);
-    return posixVenv;
-  }
-
-  log(`[resolvePythonPath] Checking venv: ${windowsVenv}`);
-  if (fs.existsSync(windowsVenv)) {
-    log(`[resolvePythonPath] Using backend venv at ${windowsVenv}`);
-    return windowsVenv;
-  }
-
-  log(`[resolvePythonPath] No venv found`);
-
-  const candidates = [
-    process.platform === 'win32' ? 'python' : 'python3',
-    '/usr/bin/python3',
-    '/opt/homebrew/bin/python3',
-    '/usr/local/bin/python3',
-  ];
-
-  log(`[resolvePythonPath] Checking system Python candidates: ${candidates.join(', ')}`);
-  for (const candidate of candidates) {
-    try {
-      fs.accessSync(candidate, fs.constants.X_OK);
-      log(`[resolvePythonPath] Using system python at ${candidate}`);
-      return candidate;
-    } catch (e) {
-      log(`[resolvePythonPath] Candidate ${candidate} not accessible: ${e.message}`);
-    }
-  }
-
-  log('[resolvePythonPath] Falling back to platform default python');
-  return process.platform === 'win32' ? 'python' : 'python3';
-}
+// resolvePythonPath() removed - now using PyInstaller binary directly
 
 function killProcessOnPort(port) {
   return new Promise((resolve) => {
@@ -313,21 +245,10 @@ async function ensurePortsFree() {
 }
 
 function startBackend() {
-  const pythonCmd = resolvePythonPath();
-  const args = ['-m', 'uvicorn', 'main:app', '--host', HOST, '--port', String(BACKEND_PORT)];
-
-  log(`[startBackend] Python command: ${pythonCmd}`);
-  log(`[startBackend] Backend directory: ${backendDir}`);
-  log(`[startBackend] Backend directory exists: ${fs.existsSync(backendDir)}`);
-  log(`[startBackend] Bundled runtime directory: ${bundledRuntimeDir}`);
-  log(`[startBackend] Bundled runtime exists: ${fs.existsSync(bundledRuntimeDir)}`);
-  log(`[startBackend] Python binary exists: ${fs.existsSync(pythonCmd)}`);
+  log(`[startBackend] Backend binary: ${backendBinary}`);
+  log(`[startBackend] Binary exists: ${fs.existsSync(backendBinary)}`);
   log(`[startBackend] App is packaged: ${app.isPackaged}`);
   log(`[startBackend] Resources path: ${process.resourcesPath}`);
-
-  const pathEnv = fs.existsSync(bundledRuntimeDir)
-    ? `${bundledRuntimeDir}${path.delimiter}${DEFAULT_PATH}`
-    : DEFAULT_PATH;
 
   // Set up writable data directories in userData
   const userDataPath = app.getPath('userData');
@@ -345,18 +266,16 @@ function startBackend() {
     }
   });
 
-  log(`[startBackend] PATH: ${pathEnv}`);
   log(`[startBackend] Data directory: ${dataDir}`);
   log(`[startBackend] DB path: ${dbPath}`);
-  log(`[startBackend] Starting backend with: ${pythonCmd} ${args.join(' ')}`);
+  log(`[startBackend] Starting backend binary...`);
 
-  const proc = spawn(pythonCmd, args, {
-    cwd: backendDir,
+  const proc = spawn(backendBinary, [], {
     stdio: ['ignore', 'pipe', 'pipe'],
     env: {
       ...process.env,
-      PATH: pathEnv,
-      // Configure backend to use writable directories
+      HOST: HOST,
+      BACKEND_PORT: String(BACKEND_PORT),
       UPLOAD_DIR: uploadsDir,
       MODELS_DIR: modelsDir,
       DB_PATH: dbPath,
@@ -374,7 +293,10 @@ function startBackend() {
 
   proc.on('error', (err) => {
     log(`[backend] failed to start: ${err.message}`);
-    log(`[backend] error stack: ${err.stack}`);
+    dialog.showErrorBox(
+      'Backend Error',
+      `Failed to start backend: ${err.message}\n\nCheck that the backend binary exists at:\n${backendBinary}`
+    );
   });
 
   return proc;
@@ -385,9 +307,36 @@ function resolveNextBinary() {
   return fs.existsSync(nextBin) ? nextBin : null;
 }
 
+function findServerJs(dir, maxDepth = 10, currentDepth = 0) {
+  if (currentDepth > maxDepth) return null;
+  
+  const serverJs = path.join(dir, 'server.js');
+  if (fs.existsSync(serverJs)) {
+    return serverJs;
+  }
+  
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory() && !entry.name.startsWith('.')) {
+        const found = findServerJs(path.join(dir, entry.name), maxDepth, currentDepth + 1);
+        if (found) return found;
+      }
+    }
+  } catch (err) {
+    // Ignore read errors
+  }
+  
+  return null;
+}
+
 function startFrontend() {
   // Check for standalone server first (production build)
-  const standaloneServer = path.join(frontendDir, 'server.js');
+  // Next.js standalone can nest server.js in subdirectories, so search recursively
+  let standaloneServer = path.join(frontendDir, 'server.js');
+  if (!fs.existsSync(standaloneServer)) {
+    standaloneServer = findServerJs(frontendDir) || standaloneServer;
+  }
   const hasStandalone = fs.existsSync(standaloneServer);
 
   // Fallback to regular .next build
@@ -410,11 +359,16 @@ function startFrontend() {
   let args;
   let script;
 
+  let workingDir = frontendDir;
+  
   if (hasStandalone && !useDevServer) {
     // Use standalone server (most efficient for packaged apps)
+    // Set working directory to where server.js is located (may be nested)
+    workingDir = path.dirname(standaloneServer);
     args = [standaloneServer];
     script = 'standalone';
     log(`[frontend] Using standalone server at ${standaloneServer}`);
+    log(`[frontend] Server directory: ${workingDir}`);
   } else {
     // Use regular Next.js dev/start
     const nextBin = resolveNextBinary();
@@ -461,7 +415,7 @@ function startFrontend() {
   delete env.ELECTRON_RUN_AS_NODE;
 
   const proc = spawn(nodeCmd, args, {
-    cwd: frontendDir,
+    cwd: workingDir,
     stdio: ['ignore', 'pipe', 'pipe'],
     env,
   });

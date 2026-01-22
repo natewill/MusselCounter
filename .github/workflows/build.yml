@@ -1,0 +1,184 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Trigger on version tags like v1.0.0
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build-mac:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            electron/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Flatten Next.js standalone output
+        run: |
+          STANDALONE_DIR="frontend/.next/standalone"
+          STANDALONE_FLAT="frontend/.next/standalone-flat"
+          SERVER_JS=$(find "$STANDALONE_DIR" -name "server.js" -not -path "*/node_modules/*" 2>/dev/null | head -1)
+          if [ -n "$SERVER_JS" ]; then
+            SERVER_DIR=$(dirname "$SERVER_JS")
+            echo "Found server.js at: $SERVER_DIR"
+            rm -rf "$STANDALONE_FLAT"
+            cp -R "$SERVER_DIR" "$STANDALONE_FLAT"
+          fi
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build backend with PyInstaller
+        run: |
+          cd backend
+          pyinstaller mussel-backend.spec
+          chmod +x dist/mussel-backend
+
+      - name: Install Electron dependencies
+        run: |
+          cd electron
+          npm ci
+
+      - name: Build Electron app (macOS)
+        run: |
+          cd electron
+          npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: |
+            dist/*.dmg
+            dist/*.zip
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            electron/package-lock.json
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install frontend dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Build frontend
+        run: |
+          cd frontend
+          npm run build
+
+      - name: Flatten Next.js standalone output (Windows)
+        shell: powershell
+        run: |
+          $standaloneDir = "frontend/.next/standalone"
+          $standaloneFlat = "frontend/.next/standalone-flat"
+          $serverJs = Get-ChildItem -Path $standaloneDir -Recurse -Filter "server.js" | 
+                      Where-Object { $_.FullName -notlike "*node_modules*" } | 
+                      Select-Object -First 1
+          if ($serverJs) {
+            $serverDir = $serverJs.DirectoryName
+            Write-Host "Found server.js at: $serverDir"
+            if (Test-Path $standaloneFlat) { Remove-Item -Recurse -Force $standaloneFlat }
+            Copy-Item -Recurse $serverDir $standaloneFlat
+          }
+
+      - name: Install backend dependencies
+        run: |
+          cd backend
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Build backend with PyInstaller
+        run: |
+          cd backend
+          pyinstaller mussel-backend.spec
+
+      - name: Install Electron dependencies
+        run: |
+          cd electron
+          npm ci
+
+      - name: Build Electron app (Windows)
+        run: |
+          cd electron
+          npm run dist:win
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: |
+            dist/*.exe
+
+  release:
+    needs: [build-mac, build-windows]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/macos-build/*
+            artifacts/windows-build/*
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

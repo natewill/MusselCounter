@@ -116,70 +116,39 @@ npm start
 
 #### Building Installers for Distribution
 
-**Important:** To create standalone installers that work on machines without Python installed, you must bundle a Python runtime with all dependencies.
+Build the installer on the target platform. Build machines need Node.js (v18+) and Python (3.8+).
 
-##### Step 1: Create Bundled Python Runtime
+##### One-command build
 
-**On the build machine**, create a self-contained Python environment:
-
-```bash
-cd backend
-python3 -m venv python-runtime
-source python-runtime/bin/activate  # Windows: python-runtime\Scripts\activate
-pip install -r requirements.txt
-deactivate
+**Windows (PowerShell):**
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\build-all.ps1
 ```
 
-**⚠️ Important Notes:**
-- `python-runtime/` is **excluded from git** (in `.gitignore`)
-- Must be recreated on each build machine
-- Each platform (Mac/Windows/Linux) needs its own runtime built on that platform
-- The runtime is large (~500MB-1GB due to PyTorch) but necessary for standalone installers
-
-##### Step 2: Add ML Models (Optional but Recommended)
-
-Place your model files in `backend/data/models/`:
+**macOS/Linux (bash):**
 ```bash
-cp your-model.pt backend/data/models/
+./scripts/build-all.sh
 ```
 
-**Note:** Models are **excluded from the packaged app** to keep installer size reasonable. Users can:
-- Add models to `backend/data/models/` after installation, OR
-- You can include them by removing `!data/models/**` from `electron/package.json` build filters
+This script:
+- builds the frontend (Next.js)
+- flattens the standalone output for packaging
+- builds the backend with PyInstaller
+- packages the Electron app
 
-##### Step 3: Build Frontend
+**Output:** `dist/` (installer and `win-unpacked/`)
 
-```bash
-cd frontend
-npm install  # if not already done
-npm run build
-```
+##### Notes
+- End users do **not** need Python or Node.js installed. The backend is bundled as a PyInstaller executable, and the frontend runs on Electron's bundled Node runtime.
+- Models are **excluded from the packaged app** to keep installer size reasonable. Users can:
+  - add models to `backend/data/models/` after installation, OR
+  - include them by removing `!data/models/**` from `electron/package.json` build filters
 
-##### Step 4: Package the App
-
-```bash
-cd electron
-npm install  # if not already done
-npm run dist
-```
-
-This creates installers in `dist/`:
-- **macOS**: `MusselCounter-{version}-arm64.dmg`
-- **Windows**: `MusselCounter Setup {version}.exe`
-- **Linux**: `MusselCounter-{version}.AppImage`, `.deb`
-
-**Build Output:**
-- The packaged app includes `backend/python-runtime/` with all dependencies
-- Users don't need Python or pip installed
-- The app is fully self-contained (except models if you excluded them)
-
-##### Step 5: Test the Packaged App
+##### Testing the packaged app
 
 ```bash
 # macOS - run from terminal to see logs
 open dist/mac-arm64/MusselCounter.app
-
-# Or double-click the .app in Finder
 ```
 
 Check logs if issues occur:
@@ -193,6 +162,23 @@ cat ~/Library/Application\ Support/MusselCounter/mussel-electron.log
 # Linux
 # Check ~/.config/MusselCounter/mussel-electron.log
 ```
+
+---
+
+#### Troubleshooting Packaged Apps
+
+**"Backend wasn't able to open" error:**
+- Ensure `backend/dist/mussel-backend(.exe)` exists before packaging
+- Rebuild using `scripts/build-all.ps1` or `scripts/build-all.sh`
+- View logs (see above)
+
+**App size is huge (>2GB):**
+- This is normal with PyTorch and ML dependencies
+- Consider excluding models and having users download them separately
+
+**Models not detected:**
+- Models are excluded by default - users must add them to `backend/data/models/` after installation
+- Or modify `electron/package.json` to include models in the build (increases installer size significantly)
 
 ---
 

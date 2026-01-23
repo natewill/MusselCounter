@@ -45,16 +45,9 @@ let frontendProcess;
 
 // Prefer a real Node.js binary; do NOT fall back to Electron
 function resolveNodePath() {
-  const bundledNodeDir = path.join(process.resourcesPath, 'node');
-  const bundledNode = process.platform === 'win32'
-    ? path.join(bundledNodeDir, 'node.exe')
-    : path.join(bundledNodeDir, 'bin', 'node');
-
   const candidates = [
     process.env.NODE_BINARY,
     process.env.NEXT_NODE_BINARY,
-    bundledNode,
-    path.join(process.resourcesPath, 'nodejs', 'node.exe'),
     path.join(frontendDir, 'node_modules', '.bin', process.platform === 'win32' ? 'node.exe' : 'node'),
   ];
 
@@ -352,16 +345,8 @@ function startFrontend() {
 
   log(`[frontend] hasStandalone=${hasStandalone} hasBuild=${hasBuild} useDevServer=${useDevServer}`);
 
-  const nodeCmd = resolveNodePath();
-  if (!nodeCmd) {
-    log('[frontend] No Node.js runtime found.');
-    dialog.showErrorBox(
-      'Node.js not found',
-      'Could not find a Node.js runtime to start the frontend. Install Node.js, or set NODE_BINARY/NEXT_NODE_BINARY to the Node path, or bundle Node with the app.'
-    );
-    app.quit();
-    return { proc: null, script: 'none' };
-  }
+  const nodeCmd = process.execPath;
+  log('[frontend] Using Electron bundled Node runtime (no fallback)');
 
   let args;
   let script;
@@ -419,7 +404,7 @@ function startFrontend() {
     HOSTNAME: HOST,
     PORT: String(FRONTEND_PORT),
   };
-  delete env.ELECTRON_RUN_AS_NODE;
+  env.ELECTRON_RUN_AS_NODE = '1';
 
   const proc = spawn(nodeCmd, args, {
     cwd: workingDir,

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
+import { getStoredFilename } from '@/utils/imageUtils';
 
 export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, flashingImageIds, greenHueImageIds, isRunning, currentThreshold, latestRun, recalculatedImages, sortBy, onSortChange, collectionId }) {
   // Sort images based on sortBy prop or green hue during runs

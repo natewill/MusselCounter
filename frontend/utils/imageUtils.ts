@@ -11,3 +11,13 @@ export function filterNonDuplicateIds(
   return uploadedImageIds.filter(id => !duplicateImageIds.includes(id));
 }
 
+/**
+ * Extract the filename from a stored path that may use \ or / separators.
+ */
+export function getStoredFilename(storedPath?: string | null): string | null {
+  if (!storedPath) return null;
+  const normalized = storedPath.replace(/\\/g, '/');
+  const filename = normalized.split('/').pop();
+  return filename || null;
+}
+

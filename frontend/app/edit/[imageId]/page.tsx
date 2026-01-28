@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { getImageDetails, updatePolygonClassification } from '@/lib/api';
+import { getStoredFilename } from '@/utils/imageUtils';
 import Link from 'next/link';
 import ImageHeader from '@/components/edit/ImageHeader';
 import ImageDisplay from '@/components/edit/ImageDisplay';
@@ -152,8 +153,9 @@ export default function ImageDetailPage() {
     );
   }
 
-  const imageUrl = imageData.stored_path
-    ? `http://127.0.0.1:8000/uploads/${imageData.stored_path.split('/').pop()}`
+  const filename = getStoredFilename(imageData?.stored_path);
+  const imageUrl = filename
+    ? `http://127.0.0.1:8000/uploads/${filename}`
     : null;
 
   // Filter polygons by threshold - only show detections above the threshold

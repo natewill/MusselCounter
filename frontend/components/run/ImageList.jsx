@@ -137,8 +137,9 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
             
             // Extract filename from stored_path for thumbnail URL
             // stored_path format: "data/uploads/{hash}_{filename}"
-            const thumbnailUrl = image.stored_path
-              ? `http://127.0.0.1:8000/uploads/${image.stored_path.split('/').pop()}`
+            const filename = getStoredFilename(image.stored_path);
+            const thumbnailUrl = filename
+              ? `http://127.0.0.1:8000/uploads/${filename}`
               : null;
             
             // Always allow navigation; edit mode can be disabled downstream if no results

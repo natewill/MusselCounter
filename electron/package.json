@@ -11,7 +11,7 @@
     "pack": "npm run icons && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --dir -c.mac.identity=-",
     "dist": "npm run icons && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder -c.mac.identity=-",
     "fetch-node-win": "node scripts/fetch-node-runtime.js --platform win32 --arch x64",
-    "dist:win": "npm run icons && npm run fetch-node-win && electron-builder --win",
+    "dist:win": "npm run icons && electron-builder --win",
     "dist:linux": "npm run icons && electron-builder --linux",
     "dist:all": "npm run icons && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac --win --linux -c.mac.identity=-",
     "dist:signed": "npm run icons && ulimit -n 4096 && electron-builder",
@@ -83,10 +83,6 @@
       "target": "nsis",
       "icon": "../frontend/public/icon.ico",
       "extraResources": [
-        {
-          "from": "../node-runtime/win32/node.exe",
-          "to": "node/node.exe"
-        },
         {
           "from": "../backend/dist/mussel-backend.exe",
           "to": "backend/mussel-backend.exe"

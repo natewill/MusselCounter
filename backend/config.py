@@ -14,9 +14,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # File upload settings
 UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", DATA_DIR / "uploads"))  # Directory where uploaded images are stored
-MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB - maximum size for uploaded image files
 MAX_MODEL_SIZE = 1024 * 1024 * 1024  # 1GB - maximum size for uploaded model files
-MAX_COLLECTION_SIZE = 1000  # Maximum number of images that can be in a single collection
 
 # Model settings
 _DEFAULT_MODELS_DIR = DATA_DIR / "models"

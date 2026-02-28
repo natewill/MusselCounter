@@ -51,21 +51,3 @@ def validate_file_size(file_size: int, max_size: int) -> None:
             detail=f"File is too large. Maximum file size is {max_size_mb}MB."
         )
 
-
-def validate_collection_size(file_count: int, max_count: int) -> None:
-    """
-    Validate collection size (number of files)
-    
-    Args:
-        file_count: Number of files in the collection
-        max_count: Maximum allowed number of files
-        
-    Raises:
-        HTTPException: If too many files
-    """
-    if file_count > max_count:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Too many files. Maximum {max_count} files allowed per upload."
-        )
-

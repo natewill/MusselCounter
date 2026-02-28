@@ -1,6 +1,6 @@
 """
 File processing utilities for uploads.
-- Validates file content and size
+- Validates file content
 - Deduplicates via content hash
 - Saves safely (race-proof) under UPLOAD_DIR
 """
@@ -13,7 +13,7 @@ import aiofiles
 from fastapi import UploadFile
 
 from utils.security import sanitize_filename, validate_path_in_directory
-from config import UPLOAD_DIR, MAX_FILE_SIZE
+from config import UPLOAD_DIR
 
 
 async def process_single_file(
@@ -32,11 +32,9 @@ async def process_single_file(
         except Exception:
             return None
 
-        # 2) read content once (simple + predictable); guard size
+        # 2) read content once (simple + predictable)
         content = await file.read()
         if not content:
-            return None
-        if len(content) > MAX_FILE_SIZE:
             return None
 
         # 3) basic type check by extension and MIME

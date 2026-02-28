@@ -17,7 +17,7 @@ Images are deduplicated by hash, so the same image file
 uploaded multiple times only stores one copy.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 import asyncio 
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, UploadFile, File #fastapi is the module we use to create the API that javascript can talk to
@@ -31,19 +31,16 @@ from utils.collection_utils import (
     get_latest_run_by_model,
     get_all_runs,
     remove_image_from_collection,
-) #functions imported from our utils folder
+) #functions imported from our utils folder to do sql logic
 from utils.image_utils import add_multiple_images_optimized
 from utils.file_processing import process_single_file
-from utils.validation import validate_file_size, validate_collection_size
-from api.schemas import CreateCollectionRequest, UpdateCollectionRequest, CollectionListResponse, UploadResponse
-from config import MAX_FILE_SIZE, MAX_COLLECTION_SIZE
 
 # Create router with prefix - all endpoints will be under /api/collections
 router = APIRouter(prefix="/api/collections", tags=["collections"])
 
 
-@router.post("", response_model=Dict[str, int])
-async def create_collection_endpoint(request: CreateCollectionRequest) -> Dict[str, int]:
+@router.post("") #if a POST request is sent to /api/collections, this function is called.
+async def create_collection_endpoint(request: dict):
     """
     creates a new collection.
 
@@ -52,21 +49,23 @@ async def create_collection_endpoint(request: CreateCollectionRequest) -> Dict[s
     """
     async with get_db() as db:
         now = datetime.now(timezone.utc).isoformat()
+        name = request.get("name")
+        description = request.get("description")
         cursor = await db.execute(
             """INSERT INTO collection (name, description, created_at)
                VALUES (?, ?, ?)""",
-            (request.name, request.description, now),
+            (name, description, now),
         ) #sql code for creating the collection
         await db.commit() 
         collection_id = cursor.lastrowid
         return {"collection_id": collection_id}
 
 
-@router.patch("/{collection_id}", response_model=Dict)
+@router.patch("/{collection_id}")
 async def update_collection_endpoint(
     collection_id: int,
-    request: UpdateCollectionRequest
-) -> Dict:
+    request: dict
+):
     """
     update a collection's name and/or description.
 
@@ -82,13 +81,16 @@ async def update_collection_endpoint(
         updates = []
         params = []
 
-        if request.name is not None:
-            updates.append("name = ?")
-            params.append(request.name)
+        name = request.get("name")
+        description = request.get("description")
 
-        if request.description is not None:
+        if name is not None:
+            updates.append("name = ?")
+            params.append(name)
+
+        if description is not None:
             updates.append("description = ?")
-            params.append(request.description)
+            params.append(description)
 
         if not updates:
             raise HTTPException(status_code=400, detail="No fields to update")
@@ -106,8 +108,8 @@ async def update_collection_endpoint(
         return dict(updated)
 
 
-@router.get("", response_model=List[CollectionListResponse])
-async def get_all_collections_endpoint() -> List[CollectionListResponse]:
+@router.get("")
+async def get_all_collections_endpoint():
     """
     Get all collections, ordered by creation date (newest first).
     
@@ -117,15 +119,11 @@ async def get_all_collections_endpoint() -> List[CollectionListResponse]:
         # Fetch all collections from database (ordered by created_at DESC)
         collections = await get_all_collections(db)
         
-        # Convert database rows to validated Pydantic response models
-        return [
-            CollectionListResponse.model_validate(dict[Any, Any](collection))
-            for collection in collections
-        ]
+        return [dict(collection) for collection in collections]
 
 
-@router.delete("/{collection_id}", response_model=Dict[str, Any])
-async def delete_collection_endpoint(collection_id: int) -> Dict[str, Any]:
+@router.delete("/{collection_id}")
+async def delete_collection_endpoint(collection_id: int):
     """
     Delete a collection and its associated runs/results.
 
@@ -179,11 +177,11 @@ async def delete_collection_endpoint(collection_id: int) -> Dict[str, Any]:
         return {"status": "deleted", "collection_id": collection_id}
 
 
-@router.get("/{collection_id}", response_model=Dict)
+@router.get("/{collection_id}")
 async def get_collection_endpoint(
     collection_id: int,
     model_id: Optional[int] = None
-) -> Dict:
+):
     """
     Get detailed information about a specific collection.
     
@@ -215,7 +213,7 @@ async def get_collection_endpoint(
         
         if latest_run:
             # If there's a latest run, get images with their results from that run
-            latest_run_dict = dict[Any, Any](latest_run)
+            latest_run_dict = dict(latest_run)
             images = await get_collection_images_with_results(
                 db,
                 collection_id,
@@ -238,12 +236,12 @@ async def get_collection_endpoint(
         }
 
 
-@router.get("/{collection_id}/recalculate", response_model=Dict)
+@router.get("/{collection_id}/recalculate")
 async def recalculate_threshold_endpoint(
     collection_id: int,
     threshold: float,
     model_id: int
-) -> Dict:
+):
     """
     Recalculate mussel counts for a new threshold without re-running the model.
     
@@ -293,17 +291,11 @@ async def recalculate_threshold_endpoint(
 
         run_id = run_row[0]
 
-        # Debug: Check how many detections exist for this run
-        debug_cursor = await db.execute(
-            "SELECT COUNT(*) FROM detection WHERE run_id = ?",
-            (run_id,)
-        )
-        detection_count = (await debug_cursor.fetchone())[0]
-
         # Query detections and recalculate counts with new threshold
         # Count logic:
         # - If class IS NOT NULL (manual override), always count it
         # - If class IS NULL (auto mode), count if confidence >= threshold
+        #This logic is for re-counting mussels while taking into account the "edited" mussels
         cursor = await db.execute(
             """SELECT
                    image_id,
@@ -364,6 +356,20 @@ async def recalculate_threshold_endpoint(
             (threshold, live_total, run_id)
         )
 
+        # Keep collection aggregate tied to latest run for this collection
+        await db.execute(
+            """UPDATE collection
+               SET live_mussel_count = COALESCE((
+                   SELECT r.live_mussel_count
+                   FROM run r
+                   WHERE r.collection_id = ?
+                   ORDER BY r.run_id DESC
+                   LIMIT 1
+               ), 0)
+               WHERE collection_id = ?""",
+            (collection_id, collection_id),
+        )
+
         await db.commit()
 
         return {
@@ -376,20 +382,19 @@ async def recalculate_threshold_endpoint(
         }
 
 
-@router.post("/{collection_id}/upload-images", response_model=UploadResponse)
+@router.post("/{collection_id}/upload-images")
 async def upload_images_endpoint(
     collection_id: int,
     files: List[UploadFile] = File(...)
-) -> UploadResponse:
+):
     """
     Upload multiple images to a collection.
     
     Process:
-    1. Validates collection exists
-    2. Validates file count and sizes
-    3. Processes each file in parallel (validates, hashes, saves to disk)
-    4. Adds images to collection using optimized bulk insert
-    5. Handles duplicates (same image already in collection)
+    1. Processes files (invalid files are skipped)
+    2. Processes each file in parallel (validates, hashes, saves to disk)
+    3. Adds images to collection using optimized bulk insert
+    4. Handles duplicates (same image already in collection)
     
     Returns:
     - image_ids: All image IDs (including duplicates)
@@ -402,18 +407,6 @@ async def upload_images_endpoint(
     """
     try:
         async with get_db() as db:
-            # Verify collection exists
-            if not await get_collection(db, collection_id):
-                raise HTTPException(status_code=404, detail="Collection not found")
-            
-            # Validate collection size (total number of files)
-            validate_collection_size(len(files), MAX_COLLECTION_SIZE)
-            
-            # Validate each file size
-            for file in files:
-                if file.size:
-                    validate_file_size(file.size, MAX_FILE_SIZE)
-            
             # Process all files in parallel for better performance
             # return_exceptions=True allows us to handle individual file errors gracefully
             results = await asyncio.gather(
@@ -440,25 +433,25 @@ async def upload_images_endpoint(
                 db, collection_id, image_data
             )
             
-            return UploadResponse(
-                collection_id=collection_id,
-                image_ids=image_ids,
-                count=len(image_ids),
-                added_count=added_count,
-                duplicate_count=duplicate_count,
-                duplicate_image_ids=duplicate_image_ids,
-            )
+            return {
+                "collection_id": collection_id,
+                "image_ids": image_ids,
+                "count": len(image_ids),
+                "added_count": added_count,
+                "duplicate_count": duplicate_count,
+                "duplicate_image_ids": duplicate_image_ids,
+            }
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Internal server error during upload: {exc}")
 
 
-@router.delete("/{collection_id}/images/{image_id}", response_model=Dict)
+@router.delete("/{collection_id}/images/{image_id}")
 async def delete_image_from_collection_endpoint(
     collection_id: int,
     image_id: int
-) -> Dict:
+):
     """
     Remove an image from a collection.
     
@@ -535,7 +528,7 @@ async def delete_image_from_collection_endpoint(
                            SELECT COUNT(*)
                            FROM collection_image
                            WHERE collection_id = ?
-                       ),
+                       )
                    WHERE collection_id = ?""",
                 (collection_live_count, collection_id, collection_id)
             )
@@ -547,7 +540,7 @@ async def delete_image_from_collection_endpoint(
                        SELECT COUNT(*)
                        FROM collection_image
                        WHERE collection_id = ?
-                   ),
+                   )
                    WHERE collection_id = ?""",
                 (collection_id, collection_id)
             )

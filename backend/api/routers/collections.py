@@ -1,23 +1,28 @@
 """
-Collection management API endpoints.
+API endpoints for dealing with "collections"
+collections are just historical data of results from running a model
+on a set of images
 
-This router handles all collection-related operations:
-- Creating new collections
-- Retrieving collection information and images
-- Uploading images to collections
-- Removing images from collections
+we used SQL as a database for the application, so this code connects 
+python to the SQL database
 
-A collection is a collection of images that can be processed together through
-inference runs. Images are deduplicated by hash, so the same image file
+this router (group of functions):
+- has a function for creating new collections
+- gathering information about a collection
+- uploading images to a collection
+- removing images from a collection
+
+
+Images are deduplicated by hash, so the same image file
 uploaded multiple times only stores one copy.
 """
+
 from typing import Any, Dict, List, Optional
-import asyncio
+import asyncio 
 from datetime import datetime, timezone
-from fastapi import APIRouter, HTTPException, UploadFile, File
-from db import get_db
+from fastapi import APIRouter, HTTPException, UploadFile, File #fastapi is the module we use to create the API that javascript can talk to
+from db import get_db #for sql
 from utils.collection_utils import (
-    create_collection,
     get_collection,
     get_all_collections,
     get_collection_images,
@@ -26,13 +31,12 @@ from utils.collection_utils import (
     get_latest_run_by_model,
     get_all_runs,
     remove_image_from_collection,
-)
+) #functions imported from our utils folder
 from utils.image_utils import add_multiple_images_optimized
 from utils.file_processing import process_single_file
 from utils.validation import validate_file_size, validate_collection_size
 from api.schemas import CreateCollectionRequest, UpdateCollectionRequest, CollectionListResponse, UploadResponse
 from config import MAX_FILE_SIZE, MAX_COLLECTION_SIZE
-from utils.security import validate_integer_id
 
 # Create router with prefix - all endpoints will be under /api/collections
 router = APIRouter(prefix="/api/collections", tags=["collections"])
@@ -41,13 +45,20 @@ router = APIRouter(prefix="/api/collections", tags=["collections"])
 @router.post("", response_model=Dict[str, int])
 async def create_collection_endpoint(request: CreateCollectionRequest) -> Dict[str, int]:
     """
-    Create a new collection.
+    creates a new collection.
 
-    A collection is a container for images that will be processed together.
-    Returns the ID of the newly created collection.
+    A collection is a group of images that will be processed together.
+    this function returns the ID of the newly created collection.
     """
     async with get_db() as db:
-        collection_id = await create_collection(db, request.name, request.description)
+        now = datetime.now(timezone.utc).isoformat()
+        cursor = await db.execute(
+            """INSERT INTO collection (name, description, created_at)
+               VALUES (?, ?, ?)""",
+            (request.name, request.description, now),
+        ) #sql code for creating the collection
+        await db.commit() 
+        collection_id = cursor.lastrowid
         return {"collection_id": collection_id}
 
 
@@ -57,11 +68,10 @@ async def update_collection_endpoint(
     request: UpdateCollectionRequest
 ) -> Dict:
     """
-    Update a collection's name and/or description.
+    update a collection's name and/or description.
 
     Only provided fields will be updated.
     """
-    collection_id = validate_integer_id(collection_id)
     async with get_db() as db:
         # Check collection exists
         collection = await get_collection(db, collection_id)
@@ -83,9 +93,6 @@ async def update_collection_endpoint(
         if not updates:
             raise HTTPException(status_code=400, detail="No fields to update")
 
-        # Add updated_at timestamp
-        updates.append("updated_at = ?")
-        params.append(datetime.now(timezone.utc).isoformat())
         params.append(collection_id)
 
         await db.execute(
@@ -124,8 +131,6 @@ async def delete_collection_endpoint(collection_id: int) -> Dict[str, Any]:
 
     Images remain in the database; only the collection links and run data are removed.
     """
-    collection_id = validate_integer_id(collection_id)
-
     async with get_db() as db:
         collection = await get_collection(db, collection_id)
         if not collection:
@@ -197,7 +202,6 @@ async def get_collection_endpoint(
     If a latest run exists, images include their inference results from that run.
     Otherwise, images are returned without results.
     """
-    collection_id = validate_integer_id(collection_id)
     async with get_db() as db:
         collection = await get_collection(db, collection_id)
         if not collection:
@@ -205,7 +209,6 @@ async def get_collection_endpoint(
         
         # Get latest run - either for specific model or overall latest
         if model_id is not None:
-            model_id = validate_integer_id(model_id)
             latest_run = await get_latest_run_by_model(db, collection_id, model_id)
         else:
             latest_run = await get_latest_run(db, collection_id)
@@ -262,9 +265,6 @@ async def recalculate_threshold_endpoint(
             "run_id": int or None
         }
     """
-    collection_id = validate_integer_id(collection_id)
-    model_id = validate_integer_id(model_id)
-
     if threshold < 0 or threshold > 1:
         raise HTTPException(status_code=400, detail="Threshold must be between 0 and 1")
 
@@ -400,7 +400,6 @@ async def upload_images_endpoint(
     Images are deduplicated by MD5 hash, so uploading the same file twice
     only stores one copy but links it to the collection.
     """
-    collection_id = validate_integer_id(collection_id)
     try:
         async with get_db() as db:
             # Verify collection exists
@@ -469,8 +468,6 @@ async def delete_image_from_collection_endpoint(
     After removal, recalculates mussel counts for all runs that processed this image
     and updates the collection's total count.
     """
-    collection_id = validate_integer_id(collection_id)
-    image_id = validate_integer_id(image_id)
     async with get_db() as db:
         if not await get_collection(db, collection_id):
             raise HTTPException(status_code=404, detail="Collection not found")
@@ -529,7 +526,6 @@ async def delete_image_from_collection_endpoint(
         
         # Update collection's live_mussel_count from latest run (if exists)
         latest_run = await get_latest_run(db, collection_id)
-        now = datetime.now(timezone.utc).isoformat()
         if latest_run:
             collection_live_count = latest_run['live_mussel_count'] or 0
             await db.execute(
@@ -540,9 +536,8 @@ async def delete_image_from_collection_endpoint(
                            FROM collection_image
                            WHERE collection_id = ?
                        ),
-                       updated_at = ?
                    WHERE collection_id = ?""",
-                (collection_live_count, collection_id, now, collection_id)
+                (collection_live_count, collection_id, collection_id)
             )
         else:
             # No runs exist, just update image_count
@@ -553,9 +548,8 @@ async def delete_image_from_collection_endpoint(
                        FROM collection_image
                        WHERE collection_id = ?
                    ),
-                   updated_at = ?
                    WHERE collection_id = ?""",
-                (collection_id, now, collection_id)
+                (collection_id, collection_id)
             )
 
         await db.commit()

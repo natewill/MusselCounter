@@ -62,9 +62,9 @@ async def add_image_to_collection(
     try:
         # Insert image if new; ignore if exists.
         await db.execute(
-            "INSERT OR IGNORE INTO image (filename, stored_path, file_hash, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (filename or p.name, str(p), file_hash, now, now),
+            "INSERT OR IGNORE INTO image (filename, stored_path, file_hash, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (filename or p.name, str(p), file_hash, now),
         )
 
         # Retrieve its id
@@ -109,11 +109,11 @@ async def add_multiple_images_optimized(
     try:
         # 1) Ensure all images exist (dedupe via UNIQUE(file_hash))
         to_insert = [
-            (fn or Path(fp).name, fp, h, now, now) for (fp, fn, h) in image_data
+            (fn or Path(fp).name, fp, h, now) for (fp, fn, h) in image_data
         ]
         await db.executemany(
-            "INSERT OR IGNORE INTO image (filename, stored_path, file_hash, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?)",
+            "INSERT OR IGNORE INTO image (filename, stored_path, file_hash, created_at) "
+            "VALUES (?, ?, ?, ?)",
             to_insert,
         )
 
@@ -155,10 +155,9 @@ async def add_multiple_images_optimized(
                        SELECT COUNT(*)
                        FROM collection_image
                        WHERE collection_id = ?
-                   ),
-                   updated_at = ?
+                   )
                    WHERE collection_id = ?""",
-                (collection_id, now, collection_id)
+                (collection_id, collection_id)
             )
 
         await db.commit()

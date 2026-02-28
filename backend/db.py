@@ -49,15 +49,14 @@ async def _initialize_models(db: aiosqlite.Connection):
             # Add model to database (batch size will be detected on first load)
             now = datetime.now(timezone.utc).isoformat()
             await db.execute(
-                """INSERT INTO model (name, type, weights_path, description, optimal_batch_size, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO model (name, type, weights_path, description, optimal_batch_size, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
                 (
                     model_file.stem,
                     model_type,
                     str(model_file),
                     f"Auto-detected {model_type} model",
                     8,  # Default value (will be detected and cached on first load)
-                    now,
                     now
                 )
             )

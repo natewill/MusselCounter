@@ -228,8 +228,8 @@ async def _handle_all_images_processed(db: aiosqlite.Connection, run_id: int, co
         (now, total_images, total_images, total_live_count, run_id)
     )
     await db.execute(
-        "UPDATE collection SET live_mussel_count = ?, updated_at = ? WHERE collection_id = ?",
-        (total_live_count, now, collection_id)
+        "UPDATE collection SET live_mussel_count = ? WHERE collection_id = ?",
+        (total_live_count, collection_id)
     )
     await db.commit()
 
@@ -335,11 +335,11 @@ async def _process_batch_inference(
             processed_count += len(batch_result)
             if updates:
                 async with aiosqlite.connect(db_path) as db_batch:
-                    dimension_updates = [(width, height, datetime.now(timezone.utc).isoformat(), image_id) 
+                    dimension_updates = [(width, height, image_id)
                                         for _, _, _, _, width, height, image_id in updates]
                     await db_batch.executemany(
                         """UPDATE image 
-                           SET width = ?, height = ?, updated_at = ?
+                           SET width = ?, height = ?
                            WHERE image_id = ?""",
                         dimension_updates
                     )
@@ -475,8 +475,8 @@ async def _finalize_run(
     
     # Update collection live_mussel_count from run's count
     await db.execute(
-        "UPDATE collection SET live_mussel_count = ?, updated_at = ? WHERE collection_id = ?",
-        (total_live_count, datetime.now(timezone.utc).isoformat(), collection_id)
+        "UPDATE collection SET live_mussel_count = ? WHERE collection_id = ?",
+        (total_live_count, collection_id)
     )
     
     await db.commit()

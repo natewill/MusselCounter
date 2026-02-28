@@ -68,10 +68,3 @@ def validate_path_in_directory(file_path: Path, allowed_dir: Path) -> Path:
     except (OSError, ValueError):
         raise HTTPException(status_code=403, detail="Access denied")
 
-
-def validate_integer_id(value: int, min_value: int = 1, max_value: int = 2**31 - 1) -> int:
-    """Validate integer ID"""
-    if not isinstance(value, int) or value < min_value or value > max_value:
-        raise HTTPException(status_code=400, detail="Invalid ID")
-    return value
-

@@ -243,7 +243,6 @@ results = model.detect(image, threshold=0.5)
 - name ("Beach Survey 2024")
 - description (optional)
 - created_at
-- updated_at
 ```
 
 **image**

@@ -1,37 +1,9 @@
 """
 Collection utility functions for managing collections and their images.
-Handles collection creation, image retrieval with results, and collection operations.
+Handles collection retrieval, image retrieval with results, and collection operations.
 """
 from collections import defaultdict
-from datetime import datetime, timezone
 import aiosqlite
-
-
-async def create_collection(
-    db: aiosqlite.Connection,
-    name: str = None,
-    description: str = None
-) -> int:
-    """
-    Create a new collection.
-    
-    Args:
-        db: Database connection
-        name: Optional collection name
-        description: Optional collection description
-        
-    Returns:
-        Collection ID of the created collection
-    """
-    now = datetime.now(timezone.utc).isoformat()
-    cursor = await db.execute(
-        """INSERT INTO collection (name, description, created_at, updated_at)
-           VALUES (?, ?, ?, ?)""",
-        (name, description, now, now)
-    )
-    await db.commit()
-
-    return cursor.lastrowid
 
 
 async def get_collection(db: aiosqlite.Connection, collection_id: int):
@@ -169,7 +141,6 @@ async def get_collection_images_with_results(
             i.width,
             i.height,
             i.created_at,
-            i.updated_at,
             ci.added_at,
             l.live_mussel_count,
             l.dead_mussel_count,
@@ -204,7 +175,6 @@ async def get_collection_images_with_results(
             i.width,
             i.height,
             i.created_at,
-            i.updated_at,
             ci.added_at,
             l.live_mussel_count,
             l.dead_mussel_count,
@@ -250,17 +220,15 @@ async def remove_image_from_collection(
     )
 
     # Update collection's image_count
-    now = datetime.now(timezone.utc).isoformat()
     await db.execute(
         """UPDATE collection
            SET image_count = (
                SELECT COUNT(*)
                FROM collection_image
                WHERE collection_id = ?
-           ),
-           updated_at = ?
+           )
            WHERE collection_id = ?""",
-        (collection_id, now, collection_id)
+        (collection_id, collection_id)
     )
 
     await db.commit()
@@ -320,35 +288,3 @@ async def get_all_runs(db: aiosqlite.Connection, collection_id: int):
         (collection_id,)
     )
     return await cursor.fetchall()
-
-
-async def update_collection(
-    db: aiosqlite.Connection,
-    collection_id: int,
-    name: str = None,
-    description: str = None
-):
-    """
-    Update collection name and/or description.
-    
-    Args:
-        db: Database connection
-        collection_id: Collection ID to update
-        name: Optional new name (only updates if provided)
-        description: Optional new description (only updates if provided)
-    """
-    updates = []
-    values = []
-    if name is not None:
-        updates.append("name = ?")
-        values.append(name)
-    if description is not None:
-        updates.append("description = ?")
-        values.append(description)
-    if updates:
-        updates.append("updated_at = ?")
-        values.append(datetime.now(timezone.utc).isoformat())
-        values.append(collection_id)
-        query = f"UPDATE collection SET {', '.join(updates)} WHERE collection_id = ?"
-        await db.execute(query, values)
-        await db.commit()

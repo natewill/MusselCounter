@@ -40,7 +40,6 @@ class CollectionResponse(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     created_at: str
-    updated_at: str
     image_count: int = 0
     live_mussel_count: int = 0
 
@@ -70,7 +69,6 @@ class ModelResponse(BaseModel):
     weights_path: str
     description: Optional[str] = None
     created_at: str
-    updated_at: str
 
 
 class RunResponse(BaseModel):
@@ -101,7 +99,6 @@ class ImageResponse(BaseModel):
     width: Optional[int] = None
     height: Optional[int] = None
     created_at: str
-    updated_at: str
     processed_model_ids: List[int] = Field(default_factory=list)
 
 

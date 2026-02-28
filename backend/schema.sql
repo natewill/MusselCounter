@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS collection (
   name          TEXT,
   description   TEXT,
   created_at    TEXT NOT NULL,             -- SQLite uses TEXT for dates (ISO format)
-  updated_at    TEXT NOT NULL,
   image_count   INTEGER DEFAULT 0,         -- Calculated field, not a foreign key
   live_mussel_count INTEGER DEFAULT 0    -- From latest run
 );
@@ -17,8 +16,7 @@ CREATE TABLE IF NOT EXISTS image (
   file_hash   TEXT UNIQUE,               -- MD5 hash for deduplication (UNIQUE ensures no duplicates)
   width       INTEGER,
   height      INTEGER,
-  created_at  TEXT NOT NULL,             -- SQLite uses TEXT for dates (ISO format)
-  updated_at  TEXT NOT NULL
+  created_at  TEXT NOT NULL              -- SQLite uses TEXT for dates (ISO format)
 );
 
 -- COLLECTION_IMAGE: junction table linking collections to images (many-to-many)
@@ -42,8 +40,7 @@ CREATE TABLE IF NOT EXISTS model (
   weights_path  TEXT NOT NULL,             -- local path to .pt or .pth file
   description   TEXT,
   optimal_batch_size INTEGER DEFAULT 8,    -- detected optimal batch size for inference
-  created_at    TEXT NOT NULL,            -- SQLite uses TEXT for dates (ISO format)
-  updated_at    TEXT NOT NULL
+  created_at    TEXT NOT NULL            -- SQLite uses TEXT for dates (ISO format)
 );
 
 -- RUN: each inference run on a collection (can use different models)

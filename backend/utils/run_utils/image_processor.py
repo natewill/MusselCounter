@@ -190,8 +190,8 @@ async def process_image_for_run(
         now = datetime.now(timezone.utc).isoformat()
         async with aiosqlite.connect(db_path) as db:
             await db.execute(
-                """UPDATE image SET width = ?, height = ?, updated_at = ? WHERE image_id = ?""",
-                (result["image_width"], result["image_height"], now, image_id),
+                """UPDATE image SET width = ?, height = ? WHERE image_id = ?""",
+                (result["image_width"], result["image_height"], image_id),
             )
             await db.execute(
                 """INSERT OR REPLACE INTO image_result

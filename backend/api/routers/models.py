@@ -11,7 +11,7 @@ import aiofiles
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from db import get_db
 from utils.model_utils import get_all_models, get_model
-from utils.security import validate_integer_id, sanitize_filename, validate_path_in_directory
+from utils.security import sanitize_filename, validate_path_in_directory
 from utils.validation import validate_file_size
 from api.schemas import ModelResponse
 from config import MODELS_DIR, MAX_MODEL_SIZE
@@ -34,9 +34,6 @@ async def get_all_models_endpoint() -> List[ModelResponse]:
 @router.get("/{model_id}", response_model=ModelResponse)
 async def get_model_endpoint(model_id: int) -> ModelResponse:
     """Get model information"""
-    # Validate model_id
-    model_id = validate_integer_id(model_id)
-
     async with get_db() as db:
         model = await get_model(db, model_id)
         if not model:
@@ -126,15 +123,14 @@ async def create_model_endpoint(
 
         now = datetime.now(timezone.utc).isoformat()
         cursor = await db.execute(
-            """INSERT INTO model (name, type, weights_path, description, optimal_batch_size, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO model (name, type, weights_path, description, optimal_batch_size, created_at)
+               VALUES (?, ?, ?, ?, ?, ?)""",
             (
                 model_name,
                 model_type,
                 str(file_path),
                 description or f"Uploaded {model_type} model",
                 8,
-                now,
                 now
             )
         )

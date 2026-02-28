@@ -8,7 +8,6 @@ export interface CollectionSummary {
   image_count: number;
   live_mussel_count?: number;
   created_at: string;
-  updated_at?: string;
   first_image_path?: string | null;
   latest_run_status?: string | null;
   run_count?: number;

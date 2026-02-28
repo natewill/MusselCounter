@@ -18,7 +18,6 @@ from utils.model_utils import get_model
 from utils.run_utils import get_or_create_run, process_collection_run, get_run, update_run_status
 from utils.validation import validate_threshold
 from api.schemas import StartRunRequest, RunResponse
-from utils.security import validate_integer_id
 
 router = APIRouter(prefix="/api", tags=["runs"])
 
@@ -34,8 +33,6 @@ async def get_run_endpoint(run_id: int) -> RunResponse:
     - Results (live_mussel_count, dead_mussel_count)
     - Timestamps (started_at, finished_at)
     """
-    run_id = validate_integer_id(run_id)
-
     async with get_db() as db:
         run = await get_run(db, run_id)
         if not run:
@@ -61,10 +58,6 @@ async def start_run_endpoint(
 
     Returns the run ID and initial status ("pending") immediately.
     """
-    # Validate IDs to prevent injection attacks
-    collection_id = validate_integer_id(collection_id)
-    run_request.model_id = validate_integer_id(run_request.model_id)
-
     async with get_db() as db:
         # Verify collection exists
         collection = await get_collection(db, collection_id)
@@ -117,8 +110,6 @@ async def stop_run_endpoint(run_id: int) -> RunResponse:
     
     Returns the updated run information with status 'cancelled'.
     """
-    run_id = validate_integer_id(run_id)
-    
     async with get_db() as db:
         # Get the run to check its current status
         run = await get_run(db, run_id)

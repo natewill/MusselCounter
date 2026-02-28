@@ -11,7 +11,6 @@ from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
 from db import get_db
-from utils.security import validate_integer_id
 from datetime import datetime, timezone
 
 router = APIRouter(prefix="/api/images", tags=["images"])
@@ -81,10 +80,6 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
         HTTPException 404: If image result not found
         HTTPException 400: If invalid IDs provided
     """
-    image_id = validate_integer_id(image_id)
-    model_id = validate_integer_id(model_id)
-    collection_id = validate_integer_id(collection_id) if collection_id is not None else None
-    
     async with get_db() as db:
         # Get main image and result data
         collection_filter = "AND r.collection_id = ?" if collection_id is not None else ""
@@ -294,12 +289,6 @@ async def update_polygon_classification(
     Returns:
         Updated image result data
     """
-    from utils.security import validate_integer_id
-
-    image_id = validate_integer_id(image_id)
-    model_id = validate_integer_id(model_id)
-    collection_id = validate_integer_id(collection_id) if collection_id is not None else None
-
     if new_class not in ["live", "dead"]:
         raise HTTPException(status_code=400, detail="Classification must be 'live' or 'dead'")
 

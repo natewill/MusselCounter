@@ -8,7 +8,6 @@ interface Polygon {
 
 interface BoundingBoxesOverlayProps {
   polygons: Polygon[];
-  scale: { scaleX: number; scaleY: number };
   isEditMode: boolean;
   editingPolygonIndex: number | null;
   onPolygonClick: (index: number) => void;
@@ -46,7 +45,6 @@ function convertBboxToCoords(bbox: number[]) {
 
 export default function BoundingBoxesOverlay({
   polygons,
-  scale,
   isEditMode,
   editingPolygonIndex,
   onPolygonClick,
@@ -60,17 +58,13 @@ export default function BoundingBoxesOverlay({
     >
       {polygons.map((polygon: Polygon, index: number) => {
         const coords = convertBboxToCoords(polygon.bbox);
-        const scaledCoords = coords.map((coord: number[]) => [
-          coord[0] * scale.scaleX,
-          coord[1] * scale.scaleY,
-        ]);
-        const bounds = getPolygonBounds(scaledCoords);
+        const bounds = getPolygonBounds(coords);
 
-        if (!bounds || scaledCoords.length === 0) {
+        if (!bounds || coords.length === 0) {
           return null;
         }
 
-        const pathData = scaledCoords
+        const pathData = coords
           .map((coord: number[], i: number) => 
             `${i === 0 ? 'M' : 'L'} ${coord[0]} ${coord[1]}`
           )

@@ -9,7 +9,6 @@ import { useImageUpload } from '@/hooks/useImageUpload';
 import { useImageDelete } from '@/hooks/useImageDelete';
 import { useStartRun } from '@/hooks/useStartRun';
 import { useStopRun } from '@/hooks/useStopRun';
-import { useRunState } from '@/hooks/useRunState';
 import { useThresholdRecalculation } from '@/hooks/useThresholdRecalculation';
 import PageHeader from '@/components/run/PageHeader';
 import CollectionTotals from '@/components/run/CollectionTotals';
@@ -32,9 +31,10 @@ export default function RunResultsPage() {
   const pathname = usePathname();
   const collectionId = parseInt(Array.isArray(params.collectionId) ? params.collectionId[0] : params.collectionId || '0', 10);
 
-  // Parse initial model from URL for first render
   const urlModelId = searchParams.get('modelId');
-  const initialModelId = urlModelId ? parseInt(urlModelId, 10) : null;
+  const parsedModelId = urlModelId ? parseInt(urlModelId, 10) : NaN;
+  const selectedModelId =
+    Number.isInteger(parsedModelId) && parsedModelId > 0 ? parsedModelId : null;
   const sortBy = searchParams.get('sort') || '';
   
   const fileInputRef = useRef(null);
@@ -44,14 +44,11 @@ export default function RunResultsPage() {
   const [runErrorDismissed, setRunErrorDismissed] = useState(false);
 
   // Custom hooks
-  const { models, selectedModelId, setSelectedModelId } = useModels(initialModelId);
-  const { collectionId: resolvedCollectionId, collectionData, collection, images, latestRun, isRunning, serverTime, threshold, setThreshold, loading, error, setError, setLoading, refetch } = useCollectionData(collectionId, selectedModelId);
+  const { models } = useModels();
+  const { collectionData, collection, images, latestRun, isRunning, threshold, setThreshold, loading, error, setError, setLoading, refetch } = useCollectionData(collectionId, selectedModelId);
   const { successMessage, setSuccessMessage, recentlyUploadedImageIds, setRecentlyUploadedImageIds } = useStorageData();
   const { uploading, handleFileInputChange } = useImageUpload(collectionId, setError, setLoading, setRecentlyUploadedImageIds, setSuccessMessage);
-  const { deletingImageId, handleDeleteImage } = useImageDelete(collectionId, setError, isRunning);
-
-  // Use custom hook for run state management (flashing, green hue, etc.)
-  const { flashingImageIds, greenHueImageIds } = useRunState(collectionData, recentlyUploadedImageIds, setRecentlyUploadedImageIds);
+  const { deletingImageId, handleDeleteImage } = useImageDelete(collectionId, setError, isRunning, refetch);
   
   // Handle starting new run
   const { handleStartNewRun } = useStartRun(collectionId, selectedModelId, threshold, loading, setLoading, setError);
@@ -75,15 +72,12 @@ export default function RunResultsPage() {
   );
   const runFailureMsg = latestRun?.status === 'failed' ? (latestRun.error_msg || 'Run failed') : null;
 
-  const lastUrlModelIdRef = useRef<string | null>(null);
-  const initializedFromUrlRef = useRef(false);
-
   // Extract unique models that have been run on this collection
   const modelsUsed = useMemo(() => {
     if (!collectionData?.all_runs || !models) return [];
     
     const uniqueModelIds = new Set(
-      collectionData.all_runs.map((run: any) => run.model_id)
+      collectionData.all_runs.map((run: { model_id: number }) => run.model_id)
     );
     
     return models
@@ -91,21 +85,21 @@ export default function RunResultsPage() {
       .map((model) => model.name);
   }, [collectionData?.all_runs, models]);
 
-  // One-time sync from ?modelId= in URL to picker
+  // URL is the source of truth for model selection.
+  // If modelId is missing or invalid, default to the first available model and write it to URL.
   useEffect(() => {
-    if (initializedFromUrlRef.current) return;
+    if (models.length === 0) return;
+    const hasValidModel = selectedModelId !== null && models.some((m) => m.model_id === selectedModelId);
+    if (hasValidModel) return;
+    const firstModelId = models[0]?.model_id;
+    if (!firstModelId) return;
 
-    const urlModelId = searchParams.get('modelId');
-    initializedFromUrlRef.current = true;
-
-    if (urlModelId) {
-      lastUrlModelIdRef.current = urlModelId;
-      const parsed = parseInt(urlModelId, 10);
-      if (!Number.isNaN(parsed)) {
-        setSelectedModelId(parsed);
-      }
-    }
-  }, [searchParams, setSelectedModelId]);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('modelId', String(firstModelId));
+    const query = params.toString();
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    router.replace(`${pathname}${query ? `?${query}` : ''}${hash}`);
+  }, [selectedModelId, models, searchParams, router, pathname]);
 
   const handleSortChange = (newSort: string) => {
     const params = new URLSearchParams(searchParams.toString());
@@ -139,19 +133,17 @@ export default function RunResultsPage() {
     }
   }, [images]);
 
-  // Keep URL in sync when picker changes
-  useEffect(() => {
-    if (selectedModelId === null) return;
-
-    const currentUrlModelId = searchParams.get('modelId');
-    const currentParsed = currentUrlModelId ? parseInt(currentUrlModelId, 10) : null;
-
-    if (currentParsed === selectedModelId) return;
-
+  const handleModelChange = (newModelId: number) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set('modelId', selectedModelId.toString());
-    router.replace(`${pathname}?${params.toString()}`);
-  }, [selectedModelId, searchParams, router, pathname]);
+    if (Number.isInteger(newModelId) && newModelId > 0) {
+      params.set('modelId', String(newModelId));
+    } else {
+      params.delete('modelId');
+    }
+    const query = params.toString();
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    router.replace(`${pathname}${query ? `?${query}` : ''}${hash}`);
+  };
 
   // Collection name editing handlers
   const handleStartEdit = () => {
@@ -320,7 +312,7 @@ export default function RunResultsPage() {
             }
             models={models}
             selectedModelId={selectedModelId}
-            onModelChange={setSelectedModelId}
+            onModelChange={handleModelChange}
             imageCount={images.length}
             isRecalculating={isRecalculating}
             hasRecalculatedData={hasRecalculatedData}
@@ -333,12 +325,9 @@ export default function RunResultsPage() {
           onDeleteImage={handleDeleteImage}
           deletingImageId={deletingImageId}
           selectedModelId={selectedModelId}
-          flashingImageIds={flashingImageIds}
-          greenHueImageIds={greenHueImageIds}
           sortBy={sortBy}
           onSortChange={handleSortChange}
           isRunning={isRunning}
-          currentThreshold={threshold}
           latestRun={latestRun}
           recalculatedImages={recalculatedImages}
           collectionId={collectionId}

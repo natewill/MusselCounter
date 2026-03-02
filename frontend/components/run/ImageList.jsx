@@ -1,17 +1,16 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
 
-export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, flashingImageIds, greenHueImageIds, isRunning, currentThreshold, latestRun, recalculatedImages, sortBy, onSortChange, collectionId }) {
-  // Sort images based on sortBy prop or green hue during runs
+export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, isRunning, latestRun, recalculatedImages, sortBy, onSortChange, collectionId }) {
+  // Sort images based on explicit user sort selection.
   const sortedImages = useMemo(() => {
     let sorted = [...images];
 
-    // Apply user-selected sort if provided
     if (sortBy === 'live_count') {
       sorted.sort((a, b) => {
         const aCount = recalculatedImages?.[a.image_id]?.live_mussel_count ?? a.live_mussel_count ?? 0;
         const bCount = recalculatedImages?.[b.image_id]?.live_mussel_count ?? b.live_mussel_count ?? 0;
-        return bCount - aCount; // Descending order (highest first)
+        return bCount - aCount;
       });
     } else if (sortBy === 'name') {
       sorted.sort((a, b) => {
@@ -21,69 +20,11 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
       });
     }
 
-    // During a run, prioritize green hue images if no explicit sort is set
-    if (!sortBy && isRunning && greenHueImageIds && greenHueImageIds.size > 0) {
-      sorted.sort((a, b) => {
-        const aHasGreenHue = greenHueImageIds.has(a.image_id);
-        const bHasGreenHue = greenHueImageIds.has(b.image_id);
-
-        // Images with green hue come first
-        if (aHasGreenHue && !bHasGreenHue) return -1;
-        if (!aHasGreenHue && bHasGreenHue) return 1;
-
-        return 0;
-      });
-    }
-
     return sorted;
-  }, [images, greenHueImageIds, isRunning, sortBy, recalculatedImages]);
+  }, [images, sortBy, recalculatedImages]);
 
   return (
-    <>
-      <style>{`
-        @keyframes greenFlash {
-          0% {
-            background-color: rgba(34, 197, 94, 0.1);
-            border-color: rgba(34, 197, 94, 0.4);
-          }
-          50% {
-            background-color: rgba(34, 197, 94, 0.15);
-            border-color: rgba(34, 197, 94, 0.6);
-          }
-          100% {
-            background-color: transparent;
-            border-color: transparent;
-          }
-        }
-        .green-flash {
-          animation: greenFlash 1s ease-out;
-        }
-        .green-hue {
-          background-color: rgba(34, 197, 94, 0.15);
-          border-color: rgba(34, 197, 94, 0.5);
-        }
-        @media (prefers-color-scheme: dark) {
-          @keyframes greenFlash {
-            0% {
-              background-color: rgba(34, 197, 94, 0.08);
-              border-color: rgba(34, 197, 94, 0.3);
-            }
-            50% {
-              background-color: rgba(34, 197, 94, 0.12);
-              border-color: rgba(34, 197, 94, 0.5);
-            }
-            100% {
-              background-color: transparent;
-              border-color: transparent;
-            }
-          }
-          .green-hue {
-            background-color: rgba(34, 197, 94, 0.12);
-            border-color: rgba(34, 197, 94, 0.4);
-          }
-        }
-      `}</style>
-      <div className="bg-white dark:bg-zinc-900 rounded-lg p-6 border border-zinc-200 dark:border-zinc-800">
+    <div className="bg-white dark:bg-zinc-900 rounded-lg p-6 border border-zinc-200 dark:border-zinc-800">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-semibold text-zinc-900 dark:text-zinc-100">
           Images ({images.length})
@@ -123,17 +64,8 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
             // With threshold recalculation, we only need to check if processed with selected model
             // Threshold changes no longer require re-running the model
             const hasValidResults = hasResults && isProcessedWithSelectedModel;
-            
-            // Check if this image should flash green (final flash on completion)
-            const isFlashing = flashingImageIds && flashingImageIds.has(image.image_id);
-            // Check if this image should have persistent green hue (during run only)
-            // Show green hue for images in greenHueImageIds (processed in current run, including with new threshold) AND run is active
-            const hasGreenHue = isRunning && (greenHueImageIds && greenHueImageIds.has(image.image_id));
-            
-            // Show orange hue if a model is selected AND image doesn't have green hue AND doesn't have valid results
-            // Valid results = processed with current model + current threshold
-            // This means changing models or thresholds will bring back the orange hue
-            const needsProcessing = selectedModelId && !hasGreenHue && !hasValidResults;
+            const isProcessed = Boolean(selectedModelId) && Boolean(hasValidResults);
+            const needsProcessing = Boolean(selectedModelId) && !hasValidResults;
             
             // Extract filename from stored_path for thumbnail URL
             // stored_path format: "data/uploads/{hash}_{filename}"
@@ -152,12 +84,10 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
                 id={`image-card-${image.image_id}`}
                 href={modelIdForLink && collectionIdForLink ? `/edit/${image.image_id}?modelId=${modelIdForLink}&collectionId=${collectionIdForLink}${sortParam ? `&sort=${encodeURIComponent(sortParam)}` : ''}` : '#'}
                 className={`block border rounded-lg overflow-hidden hover:bg-zinc-50 dark:hover:bg-zinc-800 transition-colors relative ${
-                  isFlashing
-                    ? 'green-flash'
-                    : hasGreenHue
-                    ? 'green-hue'
-                    : needsProcessing
+                  needsProcessing
                     ? 'border-amber-300 dark:border-amber-700 bg-amber-50/20 dark:bg-amber-900/15 ring-2 ring-amber-300/20 dark:ring-amber-700/20'
+                    : isProcessed
+                    ? 'border-green-300 dark:border-green-700 bg-green-50/20 dark:bg-green-900/15 ring-2 ring-green-300/20 dark:ring-green-700/20'
                     : 'border-zinc-200 dark:border-zinc-800 hover:shadow-md'
                 } ${!modelIdForLink || !collectionIdForLink ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}
                 onClick={(e) => {
@@ -242,7 +172,6 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
           })}
         </div>
       )}
-      </div>
-    </>
+    </div>
   );
 }

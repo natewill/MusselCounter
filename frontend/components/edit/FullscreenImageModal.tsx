@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import BoundingBoxesOverlay from './BoundingBoxesOverlay';
 
 interface Polygon {
@@ -14,14 +14,12 @@ interface FullscreenImageModalProps {
   imageUrl: string;
   filename: string;
   polygons: Polygon[];
-  scale: { scaleX: number; scaleY: number };
   isEditMode: boolean;
   editingPolygonIndex: number | null;
   visiblePolygons: boolean;
   onClose: () => void;
   onPolygonClick: (index: number) => void;
   onPolygonHover: (index: number | null) => void;
-  imageRef?: React.RefObject<HTMLImageElement>;
 }
 
 export default function FullscreenImageModal({
@@ -29,17 +27,13 @@ export default function FullscreenImageModal({
   imageUrl,
   filename,
   polygons,
-  scale,
   isEditMode,
   editingPolygonIndex,
   visiblePolygons,
   onClose,
   onPolygonClick,
   onPolygonHover,
-  imageRef,
 }: FullscreenImageModalProps) {
-  const fullscreenContainerRef = useRef<HTMLDivElement>(null);
-
   // Add ESC key handler to close fullscreen
   useEffect(() => {
     if (!isOpen) return;
@@ -74,28 +68,26 @@ export default function FullscreenImageModal({
 
       {/* Image container */}
       <div
-        className="relative max-w-full max-h-full"
+        className="relative max-w-[95vw] max-h-[95vh] overflow-auto"
         onClick={(e) => e.stopPropagation()}
-        ref={fullscreenContainerRef}
       >
-        {/* Image */}
-        <img
-          ref={imageRef}
-          src={imageUrl}
-          alt={filename}
-          className="max-w-full max-h-[95vh] object-contain rounded"
-        />
-        
-        {visiblePolygons && (
-          <BoundingBoxesOverlay
-            polygons={polygons}
-            scale={scale}
-            isEditMode={isEditMode}
-            editingPolygonIndex={editingPolygonIndex}
-            onPolygonClick={onPolygonClick}
-            onPolygonHover={onPolygonHover}
+        <div className="relative inline-block">
+          <img
+            src={imageUrl}
+            alt={filename}
+            className="block max-w-none max-h-none rounded"
           />
-        )}
+
+          {visiblePolygons && (
+            <BoundingBoxesOverlay
+              polygons={polygons}
+              isEditMode={isEditMode}
+              editingPolygonIndex={editingPolygonIndex}
+              onPolygonClick={onPolygonClick}
+              onPolygonHover={onPolygonHover}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

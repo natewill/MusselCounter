@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { getImageDetails, updatePolygonClassification } from '@/lib/api';
 import Link from 'next/link';
@@ -9,7 +9,6 @@ import ImageDisplay from '@/components/edit/ImageDisplay';
 import ImageStatsPanel from '@/components/edit/ImageStatsPanel';
 import FullscreenImageModal from '@/components/edit/FullscreenImageModal';
 import EditPolygonModal from '@/components/edit/EditPolygonModal';
-import { useImageScale } from '@/hooks/useImageScale';
 
 interface Polygon {
   detection_id: number;
@@ -49,9 +48,6 @@ export default function ImageDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const imageRef = useRef<HTMLImageElement>(null);
-  const fullscreenImageRef = useRef<HTMLImageElement>(null);
-
   // Editing related states
   const [editingPolygonIndex, setEditingPolygonIndex] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -61,15 +57,6 @@ export default function ImageDetailPage() {
 
   // Fullscreen related states
   const [isFullscreen, setIsFullscreen] = useState(false);
-
-  // Calculate scale for main image
-  const imageScale = useImageScale({ imageRef });
-  
-  // Calculate scale for fullscreen image
-  const fullscreenScale = useImageScale({ 
-    imageRef: fullscreenImageRef, 
-    enabled: isFullscreen 
-  });
 
   // Fetch image data
   useEffect(() => {
@@ -196,14 +183,12 @@ export default function ImageDetailPage() {
             imageUrl={imageUrl || ''}
             filename={imageData.filename}
             polygons={filteredPolygons}
-            scale={imageScale}
             isEditMode={isEditMode && hasResults}
             editingPolygonIndex={editingPolygonIndex}
             visiblePolygons={visiblePolygons}
             onFullscreen={() => setIsFullscreen(true)}
             onPolygonClick={(index) => setSelectedPolygonIndex(index)}
             onPolygonHover={(index) => setEditingPolygonIndex(index)}
-            imageRef={imageRef}
           />
 
           <ImageStatsPanel imageData={imageData} />
@@ -214,7 +199,6 @@ export default function ImageDetailPage() {
           imageUrl={imageUrl || ''}
           filename={imageData.filename}
           polygons={filteredPolygons}
-          scale={fullscreenScale}
           isEditMode={isEditMode && hasResults}
           editingPolygonIndex={editingPolygonIndex}
           visiblePolygons={visiblePolygons}
@@ -224,7 +208,6 @@ export default function ImageDetailPage() {
             setIsFullscreen(false);
           }}
           onPolygonHover={(index) => setEditingPolygonIndex(index)}
-          imageRef={fullscreenImageRef}
         />
 
         <EditPolygonModal

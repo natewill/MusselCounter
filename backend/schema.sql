@@ -27,9 +27,6 @@ CREATE TABLE IF NOT EXISTS collection_image (
   FOREIGN KEY (image_id) REFERENCES image(image_id)
 );
 
--- Index for faster hash lookups
-CREATE INDEX IF NOT EXISTS idx_image_hash ON image(file_hash);
-
 -- MODEL: one per trained model file, incase we want to use different models in the future
 CREATE TABLE IF NOT EXISTS model (
   model_id      INTEGER PRIMARY KEY AUTOINCREMENT, 
@@ -73,11 +70,6 @@ CREATE TABLE IF NOT EXISTS image_result (
   FOREIGN KEY (image_id) REFERENCES image(image_id)
 );
 
--- Index for faster lookups of results by run
-CREATE INDEX IF NOT EXISTS idx_image_result_run ON image_result(run_id);
--- Index for faster lookups of results by image
-CREATE INDEX IF NOT EXISTS idx_image_result_image ON image_result(image_id);
-
 -- DETECTION: stores individual mussel detections with confidence scores
 -- Enables threshold recalculation without re-running model
 CREATE TABLE IF NOT EXISTS detection (
@@ -96,21 +88,13 @@ CREATE TABLE IF NOT EXISTS detection (
 CREATE INDEX IF NOT EXISTS idx_detection_image_run ON detection(image_id, run_id);
 -- Index for faster lookups by run and image (used for recalculation)
 CREATE INDEX IF NOT EXISTS idx_detection_run_image ON detection(run_id, image_id);
--- Index for confidence-based filtering
-CREATE INDEX IF NOT EXISTS idx_detection_confidence ON detection(confidence);
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_image_hash   ON image(file_hash);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_collection_image ON collection_image(collection_id, image_id);
 
 -- Fast "images in a collection, newest first"
 CREATE INDEX IF NOT EXISTS idx_collection_image_collection_added ON collection_image(collection_id, added_at DESC);
-CREATE INDEX IF NOT EXISTS idx_collection_image_image       ON collection_image(image_id);
 
 -- "Latest result per image in a collection" (your CTE version or the simplified one)
 -- Drives WHERE r.collection_id=? and ORDER/LATEST by run_id
 CREATE INDEX IF NOT EXISTS idx_run_collection_runid            ON run(collection_id, run_id DESC);
--- If you actually filter by an exact threshold value, use this instead/also:
-CREATE INDEX IF NOT EXISTS idx_run_collection_thresh_runid     ON run(collection_id, threshold, run_id DESC);
 
 -- Joins + grouping over image_result
 -- Start from image ids, then join to runs by run_id
@@ -120,6 +104,3 @@ CREATE INDEX IF NOT EXISTS idx_imageresult_image_run      ON image_result(image_
 
 -- Collection listing by time
 CREATE INDEX IF NOT EXISTS idx_collection_created              ON collection(created_at DESC);
-
-CREATE UNIQUE INDEX IF NOT EXISTS uq_image_hash ON image(file_hash);
-CREATE UNIQUE INDEX IF NOT EXISTS uq_collection_image ON collection_image(collection_id, image_id);

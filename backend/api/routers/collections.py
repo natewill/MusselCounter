@@ -127,12 +127,22 @@ async def delete_collection_endpoint(collection_id: int):
     """
     Delete a collection and its associated runs/results.
 
-    Images remain in the database; only the collection links and run data are removed.
+    Images that are no longer linked to any collection are also removed
+    from the image table.
     """
     async with get_db() as db:
         collection = await get_collection(db, collection_id)
         if not collection:
             raise HTTPException(status_code=404, detail="Collection not found")
+
+        # Track images currently linked to this collection so we can remove
+        # orphan image rows after deleting collection links.
+        collection_images_cursor = await db.execute(
+            "SELECT image_id FROM collection_image WHERE collection_id = ?",
+            (collection_id,),
+        )
+        collection_image_rows = await collection_images_cursor.fetchall()
+        candidate_image_ids = [row["image_id"] for row in collection_image_rows]
 
         # Find runs for this collection
         runs_cursor = await db.execute(
@@ -165,6 +175,17 @@ async def delete_collection_endpoint(collection_id: int):
             "DELETE FROM collection_image WHERE collection_id = ?",
             (collection_id,)
         )
+
+        # Delete images that were part of this collection but are now orphaned
+        # (not linked to any collection anymore).
+        if candidate_image_ids:
+            placeholders = ",".join(["?"] * len(candidate_image_ids))
+            await db.execute(
+                f"""DELETE FROM image
+                    WHERE image_id IN ({placeholders})
+                      AND image_id NOT IN (SELECT image_id FROM collection_image)""",
+                candidate_image_ids,
+            )
 
         # Finally delete the collection
         await db.execute(

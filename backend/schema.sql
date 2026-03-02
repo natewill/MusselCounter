@@ -87,13 +87,8 @@ CREATE TABLE IF NOT EXISTS detection (
   run_id          INTEGER NOT NULL,
   image_id        INTEGER NOT NULL,
   confidence      REAL NOT NULL,                     -- Model confidence score (0.0 - 1.0)
-  original_class  TEXT NOT NULL CHECK(original_class IN ('live', 'dead')), -- Model's original prediction
-  class           TEXT CHECK(class IN ('live', 'dead')),  -- NULL = auto mode, 'live'/'dead' = manual override
-  bbox_x1         REAL,                              -- Bounding box top-left x
-  bbox_y1         REAL,                              -- Bounding box top-left y
-  bbox_x2         REAL,                              -- Bounding box bottom-right x
-  bbox_y2         REAL,                              -- Bounding box bottom-right y
-  polygon_coords  TEXT,                              -- JSON array of polygon coordinates
+  class           TEXT NOT NULL CHECK(class IN ('live', 'dead', 'edit_live', 'edit_dead')),
+  polygon_coords  TEXT NOT NULL,                     -- JSON array of polygon coordinates
   created_at      TEXT NOT NULL,                     -- When detection was created
   FOREIGN KEY (run_id) REFERENCES run(run_id) ON DELETE CASCADE,
   FOREIGN KEY (image_id) REFERENCES image(image_id) ON DELETE CASCADE

@@ -29,8 +29,8 @@ async def _get_counts_from_db(db_path: str, run_id: int, image_id: int, threshol
     Query the database to get live/dead counts for an image based on threshold.
     
     Uses the same logic as the recalculation endpoint:
-    - If class IS NOT NULL (manual override), always count it
-    - If class IS NULL (auto mode), count if confidence >= threshold
+    - edit_live / edit_dead always count as edited values
+    - live / dead are model values and are threshold filtered
     
     Args:
         db_path: Path to database
@@ -46,13 +46,13 @@ async def _get_counts_from_db(db_path: str, run_id: int, image_id: int, threshol
         cursor = await db.execute(
             """SELECT
                    SUM(CASE
-                       WHEN class = 'live' THEN 1
-                       WHEN class IS NULL AND confidence >= ? AND original_class = 'live' THEN 1
+                       WHEN class = 'edit_live' THEN 1
+                       WHEN class = 'live' AND confidence >= ? THEN 1
                        ELSE 0
                    END) as live_count,
                    SUM(CASE
-                       WHEN class = 'dead' THEN 1
-                       WHEN class IS NULL AND confidence >= ? AND original_class = 'dead' THEN 1
+                       WHEN class = 'edit_dead' THEN 1
+                       WHEN class = 'dead' AND confidence >= ? THEN 1
                        ELSE 0
                    END) as dead_count
                FROM detection
@@ -119,22 +119,11 @@ async def _save_detections_to_db(db_path: str, run_id: int, image_id: int, resul
         detection_rows = []
 
         for polygon in polygons:
-            bbox = polygon.get("bbox", [])
-            bbox_x1 = bbox[0] if len(bbox) > 0 else None
-            bbox_y1 = bbox[1] if len(bbox) > 1 else None
-            bbox_x2 = bbox[2] if len(bbox) > 2 else None
-            bbox_y2 = bbox[3] if len(bbox) > 3 else None
-
             detection_rows.append((
                 run_id,
                 image_id,
                 polygon["confidence"],
-                polygon["class"],  # original_class
-                None,  # class (NULL for auto mode, can be manually overridden later)
-                bbox_x1,
-                bbox_y1,
-                bbox_x2,
-                bbox_y2,
+                polygon["class"],  # live/dead base class from model
                 json.dumps(polygon.get("coords", [])),  # polygon_coords as JSON string
                 now,
             ))
@@ -142,8 +131,8 @@ async def _save_detections_to_db(db_path: str, run_id: int, image_id: int, resul
         async with aiosqlite.connect(db_path) as db:
             await db.executemany(
                 """INSERT INTO detection
-                   (run_id, image_id, confidence, original_class, class, bbox_x1, bbox_y1, bbox_x2, bbox_y2, polygon_coords, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (run_id, image_id, confidence, class, polygon_coords, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
                 detection_rows,
             )
             await db.commit()

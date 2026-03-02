@@ -12,10 +12,10 @@ import EditPolygonModal from '@/components/edit/EditPolygonModal';
 import { useImageScale } from '@/hooks/useImageScale';
 
 interface Polygon {
+  detection_id: number;
   coords: number[][];
   class: 'live' | 'dead';
   confidence: number;
-  original_class?: string;
   manually_edited: boolean;
 }
 
@@ -101,12 +101,12 @@ export default function ImageDetailPage() {
   }, [imageId, modelIdFromQuery, collectionIdFromQuery]);
 
   // Handle classification change for polygon/mussel
-  const handleClassificationChange = async (originalIndex: number, newClass: 'live' | 'dead') => {
+  const handleClassificationChange = async (detectionId: number, newClass: 'live' | 'dead') => {
     if (saving) return;
 
     setSaving(true);
     try {
-      await updatePolygonClassification(imageId, modelIdFromQuery, originalIndex, newClass, collectionIdFromQuery);
+      await updatePolygonClassification(imageId, modelIdFromQuery, detectionId, newClass, collectionIdFromQuery);
 
       // Refresh image data to show updated counts
       const updatedData = await getImageDetails(imageId, modelIdFromQuery, collectionIdFromQuery);
@@ -157,19 +157,16 @@ export default function ImageDetailPage() {
     : null;
 
   // Filter polygons by threshold - only show detections above the threshold
-  // Also keep track of original indices for editing
-  const filteredPolygonsWithIndices = imageData.polygons
-    .map((polygon, originalIndex) => ({ polygon, originalIndex }))
-    .filter(({ polygon }) => polygon.confidence >= imageData.threshold);
+  const filteredPolygons = imageData.polygons.filter(
+    (polygon) => polygon.confidence >= imageData.threshold
+  );
 
-  const filteredPolygons = filteredPolygonsWithIndices.map(({ polygon }) => polygon);
-
-  // Get selected polygon data and original index for modal
-  const selectedPolygonData = selectedPolygonIndex !== null && filteredPolygonsWithIndices[selectedPolygonIndex]
-    ? filteredPolygonsWithIndices[selectedPolygonIndex]
-    : null;
-  const selectedPolygon = selectedPolygonData?.polygon || null;
-  const originalPolygonIndex = selectedPolygonData?.originalIndex ?? null;
+  // Get selected polygon for modal
+  const selectedPolygon =
+    selectedPolygonIndex !== null && filteredPolygons[selectedPolygonIndex]
+      ? filteredPolygons[selectedPolygonIndex]
+      : null;
+  const selectedDetectionId = selectedPolygon?.detection_id ?? null;
 
   // No results (e.g., image not processed by this model)
   const hasResults = imageData.polygons && imageData.polygons.length > 0;
@@ -233,8 +230,8 @@ export default function ImageDetailPage() {
           saving={saving}
           onClose={() => setSelectedPolygonIndex(null)}
           onClassificationChange={(newClass) => {
-            if (originalPolygonIndex !== null) {
-              handleClassificationChange(originalPolygonIndex, newClass);
+            if (selectedDetectionId !== null) {
+              handleClassificationChange(selectedDetectionId, newClass);
             }
           }}
         />

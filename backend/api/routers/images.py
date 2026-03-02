@@ -6,7 +6,6 @@ including inference results, polygon data, and metadata.
 """
 
 import json
-from pathlib import Path
 from typing import Optional, List, Dict, Any
 from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
@@ -61,14 +60,14 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
     Returns comprehensive data including:
     - Image metadata (filename, dimensions, hash, etc.)
     - Mussel counts (live, dead, total, percentages)
-    - Polygon data (bounding boxes with coordinates, labels, confidence scores)
+    - Polygon data (coordinates, labels, confidence scores)
     - Model information (which model was used, threshold)
     - Collection context (for navigation back to collection/run)
     - Processing metadata (when processed, errors if any)
     
     Args:
         image_id: ID of the image to get results for
-        run_id: ID of the run to get results from
+        model_id: ID of the model to get results from
         
     Returns:
         ImageDetailResponse with all image details and inference results
@@ -179,16 +178,39 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
                 collection_name=image_row['collection_name'],
             )
         
-        # Load polygon data from JSON file
+        # Build polygon payload from detection rows in the database.
         polygons = []
-        detection_count = 0
-        if result['polygon_path']:
-            polygon_file = Path(result['polygon_path'])
-            if polygon_file.exists():
-                with open(polygon_file, 'r') as f:
-                    polygon_data = json.load(f)
-                    polygons = polygon_data.get('polygons', [])
-                    detection_count = len(polygons)
+        detections_cursor = await db.execute(
+            """
+            SELECT detection_id, confidence, class, polygon_coords
+            FROM detection
+            WHERE run_id = ? AND image_id = ?
+            ORDER BY detection_id ASC
+            """,
+            (result["run_id"], image_id),
+        )
+        detection_rows = await detections_cursor.fetchall()
+        for row in detection_rows:
+            coords = []
+            if row["polygon_coords"]:
+                try:
+                    parsed = json.loads(row["polygon_coords"])
+                    if isinstance(parsed, list):
+                        coords = parsed
+                except Exception:
+                    coords = []
+
+            stored_class = row["class"]
+            manually_edited = stored_class.startswith("edit_")
+            polygon = {
+                "detection_id": row["detection_id"],
+                "coords": coords,
+                "class": stored_class.replace("edit_", ""),
+                "confidence": row["confidence"],
+                "manually_edited": manually_edited,
+            }
+            polygons.append(polygon)
+        detection_count = len(polygons)
         
         # Calculate percentages
         live_count = result['live_mussel_count'] or 0
@@ -237,11 +259,12 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
         )
 
 
-@router.patch("/{image_id}/results/{model_id}/polygons/{polygon_index}", response_model=Dict)
+#edit endpoint
+@router.patch("/{image_id}/results/{model_id}/detections/{detection_id}", response_model=Dict)
 async def update_polygon_classification(
     image_id: int,
     model_id: int,
-    polygon_index: int,
+    detection_id: int,
     new_class: str = Body(..., embed=True),
     collection_id: Optional[int] = None
 ) -> Dict:
@@ -249,13 +272,12 @@ async def update_polygon_classification(
     Update the classification of a specific polygon (mussel detection).
 
     Changes a detection from "live" to "dead" or vice versa by updating the
-    detection table's class field (manual override). Also updates the JSON file
-    for backward compatibility and recalculates counts.
+    detection table's class field (manual override) and recalculating counts.
 
     Args:
         image_id: ID of the image
-        run_id: ID of the run
-        polygon_index: Index of the polygon in the polygons array (0-based)
+        model_id: ID of the model
+        detection_id: ID of the detection being edited
         new_class: New classification ("live" or "dead")
 
     Returns:
@@ -265,21 +287,22 @@ async def update_polygon_classification(
         raise HTTPException(status_code=400, detail="Classification must be 'live' or 'dead'")
 
     async with get_db() as db:
-        # Get the detection by polygon_index (ORDER BY detection_id to match insertion order)
+        # Resolve detection on the latest run for this image/model (+ optional collection).
         collection_filter = "AND r.collection_id = ?" if collection_id is not None else ""
-        params = [image_id, model_id]
+        params = [detection_id, image_id, model_id]
         if collection_id is not None:
             params.append(collection_id)
-        # Parameters for subquery reuse image/model (and collection if provided)
         subquery_params = [image_id, model_id]
         if collection_id is not None:
             subquery_params.append(collection_id)
 
         cursor = await db.execute(f"""
-            SELECT d.detection_id, d.original_class, d.class, d.run_id
+            SELECT d.detection_id, d.class, d.run_id
             FROM detection d
             JOIN run r ON d.run_id = r.run_id
-            WHERE d.image_id = ? AND r.model_id = ?
+            WHERE d.detection_id = ?
+              AND d.image_id = ?
+              AND r.model_id = ?
               {collection_filter}
               AND d.run_id = (
                   SELECT r2.run_id
@@ -290,9 +313,8 @@ async def update_polygon_classification(
                   ORDER BY r2.run_id DESC
                   LIMIT 1
               )
-            ORDER BY d.detection_id
-            LIMIT 1 OFFSET ?
-        """, params + subquery_params + [polygon_index])
+            LIMIT 1
+        """, params + subquery_params)
 
         detection = await cursor.fetchone()
         if not detection:
@@ -300,71 +322,20 @@ async def update_polygon_classification(
 
         detection_id = detection['detection_id']
         run_id = detection['run_id']
-        original_class = detection['original_class']
         current_class = detection['class']
-
-        # Determine what the old effective class was
-        old_class = current_class if current_class else original_class
+        old_class = current_class.replace("edit_", "")
 
         if old_class == new_class:
-            return {"message": "Classification unchanged", "polygon_index": polygon_index}
+            return {"message": "Classification unchanged", "detection_id": detection_id}
 
-        # Update detection table
-        # If new_class matches original_class, set class=NULL (revert to auto mode)
-        # Otherwise, set class=new_class (manual override)
-        if new_class == original_class:
-            await db.execute("""
-                UPDATE detection
-                SET class = NULL
-                WHERE detection_id = ?
-            """, (detection_id,))
-        else:
-            await db.execute("""
-                UPDATE detection
-                SET class = ?
-                WHERE detection_id = ?
-            """, (new_class, detection_id))
-
-        # Also update the JSON file for backward compatibility
-        result_cursor = await db.execute("""
-            SELECT polygon_path
-            FROM image_result
-            WHERE image_id = ? AND run_id = ?
-        """, (image_id, run_id))
-
-        result = await result_cursor.fetchone()
-        if result and result['polygon_path']:
-            polygon_path = result['polygon_path']
-            polygon_file = Path(polygon_path)
-            if polygon_file.exists():
-                with open(polygon_path, 'r') as f:
-                    polygon_data = json.load(f)
-
-                polygons = polygon_data.get('polygons', [])
-                if polygon_index < len(polygons):
-                    polygons[polygon_index]['class'] = new_class
-
-                    # Mark as manually edited
-                    if 'original_class' not in polygons[polygon_index]:
-                        polygons[polygon_index]['original_class'] = old_class
-                        polygons[polygon_index]['manually_edited'] = True
-                    elif new_class == polygons[polygon_index].get('original_class'):
-                        # Reverted to original - remove manual edit markers
-                        if 'manually_edited' in polygons[polygon_index]:
-                            del polygons[polygon_index]['manually_edited']
-                        if 'original_class' in polygons[polygon_index]:
-                            del polygons[polygon_index]['original_class']
-
-                    # Recalculate counts for JSON
-                    live_count = sum(1 for p in polygons if p['class'] == 'live')
-                    dead_count = sum(1 for p in polygons if p['class'] == 'dead')
-
-                    polygon_data['polygons'] = polygons
-                    polygon_data['live_count'] = live_count
-                    polygon_data['dead_count'] = dead_count
-
-                    with open(polygon_path, 'w') as f:
-                        json.dump(polygon_data, f, indent=2)
+        await db.execute(
+            """
+            UPDATE detection
+            SET class = ?
+            WHERE detection_id = ?
+            """,
+            (f"edit_{new_class}", detection_id),
+        )
 
         # Recalculate counts from detection table
         # This uses the same logic as the recalculation endpoint
@@ -377,13 +348,13 @@ async def update_polygon_classification(
         counts_cursor = await db.execute("""
             SELECT
                 SUM(CASE
-                    WHEN class = 'live' THEN 1
-                    WHEN class IS NULL AND confidence >= ? AND original_class = 'live' THEN 1
+                    WHEN class = 'edit_live' THEN 1
+                    WHEN class = 'live' AND confidence >= ? THEN 1
                     ELSE 0
                 END) as live_count,
                 SUM(CASE
-                    WHEN class = 'dead' THEN 1
-                    WHEN class IS NULL AND confidence >= ? AND original_class = 'dead' THEN 1
+                    WHEN class = 'edit_dead' THEN 1
+                    WHEN class = 'dead' AND confidence >= ? THEN 1
                     ELSE 0
                 END) as dead_count
             FROM detection
@@ -426,7 +397,6 @@ async def update_polygon_classification(
 
         return {
             "message": "Classification updated successfully",
-            "polygon_index": polygon_index,
             "detection_id": detection_id,
             "old_class": old_class,
             "new_class": new_class,

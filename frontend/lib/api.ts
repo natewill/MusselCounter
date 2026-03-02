@@ -399,20 +399,25 @@ export async function getImageDetails(imageId: number, modelId: number, collecti
 export async function updatePolygonClassification(
   imageId: number,
   modelId: number,
-  polygonIndex: number,
+  detectionId: number,
   newClass: 'live' | 'dead',
   collectionId?: number
 ) {
   const validatedImageId = validateImageId(imageId);
   const validatedModelId = validateModelId(modelId);
   const validatedCollectionId = collectionId !== undefined ? validateCollectionId(collectionId) : undefined;
+  const validatedDetectionId = Number(detectionId);
+
+  if (isNaN(validatedDetectionId) || validatedDetectionId <= 0 || !Number.isInteger(validatedDetectionId)) {
+    throw new Error('Invalid detection ID');
+  }
 
   if (newClass !== 'live' && newClass !== 'dead') {
     throw new Error('Classification must be "live" or "dead"');
   }
 
   const response = await apiClient.patch(
-    `/api/images/${validatedImageId}/results/${validatedModelId}/polygons/${polygonIndex}`,
+    `/api/images/${validatedImageId}/results/${validatedModelId}/detections/${validatedDetectionId}`,
     { new_class: newClass },
     {
       params: validatedCollectionId ? { collection_id: validatedCollectionId } : undefined,

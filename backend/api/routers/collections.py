@@ -291,22 +291,21 @@ async def recalculate_threshold_endpoint(
 
         run_id = run_row[0]
 
-        # Query detections and recalculate counts with new threshold
+        # Query detections and recalculate counts with new threshold.
         # Count logic:
-        # - If class IS NOT NULL (manual override), always count it
-        # - If class IS NULL (auto mode), count if confidence >= threshold
-        #This logic is for re-counting mussels while taking into account the "edited" mussels
+        # - edit_live / edit_dead always use the edited value
+        # - live / dead are model values and are threshold filtered
         cursor = await db.execute(
             """SELECT
                    image_id,
                    SUM(CASE
-                       WHEN class = 'live' THEN 1
-                       WHEN class IS NULL AND confidence >= ? AND original_class = 'live' THEN 1
+                       WHEN class = 'edit_live' THEN 1
+                       WHEN class = 'live' AND confidence >= ? THEN 1
                        ELSE 0
                    END) as live_count,
                    SUM(CASE
-                       WHEN class = 'dead' THEN 1
-                       WHEN class IS NULL AND confidence >= ? AND original_class = 'dead' THEN 1
+                       WHEN class = 'edit_dead' THEN 1
+                       WHEN class = 'dead' AND confidence >= ? THEN 1
                        ELSE 0
                    END) as dead_count
                FROM detection

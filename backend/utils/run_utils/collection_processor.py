@@ -1,66 +1,5 @@
 """
 Collection processing orchestrator for inference runs.
-
-THIS IS THE BRAIN OF THE SYSTEM - This file coordinates the entire inference process.
-
-=== What This File Does ===
-
-When a user clicks "Start Run" in the frontend, this is what happens:
-
-1. **Setup Phase**
-   - Loads the ML model from disk (e.g., yolov8n.pt)
-   - Gets all images in the collection from database
-   - Checks which images have already been processed (smart caching)
-   - Calculates optimal batch size based on model size
-
-2. **Processing Phase**
-   - Splits images into batches (e.g., 4 images per batch)
-   - For each batch:
-     * Load images from disk
-     * Run model inference (detect mussels)
-     * Get bounding boxes with live/dead labels
-     * Save results to database immediately (real-time updates!)
-     * Update progress counter
-   - Batches can run concurrently (controlled by semaphore)
-
-3. **Completion Phase**
-   - Sum up all live/dead counts across all images
-   - Update run status to 'completed'
-   - Frontend polls and sees the final results
-
-=== Why Batch Processing? ===
-
-Without batching:
-- Process 1 image → takes 2 seconds
-- Process 100 images → takes 200 seconds (3+ minutes!)
-
-With batching (batch_size=4):
-- Process 4 images at once → takes 3 seconds
-- Process 100 images → takes 75 seconds (1.25 minutes)
-- **2.7x faster!**
-
-=== Key Features ===
-
-**Smart Run Reuse**:
-- Run = (collection_id, model_id, threshold)
-- Same combination? Reuse the run, only process new images
-- Changed threshold or model? Create new run
-
-**Real-time Updates**:
-- Results written to database after each batch
-- Frontend polls and sees progress in real-time
-- Green flash animation shows which images just finished
-
-**Error Handling**:
-- Model fails to load? Mark run as failed
-- Image file missing? Skip it, log error, continue
-- Out of memory? Caught and logged, run fails gracefully
-
-**Cancellation Support**:
-- User clicks "Stop Run"
-- Status changes to 'cancelled'
-- Processing loop checks status and exits early
-- Partial results are saved
 """
 import asyncio
 import os
@@ -72,16 +11,9 @@ import aiosqlite
 from config import DB_PATH
 from utils.collection_utils import get_collection_images
 from utils.model_utils.db import get_model
-from utils.model_utils.inference import run_inference_batch, supports_batch_inference
 from utils.model_utils.loader import load_model
 from .db import get_run, update_run_status
-from .image_processor import process_image_for_run, _save_detections_to_db, _get_counts_from_db
-
-# Manual override settings (takes precedence over environment variables and auto-detection)
-# Set these to override automatic batch size and concurrency detection
-# Useful for debugging or forcing specific batch sizes
-MANUAL_BATCH_SIZE = None  # Set to an integer to override batch size (e.g., 4)
-MANUAL_MAX_CONCURRENT_BATCHES = None  # Set to an integer to override max concurrent batches (e.g., 2)
+from .image_processor import process_image_for_run
 
 
 async def _fail(db: aiosqlite.Connection, run_id: int, message: str, status: str = 'failed') -> None:
@@ -100,36 +32,12 @@ async def _fail(db: aiosqlite.Connection, run_id: int, message: str, status: str
         pass
 
 
-async def _batch_infer(model_type: str, model_device, image_paths: list[str]):
-    """
-    Run batch inference on multiple images in a background thread.
-    
-    Note: Inference always returns ALL detections (no threshold filtering).
-    Counts are calculated by querying the database after detections are saved.
-    
-    Args:
-        model_type: Canonical model type from DB (e.g., 'FASTRCNN', 'YOLO')
-        model_device: Tuple of (model, device) from load_model
-        image_paths: List of image file paths
-        
-    Returns:
-        List of result dictionaries with live_count, dead_count, polygons, etc.
-        Note: live_count/dead_count will be calculated from database after saving detections
-    """
-    # Always get all detections (no threshold filtering)
-    to_thread = getattr(asyncio, "to_thread", None)
-    if to_thread:
-        return await to_thread(run_inference_batch, model_device, image_paths, model_type)
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, run_inference_batch, model_device, image_paths, model_type)
-
-
 async def _setup_run_and_load_model(db: aiosqlite.Connection, run_id: int):
     """
     Setup run and load model.
     
     Returns:
-        Tuple of (run, model_device, collection_id, model_id, threshold, model_type, weights_path)
+        Tuple of (model_device, collection_id, threshold, model_type)
         or None if setup fails
     """
     run = await get_run(db, run_id)
@@ -166,7 +74,7 @@ async def _setup_run_and_load_model(db: aiosqlite.Connection, run_id: int):
         await _fail(db, run_id, f"Failed to load model: {e}")
         return None
     
-    return (run, model_device, collection_id, model_id, threshold, model_type, weights_path)
+    return (model_device, collection_id, threshold, model_type)
 
 
 async def _prepare_images(db: aiosqlite.Connection, collection_id: int, run_id: int):
@@ -227,126 +135,18 @@ async def _handle_all_images_processed(db: aiosqlite.Connection, run_id: int, to
     await db.commit()
 
 
-async def _process_batch_inference(
-    db: aiosqlite.Connection,
-    db_path: str,
-    run_id: int,
-    images: list,
-    model_type: str,
-    model_device,
-    threshold: float,
-    images_already_done: int
-):
-    """
-    Process images using batch inference (for R-CNN and YOLO models).
-    
-    Returns:
-        List of (image_id, success, live_count, dead_count) tuples
-    """
-    # Use cached optimal batch size from model loading
-    auto_batch_size = model_device[2] if len(model_device) > 2 else 8
-    auto_max_concurrent = 1
-    batch_size = MANUAL_BATCH_SIZE or int(os.getenv("INFERENCE_BATCH_SIZE", auto_batch_size))
-    max_concurrent_batches = MANUAL_MAX_CONCURRENT_BATCHES or int(os.getenv("MAX_CONCURRENT_BATCHES", auto_max_concurrent))
-    
-    semaphore = asyncio.Semaphore(max_concurrent_batches)
-    
-    async def process_batch_of_images(batch_images, batch_idx):
-        """Process a single batch of images."""
-        async with semaphore:
-            image_data = [
-                (img['image_id'], img.get('filename', 'unknown'), img.get('stored_path'))
-                for img in batch_images
-                if img.get('stored_path') and Path(img['stored_path']).exists()
-            ]
-            if not image_data:
-                return [], []
-            image_paths = [path for _, _, path in image_data]
-            results = await _batch_infer(model_type, model_device, image_paths)
-            now = datetime.now(timezone.utc).isoformat()
-            batch_results = []
-            updates = []
-            for (image_id, _, _), result in zip(image_data, results):
-                # Save ALL detections to database (threshold 0.0)
-                try:
-                    await _save_detections_to_db(db_path, run_id, image_id, result)
-                except Exception as e:
-                    pass
-                
-                # Query database to get counts based on run's threshold
-                # This uses the same logic as the recalculation endpoint
-                try:
-                    live_count, dead_count = await _get_counts_from_db(db_path, run_id, image_id, threshold)
-                except Exception as e:
-                    # Fallback: count all detections (shouldn't happen, but safe fallback)
-                    live_count = sum(1 for p in result['polygons'] if p.get('class') == 'live')
-                    dead_count = sum(1 for p in result['polygons'] if p.get('class') == 'dead')
-
-                updates.append((
-                    live_count,
-                    dead_count,
-                    now,
-                    image_id
-                ))
-                batch_results.append((image_id, True, live_count, dead_count))
-            return batch_results, updates
-    
-    # Split images into batches
-    image_batches = [images[i:i + batch_size] for i in range(0, len(images), batch_size)]
-    tasks = [process_batch_of_images(batch, idx) for idx, batch in enumerate(image_batches)]
-    batch_results = []
-    all_updates = []
-    processed_count = 0
-    
-    # Process batches as they complete
-    for coro in asyncio.as_completed(tasks):
-        try:
-            batch_result, updates = await coro
-            batch_results.append(batch_result)
-            all_updates.extend(updates)
-            
-            processed_count += len(batch_result)
-            if updates:
-                async with aiosqlite.connect(db_path) as db_batch:
-                    result_inserts = [(run_id, image_id, live_count, dead_count, processed_at, None)
-                                     for live_count, dead_count, processed_at, image_id in updates]
-                    await db_batch.executemany(
-                        """INSERT INTO image_result 
-                           (run_id, image_id, live_mussel_count, dead_mussel_count, processed_at, error_msg)
-                           VALUES (?, ?, ?, ?, ?, ?)""",
-                        result_inserts
-                    )
-                    
-                    await db_batch.execute(
-                        "UPDATE run SET processed_count = ? WHERE run_id = ?",
-                        (processed_count + images_already_done, run_id)
-                    )
-                    await db_batch.commit()
-            else:
-                async with aiosqlite.connect(db_path) as db_progress:
-                    await db_progress.execute(
-                        "UPDATE run SET processed_count = ? WHERE run_id = ?",
-                        (processed_count + images_already_done, run_id)
-                    )
-                    await db_progress.commit()
-        except Exception:
-            raise
-    
-    # Flatten results from all batches
-    return [result for batch_result in batch_results for result in batch_result]
-
-
 async def _process_single_images(
     db_path: str,
     run_id: int,
     images: list,
     model_device,
     threshold: float,
-    model_type: str
+    model_type: str,
+    images_already_done: int = 0,
 ):
     """
-    Process images one at a time (fallback for non-batch models).
-    
+    Process images one at a time.
+
     Returns:
         List of (image_id, success, live_count, dead_count) tuples
     """
@@ -381,7 +181,7 @@ async def _process_single_images(
             async with aiosqlite.connect(db_path) as db_progress:
                 await db_progress.execute(
                     "UPDATE run SET processed_count = ? WHERE run_id = ?",
-                    (processed_count, run_id)
+                    (processed_count + images_already_done, run_id)
                 )
                 await db_progress.commit()
         except Exception:
@@ -446,8 +246,8 @@ async def process_collection_run(db: aiosqlite.Connection, run_id: int):
     1. Loads the model and validates it exists
     2. Gets all images in the collection (excluding duplicates)
     3. Checks for cached results from previous runs with same model+threshold
-    4. Processes images in batches (for R-CNN) or individually (for YOLO)
-    5. Writes results incrementally to database for real-time updates
+    4. Processes images one at a time
+    5. Writes results incrementally to the database for real-time updates
     6. Aggregates final counts and updates run status
     
     Args:
@@ -460,7 +260,7 @@ async def process_collection_run(db: aiosqlite.Connection, run_id: int):
         if not setup_result:
             return
         
-        run, model_device, collection_id, model_id, threshold, model_type, weights_path = setup_result
+        model_device, collection_id, threshold, model_type = setup_result
         
         # Prepare images: Get images, filter duplicates, check already processed
         image_prep = await _prepare_images(db, collection_id, run_id)
@@ -483,19 +283,15 @@ async def process_collection_run(db: aiosqlite.Connection, run_id: int):
         await db.commit()
         
         db_path = DB_PATH
-        
-        # Determine processing method
-        use_batch_inference = supports_batch_inference(model_type)
-        
-        if use_batch_inference:
-            results = await _process_batch_inference(
-                db, db_path, run_id, images_to_process, model_type, model_device,
-                threshold, images_already_done
-            )
-        else:
-            results = await _process_single_images(
-                db_path, run_id, images_to_process, model_device, threshold, model_type
-            )
+        results = await _process_single_images(
+            db_path,
+            run_id,
+            images_to_process,
+            model_device,
+            threshold,
+            model_type,
+            images_already_done,
+        )
         
         # Finalize: Aggregate results and update status
         await _finalize_run(db, run_id, results, len(images_to_process), images_already_done)

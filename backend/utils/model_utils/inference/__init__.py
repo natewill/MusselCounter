@@ -8,22 +8,16 @@ The implementation is split across:
 - router.py
 """
 
-from .rcnn import run_rcnn_inference, run_rcnn_inference_batch
+from .rcnn import run_rcnn_inference
 from .router import (
     INFERENCE_ADAPTERS,
-    run_inference_batch,
     run_inference_on_image,
-    supports_batch_inference,
 )
-from .yolo import run_yolo_inference, run_yolo_inference_batch
+from .yolo import run_yolo_inference
 
 __all__ = [
     "run_rcnn_inference",
-    "run_rcnn_inference_batch",
     "run_yolo_inference",
-    "run_yolo_inference_batch",
-    "supports_batch_inference",
-    "run_inference_batch",
     "run_inference_on_image",
     "INFERENCE_ADAPTERS",
 ]

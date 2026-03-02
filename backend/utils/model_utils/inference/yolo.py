@@ -5,7 +5,7 @@ YOLO inference adapter implementation.
 from .common import YOLO_LABELS, convert_to_dictionary
 
 
-def _run_yolo(model_device_tuple, image_paths):
+def _run_yolo(model_device_tuple, image_paths: list[str]):
     """
     Run YOLO inference on images.
 
@@ -22,7 +22,7 @@ def _run_yolo(model_device_tuple, image_paths):
 
     Args:
         model_device_tuple: (model, device, batch_size) from loader
-        image_paths: Single path or list of paths
+        image_paths: List of image file paths
 
     Returns:
         List of result dicts, one per image
@@ -32,11 +32,10 @@ def _run_yolo(model_device_tuple, image_paths):
         # Returns: [{"live_count": 3, "dead_count": 1, ...}]
     """
     model, _ = model_device_tuple[:2]
-    paths = image_paths if isinstance(image_paths, list) else [image_paths]
-    detections = model(paths, conf=0.01, verbose=False)
+    detections = model(image_paths, conf=0.01, verbose=False)
 
     outputs = []
-    for _, det in zip(paths, detections):
+    for det in detections:
         live = dead = 0
         polygons = []
 

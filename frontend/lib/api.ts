@@ -265,14 +265,14 @@ export async function getModels() {
  */
 export async function uploadModel(
   file: File,
+  modelType: 'YOLO' | 'Faster R-CNN',
   name?: string,
-  modelType?: string,
   description?: string
 ) {
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('model_type', modelType);
   if (name) formData.append('name', name);
-  if (modelType) formData.append('model_type', modelType);
   if (description) formData.append('description', description);
   
   try {

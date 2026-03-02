@@ -7,6 +7,7 @@ import { uploadModel } from '@/lib/api';
 export default function AddModelButton({ onSuccess, onError }) {
   const fileInputRef = useRef(null);
   const [uploading, setUploading] = useState(false);
+  const [selectedModelType, setSelectedModelType] = useState('YOLO');
   const queryClient = useQueryClient();
 
   const handleFileChange = async (e) => {
@@ -31,7 +32,7 @@ export default function AddModelButton({ onSuccess, onError }) {
     onSuccess?.(null);
 
     try {
-      const result = await uploadModel(file);
+      const result = await uploadModel(file, selectedModelType);
       
       // Invalidate models query to refresh the list (for any components using React Query)
       await queryClient.invalidateQueries({ queryKey: ['models'] });
@@ -64,7 +65,16 @@ export default function AddModelButton({ onSuccess, onError }) {
   };
 
   return (
-    <div className="relative">
+    <div className="relative flex items-center gap-2">
+      <select
+        value={selectedModelType}
+        onChange={(e) => setSelectedModelType(e.target.value)}
+        disabled={uploading}
+        className="px-2 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded text-sm text-zinc-900 dark:text-zinc-100"
+      >
+        <option value="YOLO">YOLO</option>
+        <option value="Faster R-CNN">Faster R-CNN</option>
+      </select>
       <input
         ref={fileInputRef}
         type="file"

@@ -44,7 +44,7 @@ async def get_model_endpoint(model_id: int) -> ModelResponse:
 async def create_model_endpoint(
     file: UploadFile = File(...),
     name: Optional[str] = Form(None),
-    model_type: Optional[str] = Form(None),
+    model_type: str = Form(...),
     description: Optional[str] = Form(None)
 ) -> ModelResponse:
     """Upload a new model file"""
@@ -67,16 +67,8 @@ async def create_model_endpoint(
     if not content:
         raise HTTPException(status_code=400, detail="File is empty")
 
-    if not model_type:
-        filename_lower = sanitized_filename.lower()
-        if "yolo" in filename_lower:
-            model_type = "YOLO"
-        elif "rcnn" in filename_lower or "faster" in filename_lower:
-            model_type = "Faster R-CNN"
-        else:
-            model_type = "YOLO"
-    else:
-        model_type = model_type.upper()
+    if model_type not in {"YOLO", "Faster R-CNN"}:
+        raise HTTPException(status_code=400, detail="model_type must be YOLO or Faster R-CNN")
 
     model_name = name or Path(sanitized_filename).stem
     MODELS_DIR.mkdir(parents=True, exist_ok=True)

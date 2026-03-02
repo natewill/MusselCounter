@@ -78,12 +78,7 @@ async def _setup_run_and_load_model(db: aiosqlite.Connection, run_id: int):
     
     # PyTorch model loading is blocking/CPU-heavy; push it off the event loop.
     try:
-        to_thread = getattr(asyncio, "to_thread", None)
-        if to_thread:
-            model_device = await to_thread(load_model, weights_path, model_type)
-        else:
-            loop = asyncio.get_event_loop()
-            model_device = await loop.run_in_executor(None, load_model, weights_path, model_type)
+        model_device = await asyncio.to_thread(load_model, weights_path, model_type)
     except Exception as e:
         await _fail(db, run_id, f"Failed to load model: {e}")
         return None
@@ -141,17 +136,17 @@ async def _handle_all_images_processed(db: aiosqlite.Connection, run_id: int, to
     )
     row = await cursor.fetchone()
     total_live_count = row[0] or 0
-    
+
     now = datetime.now(timezone.utc).isoformat()
     await db.execute(
-        """UPDATE run 
-           SET status = 'completed', 
-               finished_at = ?, 
+        """UPDATE run
+           SET status = ?,
+               finished_at = ?,
                total_images = ?,
                processed_count = ?,
                live_mussel_count = ?
            WHERE run_id = ?""",
-        (now, total_images, total_images, total_live_count, run_id)
+        ('completed', now, total_images, total_images, total_live_count, run_id)
     )
     await db.commit()
 
@@ -174,38 +169,35 @@ async def _process_single_images(
     processed_count = 0
 
     for image in images:
-        try:
-            # Pull safe defaults so per-image failures are captured cleanly.
-            image_id = image['image_id']
-            image_path = image.get('stored_path', 'unknown')
+        # Pull safe defaults so per-image failures are captured cleanly.
+        image_id = image['image_id']
+        image_path = image.get('stored_path', 'unknown')
 
-            # process_image_for_run handles:
-            # - file existence checks
-            # - model inference
-            # - detection writes
-            # - thresholded counts
-            # - image_result writes
-            result = await process_image_for_run(
-                run_id,
-                image_id,
-                image_path,
-                model_device,
-                threshold,
-                model_type,
+        # process_image_for_run handles:
+        # - file existence checks
+        # - model inference
+        # - detection writes
+        # - thresholded counts
+        # - image_result writes
+        result = await process_image_for_run(
+            run_id,
+            image_id,
+            image_path,
+            model_device,
+            threshold,
+            model_type,
+        )
+        results.append(result)
+
+        processed_count += 1
+        # Persist incremental progress after each image so polling clients
+        # get accurate progress updates during long runs.
+        async with aiosqlite.connect(DB_PATH) as db_progress:
+            await db_progress.execute(
+                "UPDATE run SET processed_count = ? WHERE run_id = ?",
+                (processed_count + images_already_done, run_id)
             )
-            results.append(result)
-
-            processed_count += 1
-            # Persist incremental progress after each image so polling clients
-            # get accurate progress updates during long runs.
-            async with aiosqlite.connect(DB_PATH) as db_progress:
-                await db_progress.execute(
-                    "UPDATE run SET processed_count = ? WHERE run_id = ?",
-                    (processed_count + images_already_done, run_id)
-                )
-                await db_progress.commit()
-        except Exception:
-            raise
+            await db_progress.commit()
     
     return results
 
@@ -231,7 +223,6 @@ async def _finalize_run(
     successes = [result for result in results if result[1]]
     successful_images = len(successes)
     
-    # Get total counts from ALL results in this run
     cursor = await db.execute(
         """SELECT SUM(live_mussel_count) FROM image_result WHERE run_id = ?""",
         (run_id,)
@@ -247,15 +238,15 @@ async def _finalize_run(
     final_status = 'completed' if successful_images == images_processed_in_this_run else 'completed_with_errors'
     
     await db.execute(
-        """UPDATE run 
-           SET total_images = ?,
-               live_mussel_count = ?,
-               status = ?,
-               finished_at = ?
+        """UPDATE run
+           SET status = ?,
+               finished_at = ?,
+               total_images = ?,
+               processed_count = ?,
+               live_mussel_count = ?
            WHERE run_id = ?""",
-        (total_expected, total_live_count, final_status, now, run_id)
+        (final_status, now, total_expected, total_expected, total_live_count, run_id)
     )
-
     await db.commit()
 
 
@@ -317,18 +308,17 @@ async def process_collection_run(db: aiosqlite.Connection, run_id: int):
         
     except Exception as e:
         await _fail(db, run_id, f"Run processing error: {e}")
-        
-        # Get collection_id from run (in case exception happened before setup)
         run = await get_run(db, run_id)
         if not run:
             return
+
         collection_id = run['collection_id']
-        
-        # Check if all images are already processed (using same logic as main path)
         image_prep = await _prepare_images(db, collection_id, run_id)
-        if image_prep:
-            images_to_process, total_images, _ = image_prep
-            if not images_to_process:
-                # All images already processed - mark as completed despite error
-                await _handle_all_images_processed(db, run_id, total_images)
-                return
+        if not image_prep:
+            return
+
+        images_to_process, total_images, _ = image_prep
+        if images_to_process:
+            return
+
+        await _handle_all_images_processed(db, run_id, total_images)

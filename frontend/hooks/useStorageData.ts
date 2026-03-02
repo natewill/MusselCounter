@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
-import { formatUploadSuccessMessage } from '@/utils/messageUtils';
 
 export function useStorageData() {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -24,7 +23,7 @@ export function useStorageData() {
           const count = Number(addedCount);
           const dupCount = duplicateCount ? Number(duplicateCount) : 0;
           
-          const message = formatUploadSuccessMessage(count, dupCount);
+          const message = `${count} image${count === 1 ? '' : 's'} added${dupCount > 0 ? `, ${dupCount} duplicate${dupCount === 1 ? '' : 's'} skipped` : ''}!`;
           setSuccessMessage(message);
           
           // Remove query params from URL after reading them

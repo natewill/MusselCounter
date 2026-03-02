@@ -16,7 +16,7 @@ interface RecalculationResult {
 }
 
 export function useThresholdRecalculation(
-  collectionId: number | null,
+  collectionId: number,
   threshold: number,
   selectedModelId: number | null,
   latestRunThreshold?: number,
@@ -35,12 +35,10 @@ export function useThresholdRecalculation(
     }
 
     // Don't recalculate if:
-    // - No collection ID
     // - No model selected
     // - Currently running a new run
     // - No threshold difference from latest run (and same model)
     if (
-      !collectionId ||
       !selectedModelId ||
       isRunning ||
       (threshold === latestRunThreshold && selectedModelId === latestRunModelId)

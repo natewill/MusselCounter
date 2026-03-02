@@ -2,12 +2,9 @@ import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { uploadImagesToCollection } from '@/lib/api';
 import { validateImageFiles } from '@/utils/validation';
-import { filterNonDuplicateIds } from '@/utils/imageUtils';
-import { invalidateCollectionQuery } from '@/utils/queryUtils';
-import { formatUploadSuccessMessage } from '@/utils/messageUtils';
 
 export function useImageUpload(
-  collectionId: number | null,
+  collectionId: number,
   setError: (error: string | null) => void,
   setLoading: (loading: boolean) => void,
   setRecentlyUploadedImageIds: (ids: Set<number> | ((prev: Set<number>) => Set<number>)) => void,
@@ -26,15 +23,15 @@ export function useImageUpload(
       const duplicateImageIds = result.duplicate_image_ids || [];
       
       // Track recently uploaded image IDs (exclude duplicates)
-      const nonDuplicateIds = filterNonDuplicateIds(uploadedImageIds, duplicateImageIds);
+      const nonDuplicateIds = uploadedImageIds.filter((id) => !duplicateImageIds.includes(id));
       setRecentlyUploadedImageIds(new Set(nonDuplicateIds));
       
       // Set success message immediately
-      const message = formatUploadSuccessMessage(addedCount, duplicateCount);
+      const message = `${addedCount} image${addedCount === 1 ? '' : 's'} added${duplicateCount > 0 ? `, ${duplicateCount} duplicate${duplicateCount === 1 ? '' : 's'} skipped` : ''}!`;
       setSuccessMessage(message);
       
       // Invalidate and refetch collection data
-      invalidateCollectionQuery(queryClient, collectionId);
+      queryClient.invalidateQueries({ queryKey: ['collection', collectionId] });
       
       setLoading(false);
     },
@@ -64,11 +61,6 @@ export function useImageUpload(
       console.warn('Some files were skipped:', validationErrors);
     }
 
-    if (!collectionId) {
-      setError('No collection available. Please refresh the page.');
-      return;
-    }
-
     setUploading(true);
     setError(null);
 
@@ -84,4 +76,3 @@ export function useImageUpload(
 
   return { uploading, handleFileInputChange };
 }
-

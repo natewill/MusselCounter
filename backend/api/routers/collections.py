@@ -245,30 +245,36 @@ async def get_collection_endpoint(
         collection = await get_collection(db, collection_id)
         if not collection:
             raise HTTPException(status_code=404, detail="Collection not found")
+        collection_dict = dict(collection)
+        image_count = int(collection_dict.get("image_count") or 0)
         
         # Get latest run - either for specific model or overall latest.
         latest_run = await get_latest_run(db, collection_id, model_id)
+        latest_run_dict = dict(latest_run) if latest_run else None
         
-        if latest_run:
+        if latest_run_dict:
             # If there's a latest run, get images with their results from that run
-            latest_run_dict = dict(latest_run)
             images = await get_collection_images_with_results(
                 db,
                 collection_id,
                 latest_run_dict['run_id'],
             )
+            processed_count = int(latest_run_dict.get("processed_count") or 0)
+            can_start_run = processed_count != image_count
         else:
             # No runs yet, just get images without results
             images = await get_collection_images(db, collection_id)
+            can_start_run = image_count > 0
         
         # Get all runs for this collection (for showing run history)
         all_runs = await get_all_runs(db, collection_id)
         
         return {
-            "collection": dict(collection),
+            "collection": collection_dict,
             "images": [dict(img) for img in images],
-            "latest_run": dict(latest_run) if latest_run else None,
+            "latest_run": latest_run_dict,
             "all_runs": [dict(run) for run in all_runs],
+            "can_start_run": can_start_run,
             "server_time": datetime.now(timezone.utc).isoformat(),
         }
 

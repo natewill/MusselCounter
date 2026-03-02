@@ -1,11 +1,9 @@
 import { useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { startRun } from '@/lib/api';
-import { invalidateCollectionQuery } from '@/utils/queryUtils';
-import { getThresholdValidationError } from '@/utils/validation';
 
 export function useStartRun(
-  collectionId: number | null,
+  collectionId: number,
   selectedModelId: number | null,
   threshold: number,
   loading: boolean,
@@ -23,20 +21,8 @@ export function useStartRun(
   }, []);
 
   const handleStartNewRun = async () => {
-    if (!collectionId) {
-      setError('No collection available to start a run.');
-      return;
-    }
-    
     if (!selectedModelId) {
       setError('Please select a model before starting a run.');
-      return;
-    }
-    
-    // Validate threshold
-    const thresholdError = getThresholdValidationError(threshold);
-    if (thresholdError) {
-      setError(thresholdError);
       return;
     }
     
@@ -48,10 +34,10 @@ export function useStartRun(
     setLoading(true);
     setError(null);
     try {
-      const runResponse = await startRun(collectionId, selectedModelId, threshold);
+      await startRun(collectionId, selectedModelId, threshold);
 
       // Invalidate and refetch collection data to show the new run
-      invalidateCollectionQuery(queryClient, collectionId);
+      queryClient.invalidateQueries({ queryKey: ['collection', collectionId] });
       
       // Reset loading after run starts (the run will be processed in background)
       setLoading(false);
@@ -69,4 +55,3 @@ export function useStartRun(
 
   return { handleStartNewRun };
 }
-

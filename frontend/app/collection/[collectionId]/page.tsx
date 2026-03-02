@@ -21,7 +21,6 @@ import LoadingState from '@/components/run/LoadingState';
 import ErrorState from '@/components/run/ErrorState';
 import UploadProgress from '@/components/run/UploadProgress';
 import SuccessMessage from '@/components/run/SuccessMessage';
-import { shouldEnableStartRunButton } from '@/utils/run/runUtils';
 import { updateCollection } from '@/lib/api';
 
 export default function RunResultsPage() {
@@ -46,9 +45,9 @@ export default function RunResultsPage() {
   // Custom hooks
   const { models } = useModels();
   const { collectionData, collection, images, latestRun, isRunning, threshold, setThreshold, loading, error, setError, setLoading, refetch } = useCollectionData(collectionId, selectedModelId);
-  const { successMessage, setSuccessMessage, recentlyUploadedImageIds, setRecentlyUploadedImageIds } = useStorageData();
+  const { successMessage, setSuccessMessage, setRecentlyUploadedImageIds } = useStorageData();
   const { uploading, handleFileInputChange } = useImageUpload(collectionId, setError, setLoading, setRecentlyUploadedImageIds, setSuccessMessage);
-  const { deletingImageId, handleDeleteImage } = useImageDelete(collectionId, setError, isRunning, refetch);
+  const { deletingImageId, handleDeleteImage } = useImageDelete(collectionId, setError, isRunning);
   
   // Handle starting new run
   const { handleStartNewRun } = useStartRun(collectionId, selectedModelId, threshold, loading, setLoading, setError);
@@ -173,6 +172,11 @@ export default function RunResultsPage() {
     } finally {
       setSavingName(false);
     }
+  };
+
+  const handleDeleteAndRefresh = async (imageId: number) => {
+    await handleDeleteImage(imageId);
+    await refetch();
   };
 
   // Loading state
@@ -307,8 +311,9 @@ export default function RunResultsPage() {
               loading ||
               uploading ||
               isRunning ||
+              !selectedModelId ||
               images.length === 0 ||
-              !shouldEnableStartRunButton(images, selectedModelId, latestRun, recentlyUploadedImageIds)
+              !(collectionData?.can_start_run ?? false)
             }
             models={models}
             selectedModelId={selectedModelId}
@@ -322,7 +327,7 @@ export default function RunResultsPage() {
 
         <ImageList
           images={images}
-          onDeleteImage={handleDeleteImage}
+          onDeleteImage={handleDeleteAndRefresh}
           deletingImageId={deletingImageId}
           selectedModelId={selectedModelId}
           sortBy={sortBy}

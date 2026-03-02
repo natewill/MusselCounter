@@ -97,12 +97,6 @@ export async function handleFileSelect(
     // Get upload counts for success message
     const addedCount = uploadResult?.added_count || 0;
     const duplicateCount = uploadResult?.duplicate_count || 0;
-    const uploadedImageIds = uploadResult?.image_ids || [];
-    const duplicateImageIds = uploadResult?.duplicate_image_ids || [];
-    
-    // Exclude duplicates from recently uploaded IDs
-    const { filterNonDuplicateIds } = await import('@/utils/imageUtils');
-    const nonDuplicateIds = filterNonDuplicateIds(uploadedImageIds, duplicateImageIds);
     
     // Navigate to collection page with upload counts in URL query params
     // The collection page will show "X images added!" and a button to start the run

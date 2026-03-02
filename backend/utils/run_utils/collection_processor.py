@@ -311,8 +311,6 @@ async def _process_batch_inference(
                     dead_count,
                     polygon_path,
                     now,
-                    result['image_width'],
-                    result['image_height'],
                     image_id
                 ))
                 batch_results.append((image_id, True, live_count, dead_count))
@@ -335,17 +333,8 @@ async def _process_batch_inference(
             processed_count += len(batch_result)
             if updates:
                 async with aiosqlite.connect(db_path) as db_batch:
-                    dimension_updates = [(width, height, image_id)
-                                        for _, _, _, _, width, height, image_id in updates]
-                    await db_batch.executemany(
-                        """UPDATE image 
-                           SET width = ?, height = ?
-                           WHERE image_id = ?""",
-                        dimension_updates
-                    )
-                    
                     result_inserts = [(run_id, image_id, live_count, dead_count, polygon_path, processed_at, None)
-                                     for live_count, dead_count, polygon_path, processed_at, _, _, image_id in updates]
+                                     for live_count, dead_count, polygon_path, processed_at, image_id in updates]
                     await db_batch.executemany(
                         """INSERT INTO image_result 
                            (run_id, image_id, live_mussel_count, dead_mussel_count, polygon_path, processed_at, error_msg)

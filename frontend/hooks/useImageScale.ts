@@ -7,22 +7,22 @@ interface ImageScale {
 
 interface UseImageScaleProps {
   imageRef: React.RefObject<HTMLImageElement>;
-  imageData: { width?: number; height?: number } | null;
   enabled?: boolean;
 }
 
-export function useImageScale({ imageRef, imageData, enabled = true }: UseImageScaleProps): ImageScale {
+export function useImageScale({ imageRef, enabled = true }: UseImageScaleProps): ImageScale {
   const [scale, setScale] = useState<ImageScale>({ scaleX: 1, scaleY: 1 });
 
   useEffect(() => {
     if (!enabled) return;
+    const currentImage = imageRef.current;
 
     const updateScale = () => {
-      if (imageRef.current && imageData) {
-        const displayedWidth = imageRef.current.offsetWidth;
-        const displayedHeight = imageRef.current.offsetHeight;
-        const originalWidth = imageData.width || displayedWidth;
-        const originalHeight = imageData.height || displayedHeight;
+      if (currentImage) {
+        const displayedWidth = currentImage.offsetWidth;
+        const displayedHeight = currentImage.offsetHeight;
+        const originalWidth = currentImage.naturalWidth || displayedWidth;
+        const originalHeight = currentImage.naturalHeight || displayedHeight;
         
         setScale({
           scaleX: displayedWidth / originalWidth,
@@ -32,20 +32,19 @@ export function useImageScale({ imageRef, imageData, enabled = true }: UseImageS
     };
 
     // Update scale when image loads or window resizes
-    if (imageRef.current) {
-      imageRef.current.addEventListener('load', updateScale);
+    if (currentImage) {
+      currentImage.addEventListener('load', updateScale);
       window.addEventListener('resize', updateScale);
       updateScale();
     }
 
     return () => {
-      if (imageRef.current) {
-        imageRef.current.removeEventListener('load', updateScale);
+      if (currentImage) {
+        currentImage.removeEventListener('load', updateScale);
       }
       window.removeEventListener('resize', updateScale);
     };
-  }, [imageRef, imageData, enabled]);
+  }, [imageRef, enabled]);
 
   return scale;
 }
-

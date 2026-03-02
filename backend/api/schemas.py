@@ -96,8 +96,6 @@ class ImageResponse(BaseModel):
     filename: str
     stored_path: str
     file_hash: Optional[str] = None
-    width: Optional[int] = None
-    height: Optional[int] = None
     created_at: str
     processed_model_ids: List[int] = Field(default_factory=list)
 

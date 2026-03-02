@@ -21,10 +21,6 @@ class ImageDetailResponse(BaseModel):
     image_id: int
     filename: str
     stored_path: str
-    width: Optional[int]
-    height: Optional[int]
-    file_hash: str
-    created_at: str
     
     # Run/Model info
     run_id: int
@@ -58,7 +54,7 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
     Get detailed results for a specific image from a specific run.
     
     Returns comprehensive data including:
-    - Image metadata (filename, dimensions, hash, etc.)
+    - Image metadata (filename and stored path)
     - Mussel counts (live, dead, total, percentages)
     - Polygon data (coordinates, labels, confidence scores)
     - Model information (which model was used, threshold)
@@ -84,10 +80,6 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
                 i.image_id,
                 i.filename,
                 i.stored_path,
-                i.file_hash,
-                i.width,
-                i.height,
-                i.created_at,
                 ir.live_mussel_count,
                 ir.dead_mussel_count,
                 ir.polygon_path,
@@ -118,7 +110,7 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
             # Return a placeholder response with zero counts so the image page can still render.
             # Get basic image metadata scoped to the collection
             image_cursor = await db.execute("""
-                SELECT i.image_id, i.filename, i.stored_path, i.file_hash, i.width, i.height, i.created_at,
+                SELECT i.image_id, i.filename, i.stored_path,
                        c.collection_id, c.name as collection_name
                 FROM image i
                 JOIN collection_image ci ON ci.image_id = i.image_id
@@ -147,10 +139,6 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
                 image_id=image_row['image_id'],
                 filename=image_row['filename'],
                 stored_path=image_row['stored_path'],
-                file_hash=image_row['file_hash'],
-                width=image_row['width'],
-                height=image_row['height'],
-                created_at=image_row['created_at'],
                 run_id=0,
                 model_id=model_id,
                 model_name=model_row['name'],
@@ -161,7 +149,7 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
                 total_mussel_count=0,
                 live_percentage=None,
                 dead_percentage=None,
-                processed_at=image_row['created_at'],
+                processed_at=datetime.now(timezone.utc).isoformat(),
                 error_msg="No results yet for this model in this collection",
                 polygons=[],
                 detection_count=0,
@@ -219,10 +207,6 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
             image_id=result['image_id'],
             filename=result['filename'],
             stored_path=result['stored_path'],
-            file_hash=result['file_hash'],
-            width=result['width'],
-            height=result['height'],
-            created_at=result['created_at'],
             
             # Run/Model info
             run_id=result['run_id'],

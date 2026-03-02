@@ -10,10 +10,6 @@ interface ImageStatsPanelProps {
     model_type: string;
     threshold: number;
     processed_at: string;
-    width?: number;
-    height?: number;
-    file_hash: string;
-    created_at: string;
   };
 }
 
@@ -75,34 +71,6 @@ export default function ImageStatsPanel({ imageData }: ImageStatsPanelProps) {
           </div>
         </div>
       </div>
-
-      {/* Image Details */}
-      <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-6">
-        <h2 className="text-xl font-semibold mb-4 text-zinc-900 dark:text-zinc-100">Image Details</h2>
-        <div className="space-y-2 text-sm">
-          {imageData.width && imageData.height && (
-            <div>
-              <span className="text-zinc-600 dark:text-zinc-400">Dimensions: </span>
-              <span className="font-medium text-zinc-900 dark:text-zinc-100">
-                {imageData.width} × {imageData.height}
-              </span>
-            </div>
-          )}
-          <div>
-            <span className="text-zinc-600 dark:text-zinc-400">File Hash: </span>
-            <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400">
-              {imageData.file_hash}
-            </span>
-          </div>
-          <div>
-            <span className="text-zinc-600 dark:text-zinc-400">Uploaded: </span>
-            <span className="font-medium text-zinc-900 dark:text-zinc-100">
-              {new Date(imageData.created_at).toLocaleString()}
-            </span>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
-

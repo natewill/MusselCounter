@@ -14,8 +14,6 @@ CREATE TABLE IF NOT EXISTS image (
   filename    TEXT NOT NULL,             -- original filename
   stored_path TEXT NOT NULL,             -- where the file is stored
   file_hash   TEXT UNIQUE,               -- MD5 hash for deduplication (UNIQUE ensures no duplicates)
-  width       INTEGER,
-  height      INTEGER,
   created_at  TEXT NOT NULL              -- SQLite uses TEXT for dates (ISO format)
 );
 

@@ -24,9 +24,6 @@ interface ImageData {
   collection_id: number;
   filename: string;
   stored_path: string;
-  file_hash: string;
-  width?: number;
-  height?: number;
   live_mussel_count: number;
   dead_mussel_count: number;
   total_mussel_count: number;
@@ -35,7 +32,6 @@ interface ImageData {
   model_type: string;
   threshold: number;
   processed_at: string;
-  created_at: string;
   model_id?: number;
   polygons: Polygon[];
 }
@@ -66,12 +62,11 @@ export default function ImageDetailPage() {
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   // Calculate scale for main image
-  const imageScale = useImageScale({ imageRef, imageData });
+  const imageScale = useImageScale({ imageRef });
   
   // Calculate scale for fullscreen image
   const fullscreenScale = useImageScale({ 
     imageRef: fullscreenImageRef, 
-    imageData, 
     enabled: isFullscreen 
   });
 

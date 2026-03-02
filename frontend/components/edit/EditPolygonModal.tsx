@@ -3,7 +3,6 @@
 interface Polygon {
   class: 'live' | 'dead';
   confidence: number;
-  original_class?: string;
   manually_edited: boolean;
 }
 
@@ -71,7 +70,7 @@ export default function EditPolygonModal({
           <div>
             <div className="text-sm text-zinc-600 dark:text-zinc-400 mb-1">Confidence</div>
             <div className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
-              {(polygon.confidence * 100).toFixed(1)}% {polygon.original_class ? polygon.original_class.charAt(0).toUpperCase() + polygon.original_class.slice(1) : polygon.class.charAt(0).toUpperCase() + polygon.class.slice(1)}
+              {(polygon.confidence * 100).toFixed(1)}%
             </div>
           </div>
 
@@ -113,4 +112,3 @@ export default function EditPolygonModal({
     </div>
   );
 }
-

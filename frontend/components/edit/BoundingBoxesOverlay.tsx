@@ -15,6 +15,21 @@ interface BoundingBoxesOverlayProps {
   onPolygonHover: (index: number | null) => void;
 }
 
+function getPolygonBounds(coords: number[][]) {
+  if (!coords || coords.length === 0) {
+    return null;
+  }
+
+  const xs = coords.map((coord) => coord[0]);
+  const ys = coords.map((coord) => coord[1]);
+  return {
+    minX: Math.min(...xs),
+    minY: Math.min(...ys),
+    maxX: Math.max(...xs),
+    maxY: Math.max(...ys),
+  };
+}
+
 export default function BoundingBoxesOverlay({
   polygons,
   scale,
@@ -35,6 +50,11 @@ export default function BoundingBoxesOverlay({
           coord[0] * scale.scaleX,
           coord[1] * scale.scaleY,
         ]);
+        const bounds = getPolygonBounds(scaledCoords);
+
+        if (!bounds || scaledCoords.length === 0) {
+          return null;
+        }
 
         const pathData = scaledCoords
           .map((coord: number[], i: number) => 
@@ -74,10 +94,10 @@ export default function BoundingBoxesOverlay({
             />
 
             {/* label w/ confidence */}
-            {scaledCoords[0] && (() => {
+            {(() => {
               const labelText = `${polygon.class} ${(polygon.confidence * 100).toFixed(0)}%`;
-              const labelX = scaledCoords[0][0];
-              const labelY = scaledCoords[0][1] - 5;
+              const labelX = bounds.minX;
+              const labelY = bounds.minY - 5;
 
               const textWidth = labelText.length * 6;
               const textHeight = 14;

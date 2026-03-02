@@ -12,9 +12,8 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from db import get_db
 from utils.model_utils import get_all_models, get_model
 from utils.security import sanitize_filename, validate_path_in_directory
-from utils.validation import validate_file_size
 from api.schemas import ModelResponse
-from config import MODELS_DIR, MAX_MODEL_SIZE
+from config import MODELS_DIR
 from datetime import datetime, timezone
 
 router = APIRouter(prefix="/api/models", tags=["models"])
@@ -64,13 +63,9 @@ async def create_model_endpoint(
             detail=f"Invalid file type. Supported: {', '.join(MODEL_EXTENSIONS)}"
         )
 
-    if file.size:
-        validate_file_size(file.size, MAX_MODEL_SIZE)
-
     content = await file.read()
     if not content:
         raise HTTPException(status_code=400, detail="File is empty")
-    validate_file_size(len(content), MAX_MODEL_SIZE)
 
     if not model_type:
         filename_lower = sanitized_filename.lower()

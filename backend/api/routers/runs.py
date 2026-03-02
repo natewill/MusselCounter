@@ -16,8 +16,8 @@ from db import get_db
 from utils.collection_utils import get_collection
 from utils.model_utils import get_model
 from utils.run_utils import get_or_create_run, process_collection_run, get_run, update_run_status
-from utils.validation import validate_threshold
 from api.schemas import StartRunRequest, RunResponse
+from config import DEFAULT_THRESHOLD
 
 router = APIRouter(prefix="/api", tags=["runs"])
 
@@ -69,8 +69,8 @@ async def start_run_endpoint(
         if not model:
             raise HTTPException(status_code=404, detail="Model not found")
 
-        # Validate threshold (must be between 0.0 and 1.0)
-        threshold = validate_threshold(run_request.threshold)
+        # Request model already validates range; just apply default if explicitly null.
+        threshold = run_request.threshold if run_request.threshold is not None else DEFAULT_THRESHOLD
 
         # Get or create run record in database (reuses run if same collection+model+threshold)
         run_id, _ = await get_or_create_run(db, collection_id, run_request.model_id, threshold)

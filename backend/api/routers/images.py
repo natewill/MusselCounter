@@ -36,7 +36,6 @@ class ImageDetailResponse(BaseModel):
     live_percentage: Optional[float]  # Computed: (live / total) * 100
     dead_percentage: Optional[float]  # Computed: (dead / total) * 100
     processed_at: str
-    error_msg: Optional[str]
     
     # Polygon data
     polygons: List[Dict[str, Any]]  # Full polygon data with labels and confidence
@@ -44,7 +43,6 @@ class ImageDetailResponse(BaseModel):
     
     # Collection context (helpful for navigation)
     collection_id: int
-    collection_name: Optional[str]
 
 
 #When you open an image in the /results page this is called
@@ -59,7 +57,7 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
     - Polygon data (coordinates, labels, confidence scores)
     - Model information (which model was used, threshold)
     - Collection context (for navigation back to collection/run)
-    - Processing metadata (when processed, errors if any)
+    - Processing metadata (when processed)
     
     Args:
         image_id: ID of the image to get results for
@@ -84,19 +82,16 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
                 ir.dead_mussel_count,
                 ir.polygon_path,
                 ir.processed_at,
-                ir.error_msg,
                 r.run_id,
                 r.collection_id,
                 r.threshold,
                 r.model_id,
                 m.name as model_name,
-                m.type as model_type,
-                c.name as collection_name
+                m.type as model_type
             FROM image i
             JOIN image_result ir ON i.image_id = ir.image_id
             JOIN run r ON ir.run_id = r.run_id
             JOIN model m ON r.model_id = m.model_id
-            LEFT JOIN collection c ON r.collection_id = c.collection_id
             WHERE i.image_id = ? AND r.model_id = ?
               AND r.collection_id = ?
             ORDER BY r.run_id DESC
@@ -110,12 +105,10 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
             # Return a placeholder response with zero counts so the image page can still render.
             # Get basic image metadata scoped to the collection
             image_cursor = await db.execute("""
-                SELECT i.image_id, i.filename, i.stored_path,
-                       c.collection_id, c.name as collection_name
+                SELECT i.image_id, i.filename, i.stored_path, ci.collection_id
                 FROM image i
                 JOIN collection_image ci ON ci.image_id = i.image_id
-                JOIN collection c ON c.collection_id = ci.collection_id
-                WHERE i.image_id = ? AND c.collection_id = ?
+                WHERE i.image_id = ? AND ci.collection_id = ?
                 LIMIT 1
             """, (image_id, collection_id))
             image_row = await image_cursor.fetchone()
@@ -150,11 +143,9 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
                 live_percentage=None,
                 dead_percentage=None,
                 processed_at=datetime.now(timezone.utc).isoformat(),
-                error_msg="No results yet for this model in this collection",
                 polygons=[],
                 detection_count=0,
                 collection_id=image_row['collection_id'],
-                collection_name=image_row['collection_name'],
             )
         
         # Build polygon payload from detection rows in the database.
@@ -222,7 +213,6 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
             live_percentage=live_percentage,
             dead_percentage=dead_percentage,
             processed_at=result['processed_at'],
-            error_msg=result['error_msg'],
             
             # Polygon data
             polygons=polygons,
@@ -230,7 +220,6 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
             
             # Collection context
             collection_id=result['collection_id'],
-            collection_name=result['collection_name'],
         )
 
 

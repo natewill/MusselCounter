@@ -15,36 +15,58 @@ export function useImageScale({ imageRef, enabled = true }: UseImageScaleProps):
 
   useEffect(() => {
     if (!enabled) return;
-    const currentImage = imageRef.current;
+
+    let mounted = true;
+    let currentImage: HTMLImageElement | null = null;
+    let rafId: number | null = null;
+    let observer: ResizeObserver | null = null;
 
     const updateScale = () => {
-      if (currentImage) {
-        const displayedWidth = currentImage.offsetWidth;
-        const displayedHeight = currentImage.offsetHeight;
-        const originalWidth = currentImage.naturalWidth || displayedWidth;
-        const originalHeight = currentImage.naturalHeight || displayedHeight;
-        
-        setScale({
-          scaleX: displayedWidth / originalWidth,
-          scaleY: displayedHeight / originalHeight,
-        });
-      }
+      if (!currentImage || !mounted) return;
+      const displayedWidth = currentImage.offsetWidth;
+      const displayedHeight = currentImage.offsetHeight;
+      const originalWidth = currentImage.naturalWidth || displayedWidth;
+      const originalHeight = currentImage.naturalHeight || displayedHeight;
+
+      if (!originalWidth || !originalHeight) return;
+      setScale({
+        scaleX: displayedWidth / originalWidth,
+        scaleY: displayedHeight / originalHeight,
+      });
     };
 
-    // Update scale when image loads or window resizes
-    if (currentImage) {
+    const attachWhenReady = () => {
+      if (!mounted) return;
+      const el = imageRef.current;
+      if (!el) {
+        rafId = window.requestAnimationFrame(attachWhenReady);
+        return;
+      }
+
+      currentImage = el;
       currentImage.addEventListener('load', updateScale);
       window.addEventListener('resize', updateScale);
+      observer = new ResizeObserver(updateScale);
+      observer.observe(currentImage);
       updateScale();
-    }
+    };
+
+    attachWhenReady();
 
     return () => {
+      mounted = false;
+      if (rafId !== null) {
+        window.cancelAnimationFrame(rafId);
+      }
       if (currentImage) {
         currentImage.removeEventListener('load', updateScale);
       }
       window.removeEventListener('resize', updateScale);
+      if (observer) {
+        observer.disconnect();
+      }
     };
-  }, [imageRef, enabled]);
+  }, [enabled, imageRef]);
 
   return scale;
 }

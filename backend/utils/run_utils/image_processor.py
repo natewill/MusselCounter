@@ -3,12 +3,13 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 import aiosqlite
+from config import DB_PATH
 from utils.model_utils import run_inference_on_image
 
 
-async def _record_error(db_path: str, run_id: int, image_id: int, message: str) -> tuple[int, bool, int, int]:
+async def _record_error(run_id: int, image_id: int, message: str) -> tuple[int, bool, int, int]:
     try:
-        async with aiosqlite.connect(db_path) as db:
+        async with aiosqlite.connect(DB_PATH) as db:
             now = datetime.now(timezone.utc).isoformat()
             await db.execute(
                 """INSERT OR REPLACE INTO image_result
@@ -22,7 +23,7 @@ async def _record_error(db_path: str, run_id: int, image_id: int, message: str) 
     return (image_id, False, 0, 0)
 
 
-async def _get_counts_from_db(db_path: str, run_id: int, image_id: int, threshold: float) -> tuple[int, int]:
+async def _get_counts_from_db(run_id: int, image_id: int, threshold: float) -> tuple[int, int]:
     """
     Query the database to get live/dead counts for an image based on threshold.
     
@@ -31,7 +32,6 @@ async def _get_counts_from_db(db_path: str, run_id: int, image_id: int, threshol
     - live / dead are model values and are threshold filtered
     
     Args:
-        db_path: Path to database
         run_id: Run ID
         image_id: Image ID
         threshold: Threshold to filter by
@@ -39,7 +39,7 @@ async def _get_counts_from_db(db_path: str, run_id: int, image_id: int, threshol
     Returns:
         Tuple of (live_count, dead_count)
     """
-    async with aiosqlite.connect(db_path) as db:
+    async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cursor = await db.execute(
             """SELECT
@@ -77,12 +77,11 @@ async def _run_inference(model_device, image_path: str, model_type: str):
     return await loop.run_in_executor(None, run_inference_on_image, model_device, image_path, model_type)
 
 
-async def _save_detections_to_db(db_path: str, run_id: int, image_id: int, result: dict) -> None:
+async def _save_detections_to_db(run_id: int, image_id: int, result: dict) -> None:
     """
     Save individual detections to the detection table for threshold recalculation.
 
     Args:
-        db_path: Path to SQLite database
         run_id: ID of the current run
         image_id: ID of the image being processed
         result: Inference result dict containing polygons with confidence scores
@@ -105,7 +104,7 @@ async def _save_detections_to_db(db_path: str, run_id: int, image_id: int, resul
                 now,
             ))
 
-        async with aiosqlite.connect(db_path) as db:
+        async with aiosqlite.connect(DB_PATH) as db:
             await db.executemany(
                 """INSERT INTO detection
                    (run_id, image_id, confidence, class, bbox, created_at)
@@ -119,39 +118,29 @@ async def _save_detections_to_db(db_path: str, run_id: int, image_id: int, resul
 
 
 async def process_image_for_run(
-    db_path: str,
     run_id: int,
     image_id: int,
     image_path: str,
-    image_filename: str,
     model_device,
     threshold: float,
     model_type: str,
-    idx: int,
-    total: int,
 ) -> tuple[int, bool, int, int]:
     try:
         if not Path(image_path).exists():
-            return await _record_error(db_path, run_id, image_id, f"Image file not found: {image_path}")
+            return await _record_error(run_id, image_id, f"Image file not found: {image_path}")
         try:
             result = await _run_inference(model_device, image_path, model_type)
         except Exception as exc:
-            return await _record_error(db_path, run_id, image_id, f"Inference error: {exc}")
+            return await _record_error(run_id, image_id, f"Inference error: {exc}")
         
         # Save ALL detections to database (threshold 0.0)
-        await _save_detections_to_db(db_path, run_id, image_id, result)
+        await _save_detections_to_db(run_id, image_id, result)
 
-        # Query database to get counts based on run's threshold
-        # This uses the same logic as the recalculation endpoint
-        try:
-            live_count, dead_count = await _get_counts_from_db(db_path, run_id, image_id, threshold)
-        except Exception as e:
-            # Fallback: count all detections (shouldn't happen, but safe fallback)
-            live_count = sum(1 for p in result['polygons'] if p.get('class') == 'live')
-            dead_count = sum(1 for p in result['polygons'] if p.get('class') == 'dead')
+        # Query database to get counts based on run's threshold.
+        live_count, dead_count = await _get_counts_from_db(run_id, image_id, threshold)
         
         now = datetime.now(timezone.utc).isoformat()
-        async with aiosqlite.connect(db_path) as db:
+        async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
                 """INSERT OR REPLACE INTO image_result
                    (run_id, image_id, live_mussel_count, dead_mussel_count, processed_at, error_msg)
@@ -161,4 +150,4 @@ async def process_image_for_run(
             await db.commit()
         return (image_id, True, live_count, dead_count)
     except Exception as exc:
-        return await _record_error(db_path, run_id, image_id, f"Processing error: {exc}")
+        return await _record_error(run_id, image_id, f"Processing error: {exc}")

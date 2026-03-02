@@ -36,6 +36,7 @@ class ImageDetailResponse(BaseModel):
     live_percentage: Optional[float]  # Computed: (live / total) * 100
     dead_percentage: Optional[float]  # Computed: (dead / total) * 100
     processed_at: str
+    error_msg: Optional[str] = None
     
     # Detection data
     polygons: List[Dict[str, Any]]  # Detection payloads with bbox, labels, and confidence
@@ -81,6 +82,7 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
                 ir.live_mussel_count,
                 ir.dead_mussel_count,
                 ir.processed_at,
+                ir.error_msg,
                 r.run_id,
                 r.collection_id,
                 r.threshold,
@@ -142,6 +144,7 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
                 live_percentage=None,
                 dead_percentage=None,
                 processed_at=datetime.now(timezone.utc).isoformat(),
+                error_msg=None,
                 polygons=[],
                 detection_count=0,
                 collection_id=image_row['collection_id'],
@@ -212,6 +215,7 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
             live_percentage=live_percentage,
             dead_percentage=dead_percentage,
             processed_at=result['processed_at'],
+            error_msg=result['error_msg'],
             
             # Polygon data
             polygons=polygons,

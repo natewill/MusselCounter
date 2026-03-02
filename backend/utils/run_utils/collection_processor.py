@@ -1,5 +1,17 @@
 """
-Collection processing orchestrator for inference runs.
+Collection-run orchestration for model inference.
+
+This module coordinates the full lifecycle of a run:
+1) Validate run/model metadata and load model weights.
+2) Determine which images still need processing for this run.
+3) Process remaining images sequentially and persist per-image progress.
+4) Aggregate final totals and mark run status.
+
+Important behavior:
+- Runs are resumable/reusable: if a run already has image_result rows,
+  only missing images are processed.
+- Image processing is intentionally sequential to reduce CPU spikes and
+  simplify runtime behavior.
 """
 import asyncio
 from datetime import datetime, timezone
@@ -17,13 +29,10 @@ from .image_processor import process_image_for_run
 
 async def _fail(db: aiosqlite.Connection, run_id: int, message: str, status: str = 'failed') -> None:
     """
-    Helper function to log errors and update run status to failed.
-    
-    Args:
-        db: Database connection
-        run_id: Run ID
-        message: Error message
-        status: Status to set (default: 'failed')
+    Best-effort run failure/update helper.
+
+    We never want error-reporting itself to crash the task, so this function
+    intentionally suppresses secondary exceptions from status updates.
     """
     try:
         await update_run_status(db, run_id, status, message)
@@ -33,11 +42,17 @@ async def _fail(db: aiosqlite.Connection, run_id: int, message: str, status: str
 
 async def _setup_run_and_load_model(db: aiosqlite.Connection, run_id: int):
     """
-    Setup run and load model.
-    
+    Prepare run metadata and load the configured model.
+
+    Steps:
+    - Fetch run row and mark status as running.
+    - Resolve model metadata (weights path + model type).
+    - Validate weights file exists.
+    - Load model in a worker thread so the event loop stays responsive.
+
     Returns:
-        Tuple of (model_device, collection_id, threshold, model_type)
-        or None if setup fails
+        (model_device, collection_id, threshold, model_type) on success.
+        None when setup fails (and run is marked failed).
     """
     run = await get_run(db, run_id)
     if not run:
@@ -61,7 +76,7 @@ async def _setup_run_and_load_model(db: aiosqlite.Connection, run_id: int):
         await _fail(db, run_id, f"Model weights file not found: {weights_path}")
         return None
     
-    # Load model in background thread to avoid blocking the event loop
+    # PyTorch model loading is blocking/CPU-heavy; push it off the event loop.
     try:
         to_thread = getattr(asyncio, "to_thread", None)
         if to_thread:
@@ -78,11 +93,15 @@ async def _setup_run_and_load_model(db: aiosqlite.Connection, run_id: int):
 
 async def _prepare_images(db: aiosqlite.Connection, collection_id: int, run_id: int):
     """
-    Get images from collection and check which are already processed.
-    
+    Build the image worklist for a run.
+
     Returns:
-        Tuple of (images_to_process, total_images, images_already_done)
-        or None if no images found
+        (images_to_process, total_images, images_already_done)
+        or None when the collection has no images.
+
+    Notes:
+    - We check image_result for this run_id to support run reuse.
+    - Only images without a result row are sent through inference again.
     """
     # Get all images in the collection
     all_images = await get_collection_images(db, collection_id)
@@ -111,7 +130,10 @@ async def _prepare_images(db: aiosqlite.Connection, collection_id: int, run_id: 
 
 async def _handle_all_images_processed(db: aiosqlite.Connection, run_id: int, total_images: int):
     """
-    Handle case where all images are already processed - recalculate totals and mark completed.
+    Finalize a run when there is nothing left to process.
+
+    This path is hit when every image in the collection already has an
+    image_result row for this run_id.
     """
     cursor = await db.execute(
         """SELECT SUM(live_mussel_count) FROM image_result WHERE run_id = ?""",
@@ -135,7 +157,6 @@ async def _handle_all_images_processed(db: aiosqlite.Connection, run_id: int, to
 
 
 async def _process_single_images(
-    db_path: str,
     run_id: int,
     images: list,
     model_device,
@@ -144,7 +165,7 @@ async def _process_single_images(
     images_already_done: int = 0,
 ):
     """
-    Process images one at a time.
+    Process (run inference on) images sequentially (one image at a time).
 
     Returns:
         List of (image_id, success, live_count, dead_count) tuples
@@ -152,28 +173,32 @@ async def _process_single_images(
     results = []
     processed_count = 0
 
-    for idx, image in enumerate(images, start=1):
+    for image in images:
         try:
+            # Pull safe defaults so per-image failures are captured cleanly.
             image_id = image['image_id']
-            image_filename = image.get('filename', 'unknown')
             image_path = image.get('stored_path', 'unknown')
 
+            # process_image_for_run handles:
+            # - file existence checks
+            # - model inference
+            # - detection writes
+            # - thresholded counts
+            # - image_result writes
             result = await process_image_for_run(
-                db_path,
                 run_id,
                 image_id,
                 image_path,
-                image_filename,
                 model_device,
                 threshold,
                 model_type,
-                idx,
-                len(images),
             )
             results.append(result)
 
             processed_count += 1
-            async with aiosqlite.connect(db_path) as db_progress:
+            # Persist incremental progress after each image so polling clients
+            # get accurate progress updates during long runs.
+            async with aiosqlite.connect(DB_PATH) as db_progress:
                 await db_progress.execute(
                     "UPDATE run SET processed_count = ? WHERE run_id = ?",
                     (processed_count + images_already_done, run_id)
@@ -193,14 +218,15 @@ async def _finalize_run(
     images_already_done: int = 0
 ):
     """
-    Aggregate results and update run status to completed.
-    
-    Args:
-        db: Database connection
-        run_id: Run ID
-        results: List of (image_id, success, live_count, dead_count) tuples from this run
-        images_processed_in_this_run: Number of images that were processed in this run
-        images_already_done: Number of images that were already processed before this run
+    Aggregate final run totals and set terminal status.
+
+    Status rules:
+    - completed: every image processed in this invocation succeeded.
+    - completed_with_errors: at least one image failed in this invocation.
+
+    total_images is stored as:
+        images_already_done + images_processed_in_this_run
+    so resumed runs still report full collection progress.
     """
     successes = [result for result in results if result[1]]
     successful_images = len(successes)
@@ -235,19 +261,19 @@ async def _finalize_run(
 
 async def process_collection_run(db: aiosqlite.Connection, run_id: int):
     """
-    Process a collection run: load model, get images, run inference, and save results.
-    
-    This is the main function that orchestrates a complete inference run:
-    1. Loads the model and validates it exists
-    2. Gets all images in the collection (excluding duplicates)
-    3. Checks for cached results from previous runs with same model+threshold
-    4. Processes images one at a time
-    5. Writes results incrementally to the database for real-time updates
-    6. Aggregates final counts and updates run status
-    
-    Args:
-        db: Database connection
-        run_id: Run ID to process
+    Main run entrypoint used by the background task.
+
+    High-level flow:
+    1) Setup run + load model.
+    2) Build image worklist (skip already-processed images for this run).
+    3) Initialize run counters.
+    4) Process remaining images sequentially.
+    5) Finalize totals/status.
+
+    Error behavior:
+    - Any unhandled exception marks the run failed.
+    - If failure occurs but all images are already processed, we recover the
+      run into completed to avoid false failures on resumed/cached runs.
     """
     try:
         # Setup: Load run and model
@@ -277,9 +303,7 @@ async def process_collection_run(db: aiosqlite.Connection, run_id: int):
         )
         await db.commit()
         
-        db_path = DB_PATH
         results = await _process_single_images(
-            db_path,
             run_id,
             images_to_process,
             model_device,

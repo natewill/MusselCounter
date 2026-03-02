@@ -32,6 +32,7 @@ interface ImageData {
   model_type: string;
   threshold: number;
   processed_at: string;
+  error_msg: string | null;
   model_id?: number;
   polygons: Polygon[];
 }
@@ -181,6 +182,14 @@ export default function ImageDetailPage() {
           visiblePolygons={visiblePolygons}
           onToggleVisiblePolygons={() => setVisiblePolygons(!visiblePolygons)}
         />
+
+        {imageData.error_msg && (
+          <div className="mb-6 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+            <p className="text-amber-900 dark:text-amber-200 text-sm">
+              This image had a processing error in the selected run: {imageData.error_msg}
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <ImageDisplay

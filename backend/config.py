@@ -24,9 +24,6 @@ DB_PATH = os.getenv("DB_PATH", str(DATA_DIR / "mussel_counter.db"))  # SQLite da
 SCHEMA_PATH = Path(__file__).parent / "schema.sql"  # Path to SQL schema file
 RESET_DB_ON_STARTUP = os.getenv("RESET_DB_ON_STARTUP", "false").lower() in {"1", "true", "yes"}
 
-# Polygon storage
-POLYGON_DIR = Path(os.getenv("POLYGON_DIR", DATA_DIR / "polygons"))
-
 # CORS (Cross-Origin Resource Sharing) settings
 # For a solo app we default to allowing any origin. To restrict, set FRONTEND_URL.
 FRONTEND_URL = os.getenv("FRONTEND_URL")
@@ -47,6 +44,3 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # Ensure model directory exists so startup detection doesn't fail
 MODELS_DIR.mkdir(parents=True, exist_ok=True)
-
-# Ensure polygon directory exists
-POLYGON_DIR.mkdir(parents=True, exist_ok=True)

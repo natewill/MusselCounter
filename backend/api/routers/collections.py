@@ -35,7 +35,6 @@ from utils.collection_utils import (
 ) #functions imported from our utils folder to do sql logic
 from utils.image_utils import add_multiple_images_optimized
 from utils.file_processing import process_single_file
-from config import POLYGON_DIR
 
 # Create router with prefix - all endpoints will be under /api/collections
 router = APIRouter(prefix="/api/collections", tags=["collections"])
@@ -51,13 +50,6 @@ def _delete_file_if_exists(file_path: Optional[str]) -> None:
         Path(file_path).unlink(missing_ok=True)
     except Exception:
         pass
-
-
-def _delete_polygon_file_if_exists(detection_id: int) -> None:
-    """
-    Best-effort cleanup for polygon sidecar files keyed by detection ID.
-    """
-    _delete_file_if_exists(str(Path(POLYGON_DIR) / f"{detection_id}.json"))
 
 
 @router.post("") #if a POST request is sent to /api/collections, this function is called.
@@ -168,7 +160,6 @@ async def delete_collection_endpoint(collection_id: int):
         collection_image_rows = await collection_images_cursor.fetchall()
         candidate_image_ids = [row["image_id"] for row in collection_image_rows]
         orphan_rows = []
-        deleted_detection_ids: set[int] = set()
 
         # Find runs for this collection
         runs_cursor = await db.execute(
@@ -180,13 +171,6 @@ async def delete_collection_endpoint(collection_id: int):
 
         if run_ids:
             placeholders = ",".join(["?"] * len(run_ids))
-            deleted_detection_cursor = await db.execute(
-                f"SELECT detection_id FROM detection WHERE run_id IN ({placeholders})",
-                run_ids,
-            )
-            deleted_detection_rows = await deleted_detection_cursor.fetchall()
-            deleted_detection_ids.update(row["detection_id"] for row in deleted_detection_rows)
-
             # Delete detections for runs
             await db.execute(
                 f"DELETE FROM detection WHERE run_id IN ({placeholders})",
@@ -225,13 +209,6 @@ async def delete_collection_endpoint(collection_id: int):
 
             if orphan_image_ids:
                 orphan_placeholders = ",".join(["?"] * len(orphan_image_ids))
-                stale_detection_cursor = await db.execute(
-                    f"SELECT detection_id FROM detection WHERE image_id IN ({orphan_placeholders})",
-                    orphan_image_ids,
-                )
-                stale_detection_rows = await stale_detection_cursor.fetchall()
-                deleted_detection_ids.update(row["detection_id"] for row in stale_detection_rows)
-
                 # Defensive cleanup in case stale rows still reference orphan images.
                 await db.execute(
                     f"DELETE FROM detection WHERE image_id IN ({orphan_placeholders})",
@@ -256,8 +233,6 @@ async def delete_collection_endpoint(collection_id: int):
 
         for row in orphan_rows:
             _delete_file_if_exists(row["stored_path"])
-        for detection_id in deleted_detection_ids:
-            _delete_polygon_file_if_exists(detection_id)
 
         return {"status": "deleted", "collection_id": collection_id}
 
@@ -553,21 +528,12 @@ async def delete_image_from_collection_endpoint(
             (image_id, collection_id)
         )
         affected_runs = await runs_cursor.fetchall()
-        deleted_detection_ids: set[int] = set()
         
         # Delete image_result records for this image from runs in this collection
         # This ensures that when the image is re-added, it won't be marked as already processed
         if affected_runs:
             run_ids = [row[0] for row in affected_runs]
             placeholders = ','.join(['?'] * len(run_ids))
-            deleted_detection_cursor = await db.execute(
-                f"""SELECT detection_id FROM detection
-                    WHERE image_id = ? AND run_id IN ({placeholders})""",
-                (image_id, *run_ids)
-            )
-            deleted_detection_rows = await deleted_detection_cursor.fetchall()
-            deleted_detection_ids.update(row[0] for row in deleted_detection_rows)
-
             await db.execute(
                 f"""DELETE FROM image_result 
                    WHERE image_id = ? AND run_id IN ({placeholders})""",
@@ -611,13 +577,6 @@ async def delete_image_from_collection_endpoint(
 
         if not has_remaining_links and image_row:
             # Defensive cleanup in case stale rows still reference this orphan image.
-            stale_detection_cursor = await db.execute(
-                "SELECT detection_id FROM detection WHERE image_id = ?",
-                (image_id,),
-            )
-            stale_detection_rows = await stale_detection_cursor.fetchall()
-            deleted_detection_ids.update(row[0] for row in stale_detection_rows)
-
             await db.execute("DELETE FROM detection WHERE image_id = ?", (image_id,))
             await db.execute("DELETE FROM image_result WHERE image_id = ?", (image_id,))
             await db.execute("DELETE FROM image WHERE image_id = ?", (image_id,))
@@ -626,7 +585,5 @@ async def delete_image_from_collection_endpoint(
         await db.commit()
 
         _delete_file_if_exists(orphan_file_path)
-        for detection_id in deleted_detection_ids:
-            _delete_polygon_file_if_exists(detection_id)
-        
+
         return {"collection_id": collection_id, "image_id": image_id, "status": "removed"}

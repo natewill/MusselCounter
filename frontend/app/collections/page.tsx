@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import CollectionCard from '@/components/collections/CollectionCard';
 import { useCollections } from '@/hooks/useCollections';
-import { createQuickProcessCollection } from '@/utils/home/collection';
-import { deleteCollection, updateCollection } from '@/lib/api';
+import { createCollection, deleteCollection, updateCollection } from '@/lib/api';
 
 export default function CollectionsPage() {
   const router = useRouter();
@@ -73,7 +72,9 @@ export default function CollectionsPage() {
 
   const handleCreate = async () => {
     try {
-      const collectionId = await createQuickProcessCollection();
+      const name = `Quick Process - ${new Date().toLocaleString()}`;
+      const response = await createCollection(name);
+      const collectionId = response.collection_id;
       router.push(`/collection/${collectionId}`);
     } catch (err) {
       console.error('Failed to create collection', err);

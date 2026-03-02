@@ -1,7 +1,7 @@
 /**
  * File handling utilities for home page
  */
-import { uploadImagesToCollection } from '@/lib/api';
+import { createCollection, uploadImagesToCollection } from '@/lib/api';
 import { validateImageFiles } from '@/utils/validation';
 
 /**
@@ -53,17 +53,12 @@ export async function handleFileSelect(
   files,
   setLoading,
   setError,
-  createQuickProcessCollection,
   router
 ) {
   const { validFiles: imageFiles, errors: validationErrors } = validateImageFiles(files);
 
   if (imageFiles.length === 0) {
-    if (validationErrors.length > 0) {
-      setError(validationErrors.join(' '));
-    } else {
-      setError('Please select valid image files');
-    }
+    setError(validationErrors.join(' ') || 'Please select valid image files');
     return;
   }
   
@@ -76,23 +71,9 @@ export async function handleFileSelect(
   setError(null);
 
   try {
-    // Always create a new collection
-    let collectionId;
-    try {
-      collectionId = await createQuickProcessCollection();
-    } catch (err) {
-      console.error('Failed to create collection:', err);
-      throw new Error('Failed to create collection. Is the backend running?');
-    }
-
-    // Upload files
-    let uploadResult;
-    try {
-      uploadResult = await uploadImagesToCollection(collectionId, imageFiles);
-    } catch (err) {
-      const errorMsg = err.message || '';
-      throw new Error('Failed to upload files. ' + errorMsg);
-    }
+    const name = `Quick Process - ${new Date().toLocaleString()}`;
+    const { collection_id: collectionId } = await createCollection(name);
+    const uploadResult = await uploadImagesToCollection(collectionId, imageFiles);
 
     // Get upload counts for success message
     const addedCount = uploadResult?.added_count || 0;
@@ -112,7 +93,8 @@ export async function handleFileSelect(
     
     // Don't set loading to false - let the run page handle its own loading state
   } catch (err) {
-    setError(err.message || 'Failed to process images. Make sure the backend is running.');
+    const message = err instanceof Error ? err.message : 'Failed to process images. Make sure the backend is running.';
+    setError(message);
     setLoading(false);
     throw err;
   }

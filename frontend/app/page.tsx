@@ -5,8 +5,8 @@ import { useRouter } from 'next/navigation';
 import TopBar from '@/components/home/TopBar';
 import UploadArea from '@/components/home/UploadArea';
 import ErrorDisplay from '@/components/home/ErrorDisplay';
-import { createQuickProcessCollection } from '@/utils/home/collection';
 import { handleFileSelect, handleDroppedItems } from '@/utils/home/files';
+import { createCollection } from '@/lib/api';
 
 export default function Home() {
   const router = useRouter();
@@ -41,14 +41,14 @@ export default function Home() {
     if (e.dataTransfer.items) {
       const files = await handleDroppedItems(e.dataTransfer.items);
       if (files.length > 0) {
-        handleFileSelect(files, setLoading, setError, createQuickProcessCollection, router).catch(() => {
+        handleFileSelect(files, setLoading, setError, router).catch(() => {
           // Error already handled in handleFileSelect
         });
       }
     } else {
       // Fallback for older browsers
       const files = e.dataTransfer.files;
-      handleFileSelect(files, setLoading, setError, createQuickProcessCollection, router).catch(() => {
+      handleFileSelect(files, setLoading, setError, router).catch(() => {
         // Error already handled in handleFileSelect
       });
     }
@@ -56,7 +56,7 @@ export default function Home() {
 
   const handleFileInputChange = (e) => {
     const files = e.target.files;
-    handleFileSelect(files, setLoading, setError, createQuickProcessCollection, router).catch(() => {
+    handleFileSelect(files, setLoading, setError, router).catch(() => {
       // Error already handled in handleFileSelect
     });
   };
@@ -74,7 +74,7 @@ export default function Home() {
   const handleFolderInputChange = (e) => {
     const files = e.target.files;
     if (files && files.length > 0) {
-      handleFileSelect(files, setLoading, setError, createQuickProcessCollection, router).catch(() => {
+      handleFileSelect(files, setLoading, setError, router).catch(() => {
         // Error already handled in handleFileSelect
       });
     }
@@ -88,7 +88,9 @@ export default function Home() {
     
     try {
       // Always create a fresh collection for a new run
-      const collectionId = await createQuickProcessCollection();
+      const name = `Quick Process - ${new Date().toLocaleString()}`;
+      const response = await createCollection(name);
+      const collectionId = response.collection_id;
 
       // Navigate to collection page
       router.push(`/collection/${collectionId}`);

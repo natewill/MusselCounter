@@ -43,9 +43,9 @@ CREATE TABLE IF NOT EXISTS run (
   model_id      INTEGER NOT NULL,         -- Model used for this run
   started_at    TEXT NOT NULL,            -- SQLite uses TEXT for dates (ISO format)
   finished_at   TEXT,                     -- NULL if still running, set when done
-  status        TEXT DEFAULT 'pending',   -- 'pending', 'running', 'completed', 'failed'
+  status        TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'running', 'completed', 'failed', 'cancelled', 'completed_with_errors')),
   error_msg     TEXT,                      -- error if failed
-  threshold     REAL NOT NULL,   -- threshold score used for this run
+  threshold     REAL NOT NULL CHECK(threshold >= 0.0 AND threshold <= 1.0),   -- threshold score used for this run
   total_images  INTEGER DEFAULT 0,        -- number of images to process
   processed_count INTEGER DEFAULT 0,      -- number of images processed so far (for progress tracking)
   live_mussel_count INTEGER DEFAULT 0,    -- total live mussels detected in this run

@@ -92,7 +92,7 @@ async def update_run_status(
     Args:
         db: Database connection
         run_id: Run ID
-        status: New status ('pending', 'running', 'completed', 'failed')
+        status: New status ('pending', 'running', 'completed', 'failed', 'cancelled', 'completed_with_errors')
         error_msg: Optional error message
     """
     # Build update query safely (column names are hardcoded, not user input)
@@ -117,4 +117,3 @@ async def update_run_status(
     query = f"UPDATE run SET {', '.join(updates)} WHERE run_id = ?"
     await db.execute(query, values)
     await db.commit()
-

@@ -8,7 +8,7 @@ import torchvision.transforms as transforms
 from .common import RCNN_LABELS, convert_to_dictionary
 
 
-def _run_rcnn(model_device_tuple, image_path: str):
+def run_rcnn_inference(model_device_tuple, image_path: str):
     """
     Run Faster R-CNN inference on a single image.
 
@@ -64,12 +64,3 @@ def _run_rcnn(model_device_tuple, image_path: str):
         torch.cuda.empty_cache()
 
     return convert_to_dictionary(live, dead, polygons)
-
-
-def run_rcnn_inference(model_device_tuple, image_path: str):
-    """
-    Run R-CNN on a single image.
-
-    Public API for single-image processing.
-    """
-    return _run_rcnn(model_device_tuple, image_path)

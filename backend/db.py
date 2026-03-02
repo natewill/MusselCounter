@@ -136,7 +136,7 @@ async def init_db() -> None:
             )
             await db.commit()
         
-        # Models are now added via the API endpoint, not automatically on startup
+        # Seed model rows for any weights already present in MODELS_DIR.
         await _initialize_models(db)
 
 

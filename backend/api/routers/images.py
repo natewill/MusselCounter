@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, Body
 from pydantic import BaseModel
 from db import get_db
 from datetime import datetime, timezone
+from utils.detection_counts import get_counts_for_image
 
 router = APIRouter(prefix="/api/images", tags=["images"])
 
@@ -308,25 +309,7 @@ async def update_polygon_classification(
         run_info = await run_cursor.fetchone()
         threshold = run_info['threshold'] if run_info else 0.5
 
-        counts_cursor = await db.execute("""
-            SELECT
-                SUM(CASE
-                    WHEN class = 'edit_live' THEN 1
-                    WHEN class = 'live' AND confidence >= ? THEN 1
-                    ELSE 0
-                END) as live_count,
-                SUM(CASE
-                    WHEN class = 'edit_dead' THEN 1
-                    WHEN class = 'dead' AND confidence >= ? THEN 1
-                    ELSE 0
-                END) as dead_count
-            FROM detection
-            WHERE image_id = ? AND run_id = ?
-        """, (threshold, threshold, image_id, run_id))
-
-        counts = await counts_cursor.fetchone()
-        live_count = counts['live_count'] or 0
-        dead_count = counts['dead_count'] or 0
+        live_count, dead_count = await get_counts_for_image(db, run_id, image_id, threshold)
 
         # Update image_result
         now = datetime.now(timezone.utc).isoformat()

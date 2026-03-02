@@ -29,10 +29,10 @@ from utils.collection_utils import (
     get_collection_images,
     get_collection_images_with_results,
     get_latest_run,
-    get_latest_run_by_model,
     get_all_runs,
     remove_image_from_collection,
 ) #functions imported from our utils folder to do sql logic
+from utils.detection_counts import get_counts_by_image_for_run
 from utils.image_utils import add_multiple_images_optimized
 from utils.file_processing import process_single_file
 
@@ -246,11 +246,8 @@ async def get_collection_endpoint(
         if not collection:
             raise HTTPException(status_code=404, detail="Collection not found")
         
-        # Get latest run - either for specific model or overall latest
-        if model_id is not None:
-            latest_run = await get_latest_run_by_model(db, collection_id, model_id)
-        else:
-            latest_run = await get_latest_run(db, collection_id)
+        # Get latest run - either for specific model or overall latest.
+        latest_run = await get_latest_run(db, collection_id, model_id)
         
         if latest_run:
             # If there's a latest run, get images with their results from that run
@@ -259,7 +256,6 @@ async def get_collection_endpoint(
                 db,
                 collection_id,
                 latest_run_dict['run_id'],
-                latest_run_dict.get('threshold'),  # Filter results by threshold
             )
         else:
             # No runs yet, just get images without results
@@ -332,30 +328,7 @@ async def recalculate_threshold_endpoint(
 
         run_id = run_row[0]
 
-        # Query detections and recalculate counts with new threshold.
-        # Count logic:
-        # - edit_live / edit_dead always use the edited value
-        # - live / dead are model values and are threshold filtered
-        cursor = await db.execute(
-            """SELECT
-                   image_id,
-                   SUM(CASE
-                       WHEN class = 'edit_live' THEN 1
-                       WHEN class = 'live' AND confidence >= ? THEN 1
-                       ELSE 0
-                   END) as live_count,
-                   SUM(CASE
-                       WHEN class = 'edit_dead' THEN 1
-                       WHEN class = 'dead' AND confidence >= ? THEN 1
-                       ELSE 0
-                   END) as dead_count
-               FROM detection
-               WHERE run_id = ?
-               GROUP BY image_id""",
-            (threshold, threshold, run_id)
-        )
-
-        rows = await cursor.fetchall()
+        rows = await get_counts_by_image_for_run(db, run_id, threshold)
 
         # Build response and update database
         images_dict = {}
@@ -364,10 +337,7 @@ async def recalculate_threshold_endpoint(
         now = datetime.now(timezone.utc).isoformat()
 
         # Update each image_result with new counts
-        for row in rows:
-            image_id = row[0]
-            live_count = row[1] or 0
-            dead_count = row[2] or 0
+        for image_id, live_count, dead_count in rows:
 
             images_dict[image_id] = {
                 "live_count": live_count,

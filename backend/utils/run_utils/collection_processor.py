@@ -19,7 +19,6 @@ from pathlib import Path
 
 import aiosqlite
 
-from config import DB_PATH
 from utils.collection_utils import get_collection_images
 from utils.model_utils.db import get_model
 from utils.model_utils.loader import load_model
@@ -152,6 +151,7 @@ async def _handle_all_images_processed(db: aiosqlite.Connection, run_id: int, to
 
 
 async def _process_single_images(
+    db: aiosqlite.Connection,
     run_id: int,
     images: list,
     model_device,
@@ -192,12 +192,11 @@ async def _process_single_images(
         processed_count += 1
         # Persist incremental progress after each image so polling clients
         # get accurate progress updates during long runs.
-        async with aiosqlite.connect(DB_PATH) as db_progress:
-            await db_progress.execute(
-                "UPDATE run SET processed_count = ? WHERE run_id = ?",
-                (processed_count + images_already_done, run_id)
-            )
-            await db_progress.commit()
+        await db.execute(
+            "UPDATE run SET processed_count = ? WHERE run_id = ?",
+            (processed_count + images_already_done, run_id),
+        )
+        await db.commit()
     
     return results
 
@@ -295,6 +294,7 @@ async def process_collection_run(db: aiosqlite.Connection, run_id: int):
         await db.commit()
         
         results = await _process_single_images(
+            db,
             run_id,
             images_to_process,
             model_device,

@@ -72,12 +72,6 @@ async def create_model_endpoint(
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     file_path = MODELS_DIR / sanitized_filename
 
-    if file_path.exists():
-        raise HTTPException(
-            status_code=400,
-            detail=f"Model file {sanitized_filename} already exists"
-        )
-
     try:
         async with aiofiles.open(file_path, "xb") as f:
             await f.write(content)

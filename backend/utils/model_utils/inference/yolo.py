@@ -5,7 +5,7 @@ YOLO inference adapter implementation.
 from .common import YOLO_LABELS, convert_to_dictionary
 
 
-def _run_yolo(model_device_tuple, image_path: str):
+def run_yolo_inference(model_device_tuple, image_path: str):
     """
     Run YOLO inference on a single image.
 
@@ -55,12 +55,3 @@ def _run_yolo(model_device_tuple, image_path: str):
         )
 
     return convert_to_dictionary(live, dead, polygons)
-
-
-def run_yolo_inference(model_device_tuple, image_path: str):
-    """
-    Run YOLO on a single image.
-
-    Public API for single-image processing.
-    """
-    return _run_yolo(model_device_tuple, image_path)

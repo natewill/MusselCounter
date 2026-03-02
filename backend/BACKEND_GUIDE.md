@@ -393,12 +393,11 @@ async with aiofiles.open(file_path, 'rb') as f:
 
 ### "Out of Memory" errors
 - Model too large for available RAM
-- **Solution**: Reduce batch size in `collection_processor.py::MANUAL_BATCH_SIZE = 1`
+- **Solution**: Use a smaller model and process fewer images per run
 
 ### Slow inference
-- CPU not optimized properly
-- **Check**: Logs should show thread optimization
-- **Solution**: Verify `pick_threads()` is called on startup
+- CPU-only inference can be slow for larger models
+- **Solution**: Use a smaller model or run on a machine with GPU support
 
 ### Images not appearing
 - Check file permissions on `data/uploads/`
@@ -420,8 +419,7 @@ async with aiofiles.open(file_path, 'rb') as f:
 def load_my_model(weights_path: str, model_type: str):
     model = MyModel()
     model.load_weights(weights_path)
-    batch_size = calculate_batch_size_from_model(model, device)
-    return model, device, batch_size
+    return model, device
 ```
 
 2. Add inference in `utils/model_utils/inference.py`:

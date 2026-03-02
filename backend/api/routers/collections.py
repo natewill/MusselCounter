@@ -20,6 +20,7 @@ uploaded multiple times only stores one copy.
 from typing import List, Optional
 import asyncio 
 from datetime import datetime, timezone
+from pathlib import Path
 from fastapi import APIRouter, HTTPException, UploadFile, File #fastapi is the module we use to create the API that javascript can talk to
 from db import get_db #for sql
 from utils.collection_utils import (
@@ -34,9 +35,29 @@ from utils.collection_utils import (
 ) #functions imported from our utils folder to do sql logic
 from utils.image_utils import add_multiple_images_optimized
 from utils.file_processing import process_single_file
+from config import POLYGON_DIR
 
 # Create router with prefix - all endpoints will be under /api/collections
 router = APIRouter(prefix="/api/collections", tags=["collections"])
+
+
+def _delete_file_if_exists(file_path: Optional[str]) -> None:
+    """
+    Best-effort file cleanup for orphaned images.
+    """
+    if not file_path:
+        return
+    try:
+        Path(file_path).unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+def _delete_polygon_file_if_exists(detection_id: int) -> None:
+    """
+    Best-effort cleanup for polygon sidecar files keyed by detection ID.
+    """
+    _delete_file_if_exists(str(Path(POLYGON_DIR) / f"{detection_id}.json"))
 
 
 @router.post("") #if a POST request is sent to /api/collections, this function is called.
@@ -128,7 +149,7 @@ async def delete_collection_endpoint(collection_id: int):
     Delete a collection and its associated runs/results.
 
     Images that are no longer linked to any collection are also removed
-    from the image table.
+    from the image table and from disk.
     """
     async with get_db() as db:
         collection = await get_collection(db, collection_id)
@@ -136,13 +157,18 @@ async def delete_collection_endpoint(collection_id: int):
             raise HTTPException(status_code=404, detail="Collection not found")
 
         # Track images currently linked to this collection so we can remove
-        # orphan image rows after deleting collection links.
+        # orphan image rows/files after deleting collection links.
         collection_images_cursor = await db.execute(
-            "SELECT image_id FROM collection_image WHERE collection_id = ?",
+            """SELECT i.image_id, i.stored_path
+               FROM collection_image ci
+               JOIN image i ON i.image_id = ci.image_id
+               WHERE ci.collection_id = ?""",
             (collection_id,),
         )
         collection_image_rows = await collection_images_cursor.fetchall()
         candidate_image_ids = [row["image_id"] for row in collection_image_rows]
+        orphan_rows = []
+        deleted_detection_ids: set[int] = set()
 
         # Find runs for this collection
         runs_cursor = await db.execute(
@@ -154,6 +180,13 @@ async def delete_collection_endpoint(collection_id: int):
 
         if run_ids:
             placeholders = ",".join(["?"] * len(run_ids))
+            deleted_detection_cursor = await db.execute(
+                f"SELECT detection_id FROM detection WHERE run_id IN ({placeholders})",
+                run_ids,
+            )
+            deleted_detection_rows = await deleted_detection_cursor.fetchall()
+            deleted_detection_ids.update(row["detection_id"] for row in deleted_detection_rows)
+
             # Delete detections for runs
             await db.execute(
                 f"DELETE FROM detection WHERE run_id IN ({placeholders})",
@@ -180,12 +213,38 @@ async def delete_collection_endpoint(collection_id: int):
         # (not linked to any collection anymore).
         if candidate_image_ids:
             placeholders = ",".join(["?"] * len(candidate_image_ids))
-            await db.execute(
-                f"""DELETE FROM image
+            orphan_cursor = await db.execute(
+                f"""SELECT image_id, stored_path
+                    FROM image
                     WHERE image_id IN ({placeholders})
                       AND image_id NOT IN (SELECT image_id FROM collection_image)""",
                 candidate_image_ids,
             )
+            orphan_rows = await orphan_cursor.fetchall()
+            orphan_image_ids = [row["image_id"] for row in orphan_rows]
+
+            if orphan_image_ids:
+                orphan_placeholders = ",".join(["?"] * len(orphan_image_ids))
+                stale_detection_cursor = await db.execute(
+                    f"SELECT detection_id FROM detection WHERE image_id IN ({orphan_placeholders})",
+                    orphan_image_ids,
+                )
+                stale_detection_rows = await stale_detection_cursor.fetchall()
+                deleted_detection_ids.update(row["detection_id"] for row in stale_detection_rows)
+
+                # Defensive cleanup in case stale rows still reference orphan images.
+                await db.execute(
+                    f"DELETE FROM detection WHERE image_id IN ({orphan_placeholders})",
+                    orphan_image_ids,
+                )
+                await db.execute(
+                    f"DELETE FROM image_result WHERE image_id IN ({orphan_placeholders})",
+                    orphan_image_ids,
+                )
+                await db.execute(
+                    f"DELETE FROM image WHERE image_id IN ({orphan_placeholders})",
+                    orphan_image_ids,
+                )
 
         # Finally delete the collection
         await db.execute(
@@ -194,6 +253,11 @@ async def delete_collection_endpoint(collection_id: int):
         )
 
         await db.commit()
+
+        for row in orphan_rows:
+            _delete_file_if_exists(row["stored_path"])
+        for detection_id in deleted_detection_ids:
+            _delete_polygon_file_if_exists(detection_id)
 
         return {"status": "deleted", "collection_id": collection_id}
 
@@ -461,8 +525,8 @@ async def delete_image_from_collection_endpoint(
     """
     Remove an image from a collection.
     
-    Note: This only removes the link between image and collection.
-    The image file and its data remain in the database (in case it's used in other collections).
+    If the image is no longer linked to any collection after removal, it is also
+    deleted from the database and from disk.
     
     After removal, recalculates mussel counts for all runs that processed this image
     and updates the collection's total count.
@@ -470,6 +534,13 @@ async def delete_image_from_collection_endpoint(
     async with get_db() as db:
         if not await get_collection(db, collection_id):
             raise HTTPException(status_code=404, detail="Collection not found")
+
+        image_cursor = await db.execute(
+            "SELECT stored_path FROM image WHERE image_id = ?",
+            (image_id,),
+        )
+        image_row = await image_cursor.fetchone()
+
         if not await remove_image_from_collection(db, collection_id, image_id):
             raise HTTPException(status_code=404, detail="Image not found")
         
@@ -482,23 +553,31 @@ async def delete_image_from_collection_endpoint(
             (image_id, collection_id)
         )
         affected_runs = await runs_cursor.fetchall()
+        deleted_detection_ids: set[int] = set()
         
         # Delete image_result records for this image from runs in this collection
         # This ensures that when the image is re-added, it won't be marked as already processed
         if affected_runs:
             run_ids = [row[0] for row in affected_runs]
             placeholders = ','.join(['?'] * len(run_ids))
+            deleted_detection_cursor = await db.execute(
+                f"""SELECT detection_id FROM detection
+                    WHERE image_id = ? AND run_id IN ({placeholders})""",
+                (image_id, *run_ids)
+            )
+            deleted_detection_rows = await deleted_detection_cursor.fetchall()
+            deleted_detection_ids.update(row[0] for row in deleted_detection_rows)
+
             await db.execute(
                 f"""DELETE FROM image_result 
                    WHERE image_id = ? AND run_id IN ({placeholders})""",
                 (image_id, *run_ids)
             )
-            detections_cursor = await db.execute(
+            await db.execute(
                 f"""DELETE FROM detection
                    WHERE image_id = ? AND run_id IN ({placeholders})""",
                 (image_id, *run_ids)
             )
-            detections_deleted = detections_cursor.rowcount or 0
         
         # Recalculate counts for each affected run
         for run_row in affected_runs:
@@ -522,7 +601,32 @@ async def delete_image_from_collection_endpoint(
                    WHERE run_id = ?""",
                 (total_live, run_id)
             )
+
+        orphan_file_path = None
+        link_cursor = await db.execute(
+            "SELECT 1 FROM collection_image WHERE image_id = ? LIMIT 1",
+            (image_id,),
+        )
+        has_remaining_links = await link_cursor.fetchone() is not None
+
+        if not has_remaining_links and image_row:
+            # Defensive cleanup in case stale rows still reference this orphan image.
+            stale_detection_cursor = await db.execute(
+                "SELECT detection_id FROM detection WHERE image_id = ?",
+                (image_id,),
+            )
+            stale_detection_rows = await stale_detection_cursor.fetchall()
+            deleted_detection_ids.update(row[0] for row in stale_detection_rows)
+
+            await db.execute("DELETE FROM detection WHERE image_id = ?", (image_id,))
+            await db.execute("DELETE FROM image_result WHERE image_id = ?", (image_id,))
+            await db.execute("DELETE FROM image WHERE image_id = ?", (image_id,))
+            orphan_file_path = image_row["stored_path"]
         
         await db.commit()
+
+        _delete_file_if_exists(orphan_file_path)
+        for detection_id in deleted_detection_ids:
+            _delete_polygon_file_if_exists(detection_id)
         
         return {"collection_id": collection_id, "image_id": image_id, "status": "removed"}

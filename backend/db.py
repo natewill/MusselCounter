@@ -34,7 +34,7 @@ async def _initialize_models(db: aiosqlite.Connection):
         if "yolo" in filename_lower:
             model_type = "YOLO"
         elif "cnn" in filename_lower or "faster" in filename_lower:
-            model_type = "Faster R-CNN"
+            model_type = "FASTRCNN"
         else:
             model_type = "YOLO"  # Default to YOLO
         

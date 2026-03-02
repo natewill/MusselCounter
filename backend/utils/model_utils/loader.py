@@ -11,6 +11,8 @@ This module handles:
 import torch
 from torchvision.models.detection import fasterrcnn_resnet50_fpn
 
+SUPPORTED_MODEL_TYPES = ("FASTRCNN", "YOLO")
+
 
 def _load_checkpoint(weights_path: str, device: torch.device):
     """
@@ -69,7 +71,7 @@ def load_rcnn_model(weights_path: str, model_type: str):
     
     Args:
         weights_path: Path to the .pth file with trained weights
-        model_type: Type string (e.g., "Faster R-CNN")
+        model_type: Type string (e.g., "FASTRCNN")
         
     Returns:
         Tuple of (model, device, batch_size)
@@ -204,14 +206,11 @@ def load_model(weights_path: str, model_type: str):
     """
     Main entry point for loading any supported model type.
     
-    This function acts as a router - it looks at the model_type string
-    and calls the appropriate specific loader (R-CNN, YOLO, etc.).
+    This function routes by canonical SQL model type.
     
     Supported Model Types:
-    - "Faster R-CNN", "RCNN" → loads Faster R-CNN
-    - "YOLO", "YOLOv8" → loads YOLO
-    - "SSD" → not implemented yet
-    - "CNN" → not implemented yet
+    - "FASTRCNN" → loads Faster R-CNN
+    - "YOLO" → loads YOLO
     
     What Gets Returned:
     - model: The loaded PyTorch model ready for inference
@@ -220,7 +219,7 @@ def load_model(weights_path: str, model_type: str):
     
     Args:
         weights_path: Path to the .pt or .pth file with model weights
-        model_type: Type of model as a string (e.g., "YOLO", "Faster R-CNN")
+        model_type: Canonical model type (e.g., "YOLO", "FASTRCNN")
         
     Returns:
         Tuple of (model, device, batch_size)
@@ -232,20 +231,12 @@ def load_model(weights_path: str, model_type: str):
         model, device, batch_size = load_model("yolov8n.pt", "YOLO")
         # Returns: (YOLO model, "cpu", 4)
     """
-    # Convert to lowercase for case-insensitive matching
-    model_type_lower = model_type.lower()
-    
-    # Route to appropriate loader based on model type
-    if "cnn" in model_type_lower or "faster" in model_type_lower:
+    if model_type == "FASTRCNN":
         return load_rcnn_model(weights_path, model_type)
-    if "yolo" in model_type_lower:
+    if model_type == "YOLO":
         return load_yolo_model(weights_path, model_type)
-    if "ssd" in model_type_lower:
-        return load_ssd_model(weights_path)
-    if "cnn" in model_type_lower and "rcnn" not in model_type_lower:
-        return load_cnn_model(weights_path)
-    
-    # Model type not recognized
+
     raise ValueError(
-        f"Unsupported model type: {model_type}. Supported types: RCNN, YOLO, SSD, CNN."
+        f"Unsupported model type: {model_type}. "
+        f"Supported types: {', '.join(SUPPORTED_MODEL_TYPES)}."
     )

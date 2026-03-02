@@ -20,9 +20,10 @@ Process Overview:
 7. Return standardized results
 """
 
+from typing import Callable
+from PIL import Image
 import torch
 import torchvision.transforms as transforms
-from PIL import Image
 
 
 # Label mappings - different models use different class numbers
@@ -64,7 +65,7 @@ def _rectangle(box):
     ]
 
 
-def _result(live, dead, polygons, size):
+def _result(live, dead, polygons):
     """
     Create standardized result dictionary for an image.
     
@@ -75,28 +76,22 @@ def _result(live, dead, polygons, size):
         live: Number of live mussels detected
         dead: Number of dead mussels detected
         polygons: List of detection polygons with metadata
-        size: (width, height) of the image
         
     Returns:
-        Dictionary with counts, polygons, and image dimensions
+        Dictionary with counts and polygons
         
     Example:
-        _result(5, 2, [...polygons...], (1920, 1080))
+        _result(5, 2, [...polygons...])
         # Returns: {
         #     "live_count": 5,
         #     "dead_count": 2,
-        #     "polygons": [...],
-        #     "image_width": 1920,
-        #     "image_height": 1080
+        #     "polygons": [...]
         # }
     """
-    width, height = size
     return {
         "live_count": live,
         "dead_count": dead,
         "polygons": polygons,
-        "image_width": width,
-        "image_height": height,
     }
 
 
@@ -138,12 +133,10 @@ def _run_rcnn(model_device_tuple, image_paths):
     # Prepare to convert images to PyTorch tensors
     transform = transforms.ToTensor()
     tensors = []  # Will hold image tensors
-    sizes = []    # Will hold original (width, height) for each image
     
     # Load and convert all images
     for path in image_paths:
         image = Image.open(path).convert("RGB")  # Ensure RGB format
-        sizes.append(image.size)  # Save original dimensions
         tensors.append(transform(image).to(device))  # Convert and move to device
     
     # Run inference on all images at once (batch processing)
@@ -153,7 +146,7 @@ def _run_rcnn(model_device_tuple, image_paths):
     
     # Process predictions for each image
     results = []
-    for size, pred in zip(sizes, predictions):
+    for pred in predictions:
         live = dead = 0  # Counters
         polygons = []    # List of detections with metadata
         
@@ -187,7 +180,7 @@ def _run_rcnn(model_device_tuple, image_paths):
             )
         
         # Create result dict for this image
-        results.append(_result(live, dead, polygons, size))
+        results.append(_result(live, dead, polygons))
     
     # Clean up GPU memory if using CUDA
     if device.type == "cuda":
@@ -265,10 +258,7 @@ def _run_yolo(model_device_tuple, image_paths):
     
     # Process results for each image
     outputs = []
-    for path, det in zip(paths, detections):
-        # Get image dimensions (needed for result dict)
-        width, height = Image.open(path).size
-        
+    for _, det in zip(paths, detections):
         live = dead = 0  # Counters
         polygons = []    # List of detections
         
@@ -304,7 +294,7 @@ def _run_yolo(model_device_tuple, image_paths):
             )
         
         # Create result dict for this image
-        outputs.append(_result(live, dead, polygons, (width, height)))
+        outputs.append(_result(live, dead, polygons))
     
     return outputs
 
@@ -345,6 +335,59 @@ def run_cnn_inference(model_device_tuple, image_path: str):
     raise NotImplementedError("CNN detection inference not implemented.")
 
 
+def _get_inference_adapter(model_type: str, batch: bool) -> Callable:
+    """
+    Retrieve the adapter for an exact model type and execution mode.
+
+    Args:
+        model_type: Canonical model type string from SQL (e.g., "YOLO", "FASTRCNN")
+        batch: True for batch adapter, False for single-image adapter
+    """
+    mode = "batch" if batch else "single"
+    model_adapters = INFERENCE_ADAPTERS.get(model_type)
+
+    if model_adapters is None:
+        supported = ", ".join(INFERENCE_ADAPTERS.keys())
+        raise ValueError(
+            f"Unsupported model type: {model_type}. Supported types: {supported}."
+        )
+
+    adapter = model_adapters.get(mode)
+
+    if adapter is None:
+        execution_mode = "batch" if batch else "single-image"
+        raise ValueError(
+            f"Model type '{model_type}' does not support {execution_mode} inference."
+        )
+
+    return adapter
+
+
+def supports_batch_inference(model_type: str) -> bool:
+    """
+    Return True when a model type has a registered batch adapter.
+
+    Raises ValueError for unknown model types.
+    """
+    model_adapters = INFERENCE_ADAPTERS.get(model_type)
+    if model_adapters is None:
+        supported = ", ".join(INFERENCE_ADAPTERS.keys())
+        raise ValueError(
+            f"Unsupported model type: {model_type}. Supported types: {supported}."
+        )
+    return "batch" in model_adapters
+
+
+def run_inference_batch(model_device_tuple, image_paths: list[str], model_type: str):
+    """
+    Main entry point for running inference on multiple images.
+
+    This routes to the registered batch adapter for the exact model type.
+    """
+    adapter = _get_inference_adapter(model_type, batch=True)
+    return adapter(model_device_tuple, image_paths)
+
+
 def run_inference_on_image(model_device_tuple, image_path: str, model_type: str):
     """
     Main entry point for running inference on a single image.
@@ -357,16 +400,15 @@ def run_inference_on_image(model_device_tuple, image_path: str, model_type: str)
     
     Why This Exists:
     - Provides a unified interface for all model types
-    - Makes it easy to add new model types (just add a case here)
-    - Handles model type string variations (case-insensitive, partial matches)
+    - Makes it easy to add new model types (register a new adapter)
     
     Args:
         model_device_tuple: (model, device, batch_size) from loader
         image_path: Path to the image file
-        model_type: Type of model as string (e.g., "YOLO", "Faster R-CNN")
+        model_type: Canonical model type string (e.g., "YOLO", "FASTRCNN")
         
     Returns:
-        Result dict with counts, polygons, and image dimensions
+        Result dict with counts and polygons
         Always returns ALL detections (no threshold filtering).
         Threshold filtering happens later when querying the database.
         
@@ -377,22 +419,19 @@ def run_inference_on_image(model_device_tuple, image_path: str, model_type: str)
         result = run_inference_on_image(model_tuple, "mussel.jpg", "YOLO")
         # Returns: {"live_count": 5, "dead_count": 2, "polygons": [...], ...}
     """
-    # Convert to lowercase for case-insensitive matching
-    model_type_lower = model_type.lower()
-    
-    # Route to appropriate inference function
-    # Uses partial string matching for flexibility
-    if "rcnn" in model_type_lower or "faster" in model_type_lower:
-        return run_rcnn_inference(model_device_tuple, image_path)
-    if "yolo" in model_type_lower:
-        return run_yolo_inference(model_device_tuple, image_path)
-    if "ssd" in model_type_lower:
-        return run_ssd_inference(model_device_tuple, image_path)
-    if "cnn" in model_type_lower and "rcnn" not in model_type_lower:
-        return run_cnn_inference(model_device_tuple, image_path)
-    
-    # Model type not recognized
-    raise ValueError(
-        f"Unsupported model type: {model_type}. "
-        "Supported types: RCNN, YOLO, SSD, CNN (object detection models only)."
-    )
+    adapter = _get_inference_adapter(model_type, batch=False)
+    return adapter(model_device_tuple, image_path)
+
+
+# Adapter registry by canonical SQL model type.
+# Each adapter converts model-specific outputs into the shared app result contract.
+INFERENCE_ADAPTERS: dict[str, dict[str, Callable]] = {
+    "FASTRCNN": {
+        "single": run_rcnn_inference,
+        "batch": run_rcnn_inference_batch,
+    },
+    "YOLO": {
+        "single": run_yolo_inference,
+        "batch": run_yolo_inference_batch,
+    },
+}

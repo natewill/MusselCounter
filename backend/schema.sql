@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS collection_image (
 CREATE TABLE IF NOT EXISTS model (
   model_id      INTEGER PRIMARY KEY AUTOINCREMENT, 
   name          TEXT NOT NULL,             -- "CNN v2 - 2025-11 blah blah"
-  type          TEXT NOT NULL,             -- CNN, YOLO, etc.
+  type          TEXT NOT NULL CHECK(type IN ('FASTRCNN', 'YOLO')),  -- canonical model type
   weights_path  TEXT NOT NULL,             -- local path to .pt or .pth file
   description   TEXT,
   optimal_batch_size INTEGER DEFAULT 8,    -- detected optimal batch size for inference

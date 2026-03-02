@@ -67,8 +67,8 @@ async def create_model_endpoint(
     if not content:
         raise HTTPException(status_code=400, detail="File is empty")
 
-    if model_type not in {"YOLO", "Faster R-CNN"}:
-        raise HTTPException(status_code=400, detail="model_type must be YOLO or Faster R-CNN")
+    if model_type not in {"YOLO", "FASTRCNN"}:
+        raise HTTPException(status_code=400, detail="model_type must be YOLO or FASTRCNN")
 
     model_name = name or Path(sanitized_filename).stem
     MODELS_DIR.mkdir(parents=True, exist_ok=True)

@@ -149,7 +149,7 @@ export default function AddModelButton({ onSuccess, onError }) {
                   className="w-full px-3 py-2 bg-white dark:bg-zinc-900 border border-zinc-300 dark:border-zinc-700 rounded text-sm text-zinc-900 dark:text-zinc-100"
                 >
                   <option value="YOLO">YOLO</option>
-                  <option value="Faster R-CNN">Faster R-CNN</option>
+                  <option value="FASTRCNN">Faster R-CNN</option>
                 </select>
               </div>
 

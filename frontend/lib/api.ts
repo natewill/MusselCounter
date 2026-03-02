@@ -265,7 +265,7 @@ export async function getModels() {
  */
 export async function uploadModel(
   file: File,
-  modelType: 'YOLO' | 'Faster R-CNN',
+  modelType: 'YOLO' | 'FASTRCNN',
   name?: string,
   description?: string
 ) {

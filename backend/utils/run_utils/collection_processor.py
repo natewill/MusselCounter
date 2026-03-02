@@ -72,7 +72,7 @@ import aiosqlite
 from config import DB_PATH
 from utils.collection_utils import get_collection_images
 from utils.model_utils.db import get_model
-from utils.model_utils.inference import run_rcnn_inference_batch, run_yolo_inference_batch
+from utils.model_utils.inference import run_inference_batch, supports_batch_inference
 from utils.model_utils.loader import load_model
 from .db import get_run, update_run_status
 from .image_processor import process_image_for_run, _save_detections_to_db, _get_counts_from_db
@@ -108,7 +108,7 @@ async def _batch_infer(model_type: str, model_device, image_paths: list[str]):
     Counts are calculated by querying the database after detections are saved.
     
     Args:
-        model_type: Type of model ('RCNN', 'YOLO', etc.)
+        model_type: Canonical model type from DB (e.g., 'FASTRCNN', 'YOLO')
         model_device: Tuple of (model, device) from load_model
         image_paths: List of image file paths
         
@@ -117,12 +117,11 @@ async def _batch_infer(model_type: str, model_device, image_paths: list[str]):
         Note: live_count/dead_count will be calculated from database after saving detections
     """
     # Always get all detections (no threshold filtering)
-    fn = run_yolo_inference_batch if 'yolo' in model_type.lower() else run_rcnn_inference_batch
     to_thread = getattr(asyncio, "to_thread", None)
     if to_thread:
-        return await to_thread(fn, model_device, image_paths)
+        return await to_thread(run_inference_batch, model_device, image_paths, model_type)
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, fn, model_device, image_paths)
+    return await loop.run_in_executor(None, run_inference_batch, model_device, image_paths, model_type)
 
 
 async def _setup_run_and_load_model(db: aiosqlite.Connection, run_id: int):
@@ -486,8 +485,7 @@ async def process_collection_run(db: aiosqlite.Connection, run_id: int):
         db_path = DB_PATH
         
         # Determine processing method
-        use_batch_inference = ('rcnn' in model_type.lower() or 'faster' in model_type.lower() or 
-                              'yolo' in model_type.lower())
+        use_batch_inference = supports_batch_inference(model_type)
         
         if use_batch_inference:
             results = await _process_batch_inference(

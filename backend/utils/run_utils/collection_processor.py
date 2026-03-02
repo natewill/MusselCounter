@@ -2,7 +2,6 @@
 Collection processing orchestrator for inference runs.
 """
 import asyncio
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -150,33 +149,29 @@ async def _process_single_images(
     Returns:
         List of (image_id, success, live_count, dead_count) tuples
     """
-    max_concurrent = int(os.getenv("MAX_CONCURRENT_IMAGES", "4"))
-    semaphore = asyncio.Semaphore(max_concurrent)
-    
-    async def process_with_semaphore(idx, image):
-        async with semaphore:
+    results = []
+    processed_count = 0
+
+    for idx, image in enumerate(images, start=1):
+        try:
             image_id = image['image_id']
             image_filename = image.get('filename', 'unknown')
             image_path = image.get('stored_path', 'unknown')
-            
-            return await process_image_for_run(
-                db_path, run_id, image_id, image_path, image_filename,
-                model_device, threshold, model_type, idx, len(images)
+
+            result = await process_image_for_run(
+                db_path,
+                run_id,
+                image_id,
+                image_path,
+                image_filename,
+                model_device,
+                threshold,
+                model_type,
+                idx,
+                len(images),
             )
-    
-    tasks = [
-        process_with_semaphore(idx + 1, image)
-        for idx, image in enumerate(images)
-    ]
-    
-    results = []
-    processed_count = 0
-    
-    for coro in asyncio.as_completed(tasks):
-        try:
-            result = await coro
             results.append(result)
-            
+
             processed_count += 1
             async with aiosqlite.connect(db_path) as db_progress:
                 await db_progress.execute(

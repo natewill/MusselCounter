@@ -169,65 +169,132 @@ async def get_collection_images_with_results(
     data from other runs. If run_id is None, falls back to selecting the latest
     run per image (optionally filtered by threshold) for backwards compatibility.
     """
-    if run_id is not None:
-        sql = """
+    # 1) Base images in collection.
+    base_cursor = await db.execute(
+        """
         SELECT
             i.image_id,
             i.filename,
             i.stored_path,
             i.file_hash,
             i.created_at,
-            ci.added_at,
-            l.live_mussel_count,
-            l.dead_mussel_count,
-            l.processed_at,
-            l.error_msg,
-            lr.threshold AS result_threshold
+            ci.added_at
         FROM image i
         JOIN collection_image ci ON i.image_id = ci.image_id
-        LEFT JOIN image_result l ON l.image_id = i.image_id AND l.run_id = ?
-        LEFT JOIN run lr ON lr.run_id = ?
         WHERE ci.collection_id = ?
-        ORDER BY ci.added_at DESC,
-                 COALESCE(l.processed_at, '1970-01-01T00:00:00Z') DESC
-        """
-        params = (run_id, run_id, collection_id)
+        ORDER BY ci.added_at DESC
+        """,
+        (collection_id,),
+    )
+    base_images = await base_cursor.fetchall()
+    if not base_images:
+        return await _attach_processed_models(db, [], collection_id)
+
+    image_ids = [row["image_id"] for row in base_images]
+    placeholders = ",".join(["?"] * len(image_ids))
+
+    # Defaults for LEFT JOIN-like behavior.
+    result_by_image = {
+        image_id: {
+            "live_mussel_count": None,
+            "dead_mussel_count": None,
+            "processed_at": None,
+            "error_msg": None,
+            "result_threshold": None,
+        }
+        for image_id in image_ids
+    }
+
+    if run_id is not None:
+        # 2a) Results for an explicit run.
+        run_cursor = await db.execute(
+            "SELECT threshold FROM run WHERE run_id = ?",
+            (run_id,),
+        )
+        run_row = await run_cursor.fetchone()
+        run_threshold = run_row["threshold"] if run_row else None
+
+        result_cursor = await db.execute(
+            f"""
+            SELECT image_id, live_mussel_count, dead_mussel_count, processed_at, error_msg
+            FROM image_result
+            WHERE run_id = ? AND image_id IN ({placeholders})
+            """,
+            (run_id, *image_ids),
+        )
+        for row in await result_cursor.fetchall():
+            result_by_image[row["image_id"]] = {
+                "live_mussel_count": row["live_mussel_count"],
+                "dead_mussel_count": row["dead_mussel_count"],
+                "processed_at": row["processed_at"],
+                "error_msg": row["error_msg"],
+                "result_threshold": run_threshold,
+            }
     else:
-        sql = """
-        WITH latest_key AS (
-            SELECT ir.image_id, MAX(r.run_id) AS max_run_id
+        # 2b) Latest run per image (optionally threshold-filtered), then fetch those results.
+        latest_cursor = await db.execute(
+            f"""
+            SELECT ir.image_id, MAX(ir.run_id) AS run_id
             FROM image_result ir
-            JOIN run r ON ir.run_id = r.run_id
+            JOIN run r ON r.run_id = ir.run_id
             WHERE r.collection_id = ?
               AND (? IS NULL OR ABS(r.threshold - ?) < 0.001)
+              AND ir.image_id IN ({placeholders})
             GROUP BY ir.image_id
+            """,
+            (collection_id, current_threshold, current_threshold, *image_ids),
         )
-        SELECT
-            i.image_id,
-            i.filename,
-            i.stored_path,
-            i.file_hash,
-            i.created_at,
-            ci.added_at,
-            l.live_mussel_count,
-            l.dead_mussel_count,
-            l.processed_at,
-            l.error_msg,
-            lr.threshold AS result_threshold
-        FROM image i
-        JOIN collection_image ci ON i.image_id = ci.image_id
-        LEFT JOIN latest_key lk ON lk.image_id = i.image_id
-        LEFT JOIN image_result l ON l.image_id = lk.image_id AND l.run_id = lk.max_run_id
-        LEFT JOIN run lr ON lr.run_id = lk.max_run_id
-        WHERE ci.collection_id = ?
-        ORDER BY ci.added_at DESC,
-                 COALESCE(l.processed_at, '1970-01-01T00:00:00Z') DESC
-        """
-        params = (collection_id, current_threshold, current_threshold, collection_id)
-    
-    cur = await db.execute(sql, params)
-    images = await cur.fetchall()
-    return await _attach_processed_models(db, images, collection_id)
+        latest_rows = await latest_cursor.fetchall()
+
+        if latest_rows:
+            latest_run_by_image = {row["image_id"]: row["run_id"] for row in latest_rows}
+            run_ids = sorted({row["run_id"] for row in latest_rows})
+            run_placeholders = ",".join(["?"] * len(run_ids))
+
+            threshold_cursor = await db.execute(
+                f"SELECT run_id, threshold FROM run WHERE run_id IN ({run_placeholders})",
+                run_ids,
+            )
+            threshold_by_run = {row["run_id"]: row["threshold"] for row in await threshold_cursor.fetchall()}
+
+            result_cursor = await db.execute(
+                f"""
+                SELECT image_id, run_id, live_mussel_count, dead_mussel_count, processed_at, error_msg
+                FROM image_result
+                WHERE run_id IN ({run_placeholders}) AND image_id IN ({placeholders})
+                """,
+                (*run_ids, *image_ids),
+            )
+            for row in await result_cursor.fetchall():
+                image_id = row["image_id"]
+                if latest_run_by_image.get(image_id) != row["run_id"]:
+                    continue
+                result_by_image[image_id] = {
+                    "live_mussel_count": row["live_mussel_count"],
+                    "dead_mussel_count": row["dead_mussel_count"],
+                    "processed_at": row["processed_at"],
+                    "error_msg": row["error_msg"],
+                    "result_threshold": threshold_by_run.get(row["run_id"]),
+                }
+
+    # 3) Merge base image metadata with result payload.
+    merged_images = []
+    for row in base_images:
+        image_dict = dict(row)
+        image_dict.update(result_by_image[row["image_id"]])
+        merged_images.append(image_dict)
+
+    # Preserve previous ordering semantics:
+    # newest add first, then newest processed_at (NULLs treated as very old).
+    merged_images.sort(
+        key=lambda r: (
+            r["added_at"],
+            r["processed_at"] or "1970-01-01T00:00:00Z",
+        ),
+        reverse=True,
+    )
+
+    return await _attach_processed_models(db, merged_images, collection_id)
 
 
 async def remove_image_from_collection(

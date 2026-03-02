@@ -50,11 +50,9 @@ class ImageDetailResponse(BaseModel):
     # Collection context (helpful for navigation)
     collection_id: int
     collection_name: Optional[str]
-    
-    # Other runs on this image (for comparison)
-    other_runs: List[Dict[str, Any]]  # Other runs that processed this image
 
 
+#When you open an image in the /results page this is called
 @router.get("/{image_id}/results", response_model=ImageDetailResponse)
 async def get_image_results_endpoint(image_id: int, model_id: int, collection_id: Optional[int] = None) -> ImageDetailResponse:
     """
@@ -66,7 +64,6 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
     - Polygon data (bounding boxes with coordinates, labels, confidence scores)
     - Model information (which model was used, threshold)
     - Collection context (for navigation back to collection/run)
-    - Other runs that processed this image (for comparison)
     - Processing metadata (when processed, errors if any)
     
     Args:
@@ -180,7 +177,6 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
                 detection_count=0,
                 collection_id=image_row['collection_id'],
                 collection_name=image_row['collection_name'],
-                other_runs=[]
             )
         
         # Load polygon data from JSON file
@@ -204,27 +200,6 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
         if total_count > 0:
             live_percentage = round((live_count / total_count) * 100, 1)
             dead_percentage = round((dead_count / total_count) * 100, 1)
-        
-        # Get other runs that processed this image (for comparison)
-        other_runs_cursor = await db.execute("""
-            SELECT 
-                r.run_id,
-                r.threshold,
-                r.status,
-                r.started_at,
-                m.name as model_name,
-                m.type as model_type,
-                ir.live_mussel_count,
-                ir.dead_mussel_count
-            FROM image_result ir
-            JOIN run r ON ir.run_id = r.run_id
-            JOIN model m ON r.model_id = m.model_id
-            WHERE ir.image_id = ? AND r.model_id != ?
-            ORDER BY r.started_at DESC
-            LIMIT 10
-        """, (image_id, model_id))
-        
-        other_runs = [dict(row) for row in await other_runs_cursor.fetchall()]
         
         return ImageDetailResponse(
             # Image metadata
@@ -259,9 +234,6 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
             # Collection context
             collection_id=result['collection_id'],
             collection_name=result['collection_name'],
-            
-            # Comparison data
-            other_runs=other_runs
         )
 
 

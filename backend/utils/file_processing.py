@@ -12,7 +12,7 @@ import aiosqlite
 import aiofiles
 from fastapi import UploadFile
 
-from utils.security import sanitize_filename, validate_path_in_directory
+from utils.security import sanitize_filename
 from config import UPLOAD_DIR
 
 
@@ -59,9 +59,7 @@ async def process_single_file(
         if row:
             existing_path = row[0]  # tuple access; not row["stored_path"] unless row_factory=Row
             try:
-                # ensure the path is sane and exists
                 p = Path(existing_path)
-                validate_path_in_directory(p, UPLOAD_DIR)
                 if p.exists():
                     return (str(p), sanitized, file_hash)
             except Exception:
@@ -77,8 +75,6 @@ async def process_single_file(
             name = f"{stem}{'' if counter == 0 else f'_{counter}'}{suffix}"
             dest = UPLOAD_DIR / name
             try:
-                # final security check: dest stays inside UPLOAD_DIR
-                validate_path_in_directory(dest, UPLOAD_DIR)
                 async with aiofiles.open(dest, "xb") as f:  # 'x' = fail if exists (TOCTOU-safe)
                     await f.write(content)
                 # success

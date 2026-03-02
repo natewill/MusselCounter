@@ -1,7 +1,5 @@
 """
 Security utilities for input validation and sanitization.
-
-Uses pathvalidate library for filename and path validation/sanitization.
 """
 from pathlib import Path
 from fastapi import HTTPException
@@ -39,32 +37,3 @@ def sanitize_filename(filename: str) -> str:
         return sanitized
     except (ValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=f"Invalid filename: {str(e)}")
-
-
-def validate_path_in_directory(file_path: Path, allowed_dir: Path) -> Path:
-    """
-    Validate path is within allowed directory (prevents path traversal attacks).
-    
-    Uses pathvalidate to check if the resolved path is within the allowed directory.
-    
-    Args:
-        file_path: Path to validate
-        allowed_dir: Directory that the path must be within
-        
-    Returns:
-        Resolved path if valid
-        
-    Raises:
-        HTTPException: If path is outside allowed directory
-    """
-    try:
-        resolved = file_path.resolve()
-        allowed_resolved = allowed_dir.resolve()
-        
-        # Check if resolved path is within allowed directory
-        # This prevents path traversal attacks (e.g., ../../../etc/passwd)
-        resolved.relative_to(allowed_resolved)
-        return resolved
-    except (OSError, ValueError):
-        raise HTTPException(status_code=403, detail="Access denied")
-

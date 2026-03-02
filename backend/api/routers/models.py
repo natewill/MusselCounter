@@ -11,7 +11,7 @@ import aiofiles
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from db import get_db
 from utils.model_utils import get_all_models, get_model
-from utils.security import sanitize_filename, validate_path_in_directory
+from utils.security import sanitize_filename
 from api.schemas import ModelResponse
 from config import MODELS_DIR
 from datetime import datetime, timezone
@@ -73,7 +73,6 @@ async def create_model_endpoint(
     model_name = name or Path(sanitized_filename).stem
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     file_path = MODELS_DIR / sanitized_filename
-    validate_path_in_directory(file_path, MODELS_DIR)
 
     if file_path.exists():
         raise HTTPException(

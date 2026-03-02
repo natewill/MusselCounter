@@ -93,7 +93,7 @@ cd ../backend && python3 -m venv venv && source venv/bin/activate && pip install
 cd ../electron && npm install    # Electron shell
 ```
 
-2) **(Optional) Build frontend** for faster startup:
+2) **Build frontend standalone output**:
 ```bash
 cd frontend
 npm run build
@@ -106,9 +106,8 @@ npm start
 ```
 
 **Development Notes:**
-- Uses `backend/venv` if present; otherwise falls back to system `python3`
-- Defaults to `next start` when `.next` build exists; otherwise runs `next dev`
-- Force dev mode: `NEXT_DEV=true npm start`
+- Backend is started from the compiled binary at `backend/dist/mussel-backend` (`.exe` on Windows)
+- Frontend requires a standalone server (`frontend/server.js` or `frontend/.next/standalone/server.js`)
 - Uses ports `8000` (backend) and `3000` (frontend) - ensure they're free
 - Check ports: `cd electron && npm run check-ports`
 

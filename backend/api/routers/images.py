@@ -80,7 +80,6 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
                 i.stored_path,
                 ir.live_mussel_count,
                 ir.dead_mussel_count,
-                ir.polygon_path,
                 ir.processed_at,
                 r.run_id,
                 r.collection_id,

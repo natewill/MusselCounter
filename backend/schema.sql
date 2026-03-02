@@ -3,9 +3,7 @@ CREATE TABLE IF NOT EXISTS collection (
   collection_id      INTEGER PRIMARY KEY AUTOINCREMENT,
   name          TEXT,
   description   TEXT,
-  created_at    TEXT NOT NULL,             -- SQLite uses TEXT for dates (ISO format)
-  image_count   INTEGER DEFAULT 0,         -- Calculated field, not a foreign key
-  live_mussel_count INTEGER DEFAULT 0    -- From latest run
+  created_at    TEXT NOT NULL              -- SQLite uses TEXT for dates (ISO format)
 );
 
 -- IMAGE: unique images (global, not tied to a specific batch)
@@ -62,7 +60,6 @@ CREATE TABLE IF NOT EXISTS image_result (
   image_id    INTEGER NOT NULL,
   live_mussel_count INTEGER DEFAULT 0,
   dead_mussel_count INTEGER DEFAULT 0,
-  polygon_path TEXT,                      -- path to JSON file with bounding boxes/polygons
   processed_at TEXT NOT NULL,             -- when this image was processed
   error_msg   TEXT,                        -- error if processing failed
   PRIMARY KEY (run_id, image_id),         -- One result per image per run (allows INSERT OR REPLACE)

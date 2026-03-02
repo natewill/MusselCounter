@@ -1,11 +1,8 @@
 import asyncio
-import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 import aiosqlite
 from utils.model_utils import run_inference_on_image
-from config import POLYGON_DIR
 
 
 async def _record_error(db_path: str, run_id: int, image_id: int, message: str) -> tuple[int, bool, int, int]:
@@ -14,8 +11,8 @@ async def _record_error(db_path: str, run_id: int, image_id: int, message: str) 
             now = datetime.now(timezone.utc).isoformat()
             await db.execute(
                 """INSERT OR REPLACE INTO image_result
-                       (run_id, image_id, live_mussel_count, dead_mussel_count, polygon_path, processed_at, error_msg)
-                       VALUES (?, ?, 0, 0, NULL, ?, ?)""",
+                       (run_id, image_id, live_mussel_count, dead_mussel_count, processed_at, error_msg)
+                       VALUES (?, ?, 0, 0, ?, ?)""",
                 (run_id, image_id, now, message),
             )
             await db.commit()
@@ -77,27 +74,6 @@ async def _run_inference(model_device, image_path: str, model_type: str):
         return await to_thread(run_inference_on_image, model_device, image_path, model_type)
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, run_inference_on_image, model_device, image_path, model_type)
-
-
-def _save_polygons(image_id: int, result: dict, threshold: float) -> Optional[str]:
-    if not result.get("polygons"):
-        return None
-    POLYGON_DIR.mkdir(parents=True, exist_ok=True)
-    polygon_path = POLYGON_DIR / f"{image_id}.json"
-    with open(polygon_path, "w") as handle:
-        json.dump(
-            {
-                "polygons": result["polygons"],
-                "live_count": result["live_count"],
-                "dead_count": result["dead_count"],
-                "threshold": threshold,
-                "image_width": result["image_width"],
-                "image_height": result["image_height"],
-            },
-            handle,
-            indent=2,
-        )
-    return str(polygon_path)
 
 
 async def _save_detections_to_db(db_path: str, run_id: int, image_id: int, result: dict) -> None:
@@ -173,16 +149,13 @@ async def process_image_for_run(
             live_count = sum(1 for p in result['polygons'] if p.get('class') == 'live')
             dead_count = sum(1 for p in result['polygons'] if p.get('class') == 'dead')
         
-        # Save polygon JSON with filtered counts
-        polygon_path = _save_polygons(image_id, {**result, 'live_count': live_count, 'dead_count': dead_count}, threshold)
-
         now = datetime.now(timezone.utc).isoformat()
         async with aiosqlite.connect(db_path) as db:
             await db.execute(
                 """INSERT OR REPLACE INTO image_result
-                   (run_id, image_id, live_mussel_count, dead_mussel_count, polygon_path, processed_at, error_msg)
-                   VALUES (?, ?, ?, ?, ?, ?, NULL)""",
-                (run_id, image_id, live_count, dead_count, polygon_path, now),
+                   (run_id, image_id, live_mussel_count, dead_mussel_count, processed_at, error_msg)
+                   VALUES (?, ?, ?, ?, ?, NULL)""",
+                (run_id, image_id, live_count, dead_count, now),
             )
             await db.commit()
         return (image_id, True, live_count, dead_count)

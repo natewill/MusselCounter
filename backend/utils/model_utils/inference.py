@@ -95,7 +95,6 @@ def _result(live, dead, polygons, size):
         "live_count": live,
         "dead_count": dead,
         "polygons": polygons,
-        "polygon_path": None,  # Will be set later when saving to file
         "image_width": width,
         "image_height": height,
     }

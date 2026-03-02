@@ -31,8 +31,7 @@ async def get_file_hash(file_path: str) -> str:
 async def find_image_by_hash(db: aiosqlite.Connection, file_hash: str):
     """Return a row (tuple) if found, else None."""
     async with db.execute(
-        "SELECT image_id, stored_path, live_mussel_count, dead_mussel_count, stored_polygon_path "
-        "FROM image WHERE file_hash = ? LIMIT 1",
+        "SELECT image_id, stored_path FROM image WHERE file_hash = ? LIMIT 1",
         (file_hash,),
     ) as cur:
         return await cur.fetchone()
@@ -146,19 +145,6 @@ async def add_multiple_images_optimized(
                 to_link,
             )
         added_count = len(to_link)
-
-        # Update collection's image_count
-        if added_count > 0:
-            await db.execute(
-                """UPDATE collection
-                   SET image_count = (
-                       SELECT COUNT(*)
-                       FROM collection_image
-                       WHERE collection_id = ?
-                   )
-                   WHERE collection_id = ?""",
-                (collection_id, collection_id)
-            )
 
         await db.commit()
         return (image_ids, added_count, duplicate_count, duplicate_image_ids)

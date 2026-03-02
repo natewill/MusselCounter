@@ -355,20 +355,6 @@ async def recalculate_threshold_endpoint(
             (threshold, live_total, run_id)
         )
 
-        # Keep collection aggregate tied to latest run for this collection
-        await db.execute(
-            """UPDATE collection
-               SET live_mussel_count = COALESCE((
-                   SELECT r.live_mussel_count
-                   FROM run r
-                   WHERE r.collection_id = ?
-                   ORDER BY r.run_id DESC
-                   LIMIT 1
-               ), 0)
-               WHERE collection_id = ?""",
-            (collection_id, collection_id),
-        )
-
         await db.commit()
 
         return {
@@ -516,34 +502,6 @@ async def delete_image_from_collection_endpoint(
                 (total_live, run_id)
             )
         
-        # Update collection's live_mussel_count from latest run (if exists)
-        latest_run = await get_latest_run(db, collection_id)
-        if latest_run:
-            collection_live_count = latest_run['live_mussel_count'] or 0
-            await db.execute(
-                """UPDATE collection
-                   SET live_mussel_count = ?,
-                       image_count = (
-                           SELECT COUNT(*)
-                           FROM collection_image
-                           WHERE collection_id = ?
-                       )
-                   WHERE collection_id = ?""",
-                (collection_live_count, collection_id, collection_id)
-            )
-        else:
-            # No runs exist, just update image_count
-            await db.execute(
-                """UPDATE collection
-                   SET image_count = (
-                       SELECT COUNT(*)
-                       FROM collection_image
-                       WHERE collection_id = ?
-                   )
-                   WHERE collection_id = ?""",
-                (collection_id, collection_id)
-            )
-
         await db.commit()
         
         return {"collection_id": collection_id, "image_id": image_id, "status": "removed"}

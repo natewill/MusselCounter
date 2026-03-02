@@ -63,11 +63,9 @@ With batching (batch_size=4):
 - Partial results are saved
 """
 import asyncio
-import json
 import os
 from datetime import datetime, timezone
 from pathlib import Path
-from config import POLYGON_DIR
 
 import aiosqlite
 
@@ -205,7 +203,7 @@ async def _prepare_images(db: aiosqlite.Connection, collection_id: int, run_id: 
     return (images_to_process, total_images, images_already_done)
 
 
-async def _handle_all_images_processed(db: aiosqlite.Connection, run_id: int, collection_id: int, total_images: int):
+async def _handle_all_images_processed(db: aiosqlite.Connection, run_id: int, total_images: int):
     """
     Handle case where all images are already processed - recalculate totals and mark completed.
     """
@@ -226,10 +224,6 @@ async def _handle_all_images_processed(db: aiosqlite.Connection, run_id: int, co
                live_mussel_count = ?
            WHERE run_id = ?""",
         (now, total_images, total_images, total_live_count, run_id)
-    )
-    await db.execute(
-        "UPDATE collection SET live_mussel_count = ? WHERE collection_id = ?",
-        (total_live_count, collection_id)
     )
     await db.commit()
 
@@ -270,13 +264,10 @@ async def _process_batch_inference(
                 return [], []
             image_paths = [path for _, _, path in image_data]
             results = await _batch_infer(model_type, model_device, image_paths)
-            POLYGON_DIR.mkdir(parents=True, exist_ok=True)
             now = datetime.now(timezone.utc).isoformat()
             batch_results = []
             updates = []
             for (image_id, _, _), result in zip(image_data, results):
-                polygon_path = None
-                
                 # Save ALL detections to database (threshold 0.0)
                 try:
                     await _save_detections_to_db(db_path, run_id, image_id, result)
@@ -291,25 +282,10 @@ async def _process_batch_inference(
                     # Fallback: count all detections (shouldn't happen, but safe fallback)
                     live_count = sum(1 for p in result['polygons'] if p.get('class') == 'live')
                     dead_count = sum(1 for p in result['polygons'] if p.get('class') == 'dead')
-                
-                # Save polygon JSON with filtered counts
-                if result['polygons']:
-                    polygon_path = POLYGON_DIR / f"{image_id}.json"
-                    with open(polygon_path, 'w') as f:
-                        json.dump({
-                            'polygons': result['polygons'],  # All polygons saved
-                            'live_count': live_count,  # Filtered count
-                            'dead_count': dead_count,  # Filtered count
-                            'threshold': threshold,
-                            'image_width': result['image_width'],
-                            'image_height': result['image_height']
-                        }, f, indent=2)
-                    polygon_path = str(polygon_path)
-                
+
                 updates.append((
                     live_count,
                     dead_count,
-                    polygon_path,
                     now,
                     image_id
                 ))
@@ -333,12 +309,12 @@ async def _process_batch_inference(
             processed_count += len(batch_result)
             if updates:
                 async with aiosqlite.connect(db_path) as db_batch:
-                    result_inserts = [(run_id, image_id, live_count, dead_count, polygon_path, processed_at, None)
-                                     for live_count, dead_count, polygon_path, processed_at, image_id in updates]
+                    result_inserts = [(run_id, image_id, live_count, dead_count, processed_at, None)
+                                     for live_count, dead_count, processed_at, image_id in updates]
                     await db_batch.executemany(
                         """INSERT INTO image_result 
-                           (run_id, image_id, live_mussel_count, dead_mussel_count, polygon_path, processed_at, error_msg)
-                           VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                           (run_id, image_id, live_mussel_count, dead_mussel_count, processed_at, error_msg)
+                           VALUES (?, ?, ?, ?, ?, ?)""",
                         result_inserts
                     )
                     
@@ -418,7 +394,6 @@ async def _process_single_images(
 async def _finalize_run(
     db: aiosqlite.Connection,
     run_id: int,
-    collection_id: int,
     results: list,
     images_processed_in_this_run: int,
     images_already_done: int = 0
@@ -429,7 +404,6 @@ async def _finalize_run(
     Args:
         db: Database connection
         run_id: Run ID
-        collection_id: Collection ID
         results: List of (image_id, success, live_count, dead_count) tuples from this run
         images_processed_in_this_run: Number of images that were processed in this run
         images_already_done: Number of images that were already processed before this run
@@ -461,13 +435,7 @@ async def _finalize_run(
            WHERE run_id = ?""",
         (total_expected, total_live_count, final_status, now, run_id)
     )
-    
-    # Update collection live_mussel_count from run's count
-    await db.execute(
-        "UPDATE collection SET live_mussel_count = ? WHERE collection_id = ?",
-        (total_live_count, collection_id)
-    )
-    
+
     await db.commit()
 
 
@@ -505,7 +473,7 @@ async def process_collection_run(db: aiosqlite.Connection, run_id: int):
         
         if not images_to_process:
             # All images already processed
-            await _handle_all_images_processed(db, run_id, collection_id, total_images)
+            await _handle_all_images_processed(db, run_id, total_images)
             return
         
         # Initialize run with total count and already-processed count
@@ -532,7 +500,7 @@ async def process_collection_run(db: aiosqlite.Connection, run_id: int):
             )
         
         # Finalize: Aggregate results and update status
-        await _finalize_run(db, run_id, collection_id, results, len(images_to_process), images_already_done)
+        await _finalize_run(db, run_id, results, len(images_to_process), images_already_done)
         
     except Exception as e:
         await _fail(db, run_id, f"Run processing error: {e}")
@@ -549,5 +517,5 @@ async def process_collection_run(db: aiosqlite.Connection, run_id: int):
             images_to_process, total_images, _ = image_prep
             if not images_to_process:
                 # All images already processed - mark as completed despite error
-                await _handle_all_images_processed(db, run_id, collection_id, total_images)
+                await _handle_all_images_processed(db, run_id, total_images)
                 return

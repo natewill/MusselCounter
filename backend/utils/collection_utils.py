@@ -17,7 +17,30 @@ async def get_collection(db: aiosqlite.Connection, collection_id: int):
     Returns:
         Row with collection data, or None if not found
     """
-    cursor = await db.execute("SELECT * FROM collection WHERE collection_id = ?", (collection_id,))
+    cursor = await db.execute(
+        """
+        SELECT
+            c.collection_id,
+            c.name,
+            c.description,
+            c.created_at,
+            (
+                SELECT COUNT(*)
+                FROM collection_image ci
+                WHERE ci.collection_id = c.collection_id
+            ) AS image_count,
+            COALESCE((
+                SELECT r.live_mussel_count
+                FROM run r
+                WHERE r.collection_id = c.collection_id
+                ORDER BY r.run_id DESC
+                LIMIT 1
+            ), 0) AS live_mussel_count
+        FROM collection c
+        WHERE c.collection_id = ?
+        """,
+        (collection_id,),
+    )
     return await cursor.fetchone()
 
 
@@ -34,7 +57,22 @@ async def get_all_collections(db: aiosqlite.Connection):
     cursor = await db.execute(
         """
         SELECT
-            c.*,
+            c.collection_id,
+            c.name,
+            c.description,
+            c.created_at,
+            (
+                SELECT COUNT(*)
+                FROM collection_image ci
+                WHERE ci.collection_id = c.collection_id
+            ) AS image_count,
+            COALESCE((
+                SELECT r.live_mussel_count
+                FROM run r
+                WHERE r.collection_id = c.collection_id
+                ORDER BY r.run_id DESC
+                LIMIT 1
+            ), 0) AS live_mussel_count,
             (
                 SELECT i.stored_path
                 FROM collection_image ci
@@ -142,7 +180,6 @@ async def get_collection_images_with_results(
             ci.added_at,
             l.live_mussel_count,
             l.dead_mussel_count,
-            l.polygon_path,
             l.processed_at,
             l.error_msg,
             lr.threshold AS result_threshold
@@ -174,7 +211,6 @@ async def get_collection_images_with_results(
             ci.added_at,
             l.live_mussel_count,
             l.dead_mussel_count,
-            l.polygon_path,
             l.processed_at,
             l.error_msg,
             lr.threshold AS result_threshold
@@ -213,18 +249,6 @@ async def remove_image_from_collection(
     cursor = await db.execute(
         "DELETE FROM collection_image WHERE collection_id = ? AND image_id = ?",
         (collection_id, image_id)
-    )
-
-    # Update collection's image_count
-    await db.execute(
-        """UPDATE collection
-           SET image_count = (
-               SELECT COUNT(*)
-               FROM collection_image
-               WHERE collection_id = ?
-           )
-           WHERE collection_id = ?""",
-        (collection_id, collection_id)
     )
 
     await db.commit()

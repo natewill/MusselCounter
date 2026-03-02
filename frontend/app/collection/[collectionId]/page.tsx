@@ -35,10 +35,9 @@ export default function RunResultsPage() {
   // Parse initial model from URL for first render
   const urlModelId = searchParams.get('modelId');
   const initialModelId = urlModelId ? parseInt(urlModelId, 10) : null;
-  const initialSortFromUrl = searchParams.get('sort');
+  const sortBy = searchParams.get('sort') || '';
   
   const fileInputRef = useRef(null);
-  const [sortBy, setSortBy] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
   const [savingName, setSavingName] = useState(false);
@@ -78,7 +77,6 @@ export default function RunResultsPage() {
 
   const lastUrlModelIdRef = useRef<string | null>(null);
   const initializedFromUrlRef = useRef(false);
-  const searchParamsString = useMemo(() => searchParams.toString(), [searchParams]);
 
   // Extract unique models that have been run on this collection
   const modelsUsed = useMemo(() => {
@@ -109,53 +107,17 @@ export default function RunResultsPage() {
     }
   }, [searchParams, setSelectedModelId]);
 
-  // Load persisted sort from sessionStorage and URL
-  useEffect(() => {
-    const stored = typeof window !== 'undefined'
-      ? sessionStorage.getItem(`collection-view-${collectionId}`)
-      : null;
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (!initialSortFromUrl && parsed.sortBy) {
-          setSortBy(parsed.sortBy);
-        }
-      } catch {
-        // ignore malformed storage
-      }
-    }
-    if (initialSortFromUrl) {
-      setSortBy(initialSortFromUrl);
-    }
-  }, [collectionId, initialSortFromUrl]);
-
-  // Persist sort change to URL + sessionStorage
-  useEffect(() => {
-    const params = new URLSearchParams(searchParamsString);
-    if (sortBy) {
-      params.set('sort', sortBy);
+  const handleSortChange = (newSort: string) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (newSort) {
+      params.set('sort', newSort);
     } else {
       params.delete('sort');
     }
-    const targetQuery = params.toString();
-    const currentQuery = searchParamsString;
-    if (targetQuery !== currentQuery) {
-      const hash = typeof window !== 'undefined' ? window.location.hash : '';
-      router.replace(`${pathname}?${targetQuery}${hash}`);
-    }
-
-    if (typeof window !== 'undefined') {
-      const stored = sessionStorage.getItem(`collection-view-${collectionId}`);
-      const existing = stored ? (() => { try { return JSON.parse(stored); } catch { return {}; } })() : {};
-      sessionStorage.setItem(
-        `collection-view-${collectionId}`,
-        JSON.stringify({
-          ...existing,
-          sortBy,
-        })
-      );
-    }
-  }, [sortBy, collectionId, pathname, router, searchParamsString]);
+    const query = params.toString();
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    router.replace(`${pathname}${query ? `?${query}` : ''}${hash}`);
+  };
 
   // Reset run error dismissal when run changes
   useEffect(() => {
@@ -374,7 +336,7 @@ export default function RunResultsPage() {
           flashingImageIds={flashingImageIds}
           greenHueImageIds={greenHueImageIds}
           sortBy={sortBy}
-          onSortChange={setSortBy}
+          onSortChange={handleSortChange}
           isRunning={isRunning}
           currentThreshold={threshold}
           latestRun={latestRun}

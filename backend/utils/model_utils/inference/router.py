@@ -16,26 +16,6 @@ from .rcnn import run_rcnn_inference, run_rcnn_inference_batch
 from .yolo import run_yolo_inference, run_yolo_inference_batch
 
 
-def run_ssd_inference(model_device_tuple, image_path: str):
-    """
-    SSD (Single Shot Detector) inference placeholder.
-
-    Raises:
-        NotImplementedError: SSD adapter has not been implemented yet.
-    """
-    raise NotImplementedError("SSD inference not implemented.")
-
-
-def run_cnn_inference(model_device_tuple, image_path: str):
-    """
-    Generic CNN object-detection inference placeholder.
-
-    Raises:
-        NotImplementedError: CNN adapter has not been implemented yet.
-    """
-    raise NotImplementedError("CNN detection inference not implemented.")
-
-
 def _get_inference_adapter(model_type: str, batch: bool) -> Callable:
     """
     Retrieve the adapter for an exact model type and execution mode.

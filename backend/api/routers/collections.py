@@ -63,11 +63,10 @@ async def create_collection_endpoint(request: dict):
     async with get_db() as db:
         now = datetime.now(timezone.utc).isoformat()
         name = request.get("name")
-        description = request.get("description")
         cursor = await db.execute(
-            """INSERT INTO collection (name, description, created_at)
-               VALUES (?, ?, ?)""",
-            (name, description, now),
+            """INSERT INTO collection (name, created_at)
+               VALUES (?, ?)""",
+            (name, now),
         ) #sql code for creating the collection
         await db.commit() 
         collection_id = cursor.lastrowid
@@ -80,9 +79,7 @@ async def update_collection_endpoint(
     request: dict
 ):
     """
-    update a collection's name and/or description.
-
-    Only provided fields will be updated.
+    Update a collection's name.
     """
     async with get_db() as db:
         # Check collection exists
@@ -90,29 +87,13 @@ async def update_collection_endpoint(
         if not collection:
             raise HTTPException(status_code=404, detail="Collection not found")
 
-        # Build update query dynamically based on provided fields
-        updates = []
-        params = []
-
         name = request.get("name")
-        description = request.get("description")
-
-        if name is not None:
-            updates.append("name = ?")
-            params.append(name)
-
-        if description is not None:
-            updates.append("description = ?")
-            params.append(description)
-
-        if not updates:
+        if name is None:
             raise HTTPException(status_code=400, detail="No fields to update")
 
-        params.append(collection_id)
-
         await db.execute(
-            f"UPDATE collection SET {', '.join(updates)} WHERE collection_id = ?",
-            params
+            "UPDATE collection SET name = ? WHERE collection_id = ?",
+            (name, collection_id)
         )
         await db.commit()
 
@@ -252,7 +233,7 @@ async def get_collection_endpoint(
                   returns images with results from the overall latest run.
     
     Returns:
-    - Collection metadata (name, description, etc.)
+    - Collection metadata (name, etc.)
     - All images in the collection (with latest results if available)
     - Latest run information (if any runs exist)
     - All runs for this collection

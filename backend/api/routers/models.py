@@ -14,7 +14,6 @@ from utils.model_utils import get_all_models, get_model
 from utils.security import sanitize_filename
 from api.schemas import ModelResponse
 from config import MODELS_DIR
-from datetime import datetime, timezone
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 
@@ -44,8 +43,7 @@ async def get_model_endpoint(model_id: int) -> ModelResponse:
 async def create_model_endpoint(
     file: UploadFile = File(...),
     name: Optional[str] = Form(None),
-    model_type: str = Form(...),
-    description: Optional[str] = Form(None)
+    model_type: str = Form(...)
 ) -> ModelResponse:
     """Upload a new model file"""
     if not file.filename:
@@ -107,17 +105,13 @@ async def create_model_endpoint(
                 detail=f"Model '{existing[1]}' already exists. Please upload a different model file or use a different filename."
             )
 
-        now = datetime.now(timezone.utc).isoformat()
         cursor = await db.execute(
-            """INSERT INTO model (name, type, weights_path, description, optimal_batch_size, created_at)
-               VALUES (?, ?, ?, ?, ?, ?)""",
+            """INSERT INTO model (name, type, weights_path)
+               VALUES (?, ?, ?)""",
             (
                 model_name,
                 model_type,
-                str(file_path),
-                description or f"Uploaded {model_type} model",
-                8,
-                now
+                str(file_path)
             )
         )
         model_id = cursor.lastrowid

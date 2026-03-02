@@ -87,7 +87,6 @@ async def _save_detections_to_db(run_id: int, image_id: int, result: dict) -> No
         if not polygons:
             return
 
-        now = datetime.now(timezone.utc).isoformat()
         detection_rows = []
 
         for polygon in polygons:
@@ -97,14 +96,13 @@ async def _save_detections_to_db(run_id: int, image_id: int, result: dict) -> No
                 polygon["confidence"],
                 polygon["class"],  # live/dead base class from model
                 json.dumps(polygon.get("bbox", [])),  # bbox as JSON string [x1, y1, x2, y2]
-                now,
             ))
 
         async with aiosqlite.connect(DB_PATH) as db:
             await db.executemany(
                 """INSERT INTO detection
-                   (run_id, image_id, confidence, class, bbox, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
+                   (run_id, image_id, confidence, class, bbox)
+                   VALUES (?, ?, ?, ?, ?)""",
                 detection_rows,
             )
             await db.commit()

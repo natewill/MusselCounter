@@ -22,7 +22,6 @@ async def get_collection(db: aiosqlite.Connection, collection_id: int):
         SELECT
             c.collection_id,
             c.name,
-            c.description,
             c.created_at,
             (
                 SELECT COUNT(*)
@@ -59,7 +58,6 @@ async def get_all_collections(db: aiosqlite.Connection):
         SELECT
             c.collection_id,
             c.name,
-            c.description,
             c.created_at,
             (
                 SELECT COUNT(*)
@@ -177,7 +175,6 @@ async def get_collection_images_with_results(
             i.filename,
             i.stored_path,
             i.file_hash,
-            i.created_at,
             ci.added_at
         FROM image i
         JOIN collection_image ci ON i.image_id = ci.image_id

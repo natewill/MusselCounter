@@ -2,7 +2,6 @@
 CREATE TABLE IF NOT EXISTS collection (
   collection_id      INTEGER PRIMARY KEY AUTOINCREMENT,
   name          TEXT,
-  description   TEXT,
   created_at    TEXT NOT NULL              -- SQLite uses TEXT for dates (ISO format)
 );
 
@@ -11,8 +10,7 @@ CREATE TABLE IF NOT EXISTS image (
   image_id    INTEGER PRIMARY KEY AUTOINCREMENT,        
   filename    TEXT NOT NULL,             -- original filename
   stored_path TEXT NOT NULL,             -- where the file is stored
-  file_hash   TEXT UNIQUE,               -- MD5 hash for deduplication (UNIQUE ensures no duplicates)
-  created_at  TEXT NOT NULL              -- SQLite uses TEXT for dates (ISO format)
+  file_hash   TEXT UNIQUE                -- MD5 hash for deduplication (UNIQUE ensures no duplicates)
 );
 
 -- COLLECTION_IMAGE: junction table linking collections to images (many-to-many)
@@ -30,10 +28,7 @@ CREATE TABLE IF NOT EXISTS model (
   model_id      INTEGER PRIMARY KEY AUTOINCREMENT, 
   name          TEXT NOT NULL,             -- "CNN v2 - 2025-11 blah blah"
   type          TEXT NOT NULL CHECK(type IN ('FASTRCNN', 'YOLO')),  -- canonical model type
-  weights_path  TEXT NOT NULL,             -- local path to .pt or .pth file
-  description   TEXT,
-  optimal_batch_size INTEGER DEFAULT 8,    -- detected optimal batch size for inference
-  created_at    TEXT NOT NULL            -- SQLite uses TEXT for dates (ISO format)
+  weights_path  TEXT NOT NULL             -- local path to .pt or .pth file
 );
 
 -- RUN: each inference run on a collection (can use different models)
@@ -76,28 +71,6 @@ CREATE TABLE IF NOT EXISTS detection (
   confidence      REAL NOT NULL,                     -- Model confidence score (0.0 - 1.0)
   class           TEXT NOT NULL CHECK(class IN ('live', 'dead', 'edit_live', 'edit_dead')),
   bbox            TEXT NOT NULL,                     -- JSON array: [x1, y1, x2, y2]
-  created_at      TEXT NOT NULL,                     -- When detection was created
   FOREIGN KEY (run_id) REFERENCES run(run_id) ON DELETE CASCADE,
   FOREIGN KEY (image_id) REFERENCES image(image_id) ON DELETE CASCADE
 );
-
--- Index for faster lookups of detections by image and run
-CREATE INDEX IF NOT EXISTS idx_detection_image_run ON detection(image_id, run_id);
--- Index for faster lookups by run and image (used for recalculation)
-CREATE INDEX IF NOT EXISTS idx_detection_run_image ON detection(run_id, image_id);
-
--- Fast "images in a collection, newest first"
-CREATE INDEX IF NOT EXISTS idx_collection_image_collection_added ON collection_image(collection_id, added_at DESC);
-
--- "Latest result per image in a collection" (your CTE version or the simplified one)
--- Drives WHERE r.collection_id=? and ORDER/LATEST by run_id
-CREATE INDEX IF NOT EXISTS idx_run_collection_runid            ON run(collection_id, run_id DESC);
-
--- Joins + grouping over image_result
--- Start from image ids, then join to runs by run_id
-CREATE INDEX IF NOT EXISTS idx_imageresult_image_run      ON image_result(image_id, run_id);
--- (Optional) if you sometimes start from runs then fan to images:
--- CREATE INDEX IF NOT EXISTS idx_imageresult_run_image   ON image_result(run_id, image_id);
-
--- Collection listing by time
-CREATE INDEX IF NOT EXISTS idx_collection_created              ON collection(created_at DESC);

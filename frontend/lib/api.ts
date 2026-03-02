@@ -165,10 +165,9 @@ export async function pingBackend() {
 /**
  * Create a new collection
  */
-export async function createCollection(name?: string, description?: string) {
+export async function createCollection(name?: string) {
   const response = await apiClient.post('/api/collections', {
       name: name || null,
-      description: description || null,
   });
   return response.data;
 }
@@ -182,11 +181,11 @@ export async function getCollections() {
 }
 
 /**
- * Update a collection's name and/or description
+ * Update a collection's name
  */
 export async function updateCollection(
   collectionId: number,
-  updates: { name?: string; description?: string }
+  updates: { name?: string }
 ) {
   const validatedCollectionId = validateCollectionId(collectionId);
   const response = await apiClient.patch(
@@ -266,14 +265,12 @@ export async function getModels() {
 export async function uploadModel(
   file: File,
   modelType: 'YOLO' | 'FASTRCNN',
-  name?: string,
-  description?: string
+  name?: string
 ) {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('model_type', modelType);
   if (name) formData.append('name', name);
-  if (description) formData.append('description', description);
   
   try {
     // Don't set Content-Type header - axios will set it automatically with boundary

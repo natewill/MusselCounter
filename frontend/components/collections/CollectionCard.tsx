@@ -151,11 +151,6 @@ export default function CollectionCard({
                 </>
               )}
             </div>
-            {collection.description && (
-              <p className="text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
-                {collection.description}
-              </p>
-            )}
             <div className="space-y-2 pt-2">
               <div className="flex flex-wrap items-center gap-2 text-sm">
                 <span className="px-3 py-1 rounded-md bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700">

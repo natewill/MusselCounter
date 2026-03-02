@@ -12,7 +12,7 @@ async def get_all_models(db: aiosqlite.Connection):
         List of model rows
     """
     cursor = await db.execute(
-        "SELECT * FROM model ORDER BY created_at DESC"
+        "SELECT * FROM model ORDER BY model_id DESC"
     )
     return await cursor.fetchall()
 
@@ -33,4 +33,3 @@ async def get_model(db: aiosqlite.Connection, model_id: int):
         (model_id,)
     )
     return await cursor.fetchone()
-

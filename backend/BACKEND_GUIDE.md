@@ -241,7 +241,6 @@ results = model.detect(image, threshold=0.5)
 ```
 - collection_id (primary key)
 - name ("Beach Survey 2024")
-- description (optional)
 - created_at
 ```
 
@@ -252,7 +251,6 @@ results = model.detect(image, threshold=0.5)
 - stored_path ("data/uploads/abc123_mussel1.jpg")
 - file_hash (MD5 for deduplication)
 - width, height (image dimensions)
-- created_at
 ```
 
 **collection_image** (links images to collections)
@@ -268,7 +266,6 @@ results = model.detect(image, threshold=0.5)
 - name ("YOLOv8n")
 - type ("YOLO")
 - weights_path ("data/models/yolov8n.pt")
-- description
 ```
 
 **run**

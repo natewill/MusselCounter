@@ -4,7 +4,6 @@ import { getCollections } from '@/lib/api';
 export interface CollectionSummary {
   collection_id: number;
   name: string | null;
-  description: string | null;
   image_count: number;
   live_mussel_count?: number;
   created_at: string;

@@ -16,9 +16,6 @@ from datetime import datetime, timezone
 async def _initialize_models(db: aiosqlite.Connection):
     """
     Initialize database with default models from models/ directory.
-    
-    Note: Batch size detection is now done on-demand when models are loaded,
-    not during initialization. This makes startup faster.
     """
     models_dir = MODELS_DIR
     if not models_dir.exists():
@@ -46,18 +43,14 @@ async def _initialize_models(db: aiosqlite.Connection):
         existing = await cursor.fetchone()
         
         if not existing:
-            # Add model to database (batch size will be detected on first load)
-            now = datetime.now(timezone.utc).isoformat()
+            # Add model to database.
             await db.execute(
-                """INSERT INTO model (name, type, weights_path, description, optimal_batch_size, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
+                """INSERT INTO model (name, type, weights_path)
+                   VALUES (?, ?, ?)""",
                 (
                     model_file.stem,
                     model_type,
-                    str(model_file),
-                    f"Auto-detected {model_type} model",
-                    8,  # Default value (will be detected and cached on first load)
-                    now
+                    str(model_file)
                 )
             )
     

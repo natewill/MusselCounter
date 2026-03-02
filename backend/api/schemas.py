@@ -10,13 +10,11 @@ from typing import Optional, List
 class CreateCollectionRequest(BaseModel):
     """Request model for creating a new collection"""
     name: Optional[str] = None
-    description: Optional[str] = None
 
 
 class UpdateCollectionRequest(BaseModel):
     """Request model for updating a collection"""
     name: Optional[str] = None
-    description: Optional[str] = None
 
 
 class StartRunRequest(BaseModel):
@@ -38,7 +36,6 @@ class CollectionResponse(BaseModel):
     
     collection_id: int
     name: Optional[str] = None
-    description: Optional[str] = None
     created_at: str
     image_count: int = 0
     live_mussel_count: int = 0
@@ -50,7 +47,6 @@ class CollectionListResponse(BaseModel):
 
     collection_id: int
     name: Optional[str] = None
-    description: Optional[str] = None
     created_at: str
     image_count: int = 0
     live_mussel_count: int = 0
@@ -67,8 +63,6 @@ class ModelResponse(BaseModel):
     name: str
     type: str
     weights_path: str
-    description: Optional[str] = None
-    created_at: str
 
 
 class RunResponse(BaseModel):
@@ -96,7 +90,6 @@ class ImageResponse(BaseModel):
     filename: str
     stored_path: str
     file_hash: Optional[str] = None
-    created_at: str
     processed_model_ids: List[int] = Field(default_factory=list)
 
 

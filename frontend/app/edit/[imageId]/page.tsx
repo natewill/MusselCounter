@@ -13,7 +13,7 @@ import { useImageScale } from '@/hooks/useImageScale';
 
 interface Polygon {
   detection_id: number;
-  coords: number[][];
+  bbox: number[];
   class: 'live' | 'dead';
   confidence: number;
   manually_edited: boolean;

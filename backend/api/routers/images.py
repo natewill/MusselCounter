@@ -37,8 +37,8 @@ class ImageDetailResponse(BaseModel):
     dead_percentage: Optional[float]  # Computed: (dead / total) * 100
     processed_at: str
     
-    # Polygon data
-    polygons: List[Dict[str, Any]]  # Full polygon data with labels and confidence
+    # Detection data
+    polygons: List[Dict[str, Any]]  # Detection payloads with bbox, labels, and confidence
     detection_count: int  # Number of detections (may differ from counts due to filtering)
     
     # Collection context (helpful for navigation)
@@ -54,7 +54,7 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
     Returns comprehensive data including:
     - Image metadata (filename and stored path)
     - Mussel counts (live, dead, total, percentages)
-    - Polygon data (coordinates, labels, confidence scores)
+    - Detection data (bbox, labels, confidence scores)
     - Model information (which model was used, threshold)
     - Collection context (for navigation back to collection/run)
     - Processing metadata (when processed)
@@ -151,7 +151,7 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
         polygons = []
         detections_cursor = await db.execute(
             """
-            SELECT detection_id, confidence, class, polygon_coords
+            SELECT detection_id, confidence, class, bbox
             FROM detection
             WHERE run_id = ? AND image_id = ?
             ORDER BY detection_id ASC
@@ -160,20 +160,20 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
         )
         detection_rows = await detections_cursor.fetchall()
         for row in detection_rows:
-            coords = []
-            if row["polygon_coords"]:
+            bbox = []
+            if row["bbox"]:
                 try:
-                    parsed = json.loads(row["polygon_coords"])
-                    if isinstance(parsed, list):
-                        coords = parsed
+                    parsed = json.loads(row["bbox"])
+                    if isinstance(parsed, list) and len(parsed) == 4:
+                        bbox = parsed
                 except Exception:
-                    coords = []
+                    bbox = []
 
             stored_class = row["class"]
             manually_edited = stored_class.startswith("edit_")
             polygon = {
                 "detection_id": row["detection_id"],
-                "coords": coords,
+                "bbox": bbox,
                 "class": stored_class.replace("edit_", ""),
                 "confidence": row["confidence"],
                 "manually_edited": manually_edited,

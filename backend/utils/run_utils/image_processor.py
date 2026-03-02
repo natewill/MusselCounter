@@ -1,5 +1,6 @@
 import asyncio
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 import aiosqlite
 from utils.model_utils import run_inference_on_image
@@ -100,14 +101,14 @@ async def _save_detections_to_db(db_path: str, run_id: int, image_id: int, resul
                 image_id,
                 polygon["confidence"],
                 polygon["class"],  # live/dead base class from model
-                json.dumps(polygon.get("coords", [])),  # polygon_coords as JSON string
+                json.dumps(polygon.get("bbox", [])),  # bbox as JSON string [x1, y1, x2, y2]
                 now,
             ))
 
         async with aiosqlite.connect(db_path) as db:
             await db.executemany(
                 """INSERT INTO detection
-                   (run_id, image_id, confidence, class, polygon_coords, created_at)
+                   (run_id, image_id, confidence, class, bbox, created_at)
                    VALUES (?, ?, ?, ?, ?, ?)""",
                 detection_rows,
             )

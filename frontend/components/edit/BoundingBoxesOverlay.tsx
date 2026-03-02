@@ -1,7 +1,7 @@
 'use client';
 
 interface Polygon {
-  coords: number[][];
+  bbox: number[];
   class: 'live' | 'dead';
   confidence: number;
 }
@@ -30,6 +30,20 @@ function getPolygonBounds(coords: number[][]) {
   };
 }
 
+function convertBboxToCoords(bbox: number[]) {
+  if (!Array.isArray(bbox) || bbox.length !== 4) {
+    return [];
+  }
+
+  const [x1, y1, x2, y2] = bbox;
+  return [
+    [x1, y1],
+    [x2, y1],
+    [x2, y2],
+    [x1, y2],
+  ];
+}
+
 export default function BoundingBoxesOverlay({
   polygons,
   scale,
@@ -45,8 +59,8 @@ export default function BoundingBoxesOverlay({
       className="absolute top-0 left-0 w-full h-full pointer-events-none rounded"
     >
       {polygons.map((polygon: Polygon, index: number) => {
-        // Scale coordinates
-        const scaledCoords = polygon.coords.map((coord: number[]) => [
+        const coords = convertBboxToCoords(polygon.bbox);
+        const scaledCoords = coords.map((coord: number[]) => [
           coord[0] * scale.scaleX,
           coord[1] * scale.scaleY,
         ]);

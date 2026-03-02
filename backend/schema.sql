@@ -75,7 +75,7 @@ CREATE TABLE IF NOT EXISTS detection (
   image_id        INTEGER NOT NULL,
   confidence      REAL NOT NULL,                     -- Model confidence score (0.0 - 1.0)
   class           TEXT NOT NULL CHECK(class IN ('live', 'dead', 'edit_live', 'edit_dead')),
-  polygon_coords  TEXT NOT NULL,                     -- JSON array of polygon coordinates
+  bbox            TEXT NOT NULL,                     -- JSON array: [x1, y1, x2, y2]
   created_at      TEXT NOT NULL,                     -- When detection was created
   FOREIGN KEY (run_id) REFERENCES run(run_id) ON DELETE CASCADE,
   FOREIGN KEY (image_id) REFERENCES image(image_id) ON DELETE CASCADE

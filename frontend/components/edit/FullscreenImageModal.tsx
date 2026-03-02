@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import BoundingBoxesOverlay from './BoundingBoxesOverlay';
 
 interface Polygon {
-  coords: number[][];
+  bbox: number[];
   class: 'live' | 'dead';
   confidence: number;
 }
@@ -100,4 +100,3 @@ export default function FullscreenImageModal({
     </div>
   );
 }
-

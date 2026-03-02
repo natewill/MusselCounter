@@ -18,7 +18,7 @@ async def _record_error(run_id: int, image_id: int, message: str) -> tuple[int, 
                 (run_id, image_id, now, message),
             )
             await db.commit()
-    except Exception as exc:  # pragma: no cover - log but continue returning failure tuple
+    except Exception:
         pass
     return (image_id, False, 0, 0)
 
@@ -70,11 +70,7 @@ async def _run_inference(model_device, image_path: str, model_type: str):
     Note: Inference always returns ALL detections (no threshold filtering).
     Counts are calculated by querying the database after detections are saved.
     """
-    to_thread = getattr(asyncio, "to_thread", None)
-    if to_thread:
-        return await to_thread(run_inference_on_image, model_device, image_path, model_type)
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, run_inference_on_image, model_device, image_path, model_type)
+    return await asyncio.to_thread(run_inference_on_image, model_device, image_path, model_type)
 
 
 async def _save_detections_to_db(run_id: int, image_id: int, result: dict) -> None:

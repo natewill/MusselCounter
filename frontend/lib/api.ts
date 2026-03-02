@@ -379,15 +379,15 @@ function validateImageId(imageId: unknown): number {
 /**
  * gets image details from a specific run
  */
-export async function getImageDetails(imageId: number, modelId: number, collectionId?: number) {
+export async function getImageDetails(imageId: number, modelId: number, collectionId: number) {
   const validatedImageId = validateImageId(imageId);
   const validatedModelId = validateModelId(modelId);
-  const validatedCollectionId = collectionId !== undefined ? validateCollectionId(collectionId) : undefined;
+  const validatedCollectionId = validateCollectionId(collectionId);
   
   const response = await apiClient.get(`/api/images/${validatedImageId}/results`, {
     params: { 
       model_id: validatedModelId,
-      ...(validatedCollectionId ? { collection_id: validatedCollectionId } : {})
+      collection_id: validatedCollectionId
     },
   });
   return response.data;
@@ -401,11 +401,11 @@ export async function updatePolygonClassification(
   modelId: number,
   detectionId: number,
   newClass: 'live' | 'dead',
-  collectionId?: number
+  collectionId: number
 ) {
   const validatedImageId = validateImageId(imageId);
   const validatedModelId = validateModelId(modelId);
-  const validatedCollectionId = collectionId !== undefined ? validateCollectionId(collectionId) : undefined;
+  const validatedCollectionId = validateCollectionId(collectionId);
   const validatedDetectionId = Number(detectionId);
 
   if (isNaN(validatedDetectionId) || validatedDetectionId <= 0 || !Number.isInteger(validatedDetectionId)) {
@@ -420,7 +420,7 @@ export async function updatePolygonClassification(
     `/api/images/${validatedImageId}/results/${validatedModelId}/detections/${validatedDetectionId}`,
     { new_class: newClass },
     {
-      params: validatedCollectionId ? { collection_id: validatedCollectionId } : undefined,
+      params: { collection_id: validatedCollectionId },
     }
   );
 

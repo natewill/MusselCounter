@@ -53,7 +53,7 @@ class ImageDetailResponse(BaseModel):
 
 #When you open an image in the /results page this is called
 @router.get("/{image_id}/results", response_model=ImageDetailResponse)
-async def get_image_results_endpoint(image_id: int, model_id: int, collection_id: Optional[int] = None) -> ImageDetailResponse:
+async def get_image_results_endpoint(image_id: int, model_id: int, collection_id: int) -> ImageDetailResponse:
     """
     Get detailed results for a specific image from a specific run.
     
@@ -78,10 +78,7 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
     """
     async with get_db() as db:
         # Get main image and result data
-        collection_filter = "AND r.collection_id = ?" if collection_id is not None else ""
-        params = [image_id, model_id]
-        if collection_id is not None:
-            params.append(collection_id)
+        params = [image_id, model_id, collection_id]
         cursor = await db.execute("""
             SELECT 
                 i.image_id,
@@ -109,22 +106,16 @@ async def get_image_results_endpoint(image_id: int, model_id: int, collection_id
             JOIN model m ON r.model_id = m.model_id
             LEFT JOIN collection c ON r.collection_id = c.collection_id
             WHERE i.image_id = ? AND r.model_id = ?
-              {}
+              AND r.collection_id = ?
             ORDER BY r.run_id DESC
             LIMIT 1
-        """.format(collection_filter), params)
+        """, params)
         
         result = await cursor.fetchone()
         
         if not result:
-            # No run results found for this image/model (and optional collection)
+            # No run results found for this image/model/collection.
             # Return a placeholder response with zero counts so the image page can still render.
-            if collection_id is None:
-                raise HTTPException(
-                    status_code=404, 
-                    detail=f"No results found for image {image_id} with model {model_id}"
-                )
-
             # Get basic image metadata scoped to the collection
             image_cursor = await db.execute("""
                 SELECT i.image_id, i.filename, i.stored_path, i.file_hash, i.width, i.height, i.created_at,
@@ -265,8 +256,8 @@ async def update_polygon_classification(
     image_id: int,
     model_id: int,
     detection_id: int,
+    collection_id: int,
     new_class: str = Body(..., embed=True),
-    collection_id: Optional[int] = None
 ) -> Dict:
     """
     Update the classification of a specific polygon (mussel detection).
@@ -279,6 +270,7 @@ async def update_polygon_classification(
         model_id: ID of the model
         detection_id: ID of the detection being edited
         new_class: New classification ("live" or "dead")
+        collection_id: ID of the collection
 
     Returns:
         Updated image result data
@@ -287,29 +279,24 @@ async def update_polygon_classification(
         raise HTTPException(status_code=400, detail="Classification must be 'live' or 'dead'")
 
     async with get_db() as db:
-        # Resolve detection on the latest run for this image/model (+ optional collection).
-        collection_filter = "AND r.collection_id = ?" if collection_id is not None else ""
-        params = [detection_id, image_id, model_id]
-        if collection_id is not None:
-            params.append(collection_id)
-        subquery_params = [image_id, model_id]
-        if collection_id is not None:
-            subquery_params.append(collection_id)
+        # Resolve detection on the latest run for this image/model within this collection.
+        params = [detection_id, image_id, model_id, collection_id]
+        subquery_params = [image_id, model_id, collection_id]
 
-        cursor = await db.execute(f"""
+        cursor = await db.execute("""
             SELECT d.detection_id, d.class, d.run_id
             FROM detection d
             JOIN run r ON d.run_id = r.run_id
             WHERE d.detection_id = ?
               AND d.image_id = ?
               AND r.model_id = ?
-              {collection_filter}
+              AND r.collection_id = ?
               AND d.run_id = (
                   SELECT r2.run_id
                   FROM run r2
                   JOIN detection d2 ON d2.run_id = r2.run_id
                   WHERE d2.image_id = ? AND r2.model_id = ?
-                    {collection_filter}
+                    AND r2.collection_id = ?
                   ORDER BY r2.run_id DESC
                   LIMIT 1
               )

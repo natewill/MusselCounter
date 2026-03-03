@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import Link from 'next/link';
+import { getUploadUrl } from '@/lib/api/base';
 
 export default function ImageList({ images, onDeleteImage, deletingImageId, selectedModelId, isRunning, latestRun, recalculatedImages, sortBy, onSortChange, collectionId }) {
   // Sort images based on explicit user sort selection.
@@ -67,11 +68,7 @@ export default function ImageList({ images, onDeleteImage, deletingImageId, sele
             const isProcessed = Boolean(selectedModelId) && Boolean(hasValidResults);
             const needsProcessing = Boolean(selectedModelId) && !hasValidResults;
             
-            // Extract filename from stored_path for thumbnail URL
-            // stored_path format: "data/uploads/{hash}_{filename}"
-            const thumbnailUrl = image.stored_path
-              ? `http://127.0.0.1:8000/uploads/${image.stored_path.split('/').pop()}`
-              : null;
+            const thumbnailUrl = getUploadUrl(image.stored_path);
             
             // Always allow navigation; edit mode can be disabled downstream if no results
             const modelIdForLink = selectedModelId ?? latestRun?.model_id ?? null;

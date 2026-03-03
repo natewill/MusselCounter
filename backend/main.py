@@ -5,7 +5,7 @@ This module sets up the FastAPI application with:
 - Database initialization on startup
 - CORS middleware for frontend communication
 - Exception handlers for error responses
-- API routers for different endpoints (collections, models, runs, system)
+- API routers for different endpoints (models, runs, system)
 
 The application uses SQLite for data storage and processes images through ML models
 (R-CNN or YOLO) to count live and dead mussels in images.
@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from db import init_db
 from config import CORS_ORIGINS, UPLOAD_DIR
-from api.routers import collections, models, runs, system, images
+from api.routers import models, runs, system
 from api.error_handlers import (
     validation_exception_handler,
     general_exception_handler
@@ -67,12 +67,10 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler) 
 app.add_exception_handler(Exception, general_exception_handler)  # All other unexpected errors
 
 # Include API routers - each router handles a group of related endpoints
-# Routers are organized by resource type (collections, models, runs, system)
+# Routers are organized by resource type (models, runs, system)
 app.include_router(system.router)  # Health check, DB version
-app.include_router(collections.router)  # Collection management and image uploads
 app.include_router(models.router)  # Model information
-app.include_router(runs.router)  # Inference run management
-app.include_router(images.router)  # Image detail and results
+app.include_router(runs.router)  # Run upload, processing, history, and image edit APIs
 
 # Mount static files to serve uploaded images
 # This allows frontend to access images via /uploads/{filename}

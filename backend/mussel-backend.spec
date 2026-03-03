@@ -45,11 +45,9 @@ hiddenimports += collect_submodules('ultralytics')
 hiddenimports += [
     'api',
     'api.routers',
-    'api.routers.collections',
     'api.routers.models',
     'api.routers.runs',
     'api.routers.system',
-    'api.routers.images',
     'api.error_handlers',
     'db',
     'config',

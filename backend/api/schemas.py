@@ -1,64 +1,15 @@
 """
-Pydantic models for request/response validation
+Pydantic request/response schemas.
 """
-from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List
 
+from typing import Any, Dict, List, Optional
 
-# ===== Request Models =====
-
-class CreateCollectionRequest(BaseModel):
-    """Request model for creating a new collection"""
-    name: Optional[str] = None
-
-
-class UpdateCollectionRequest(BaseModel):
-    """Request model for updating a collection"""
-    name: Optional[str] = None
-
-
-class StartRunRequest(BaseModel):
-    """Request model for starting a run"""
-    model_id: int = Field(..., description="ID of the model to use")
-    threshold: Optional[float] = Field(
-        default=0.5,
-        ge=0.0,
-        le=1.0,
-        description="Confidence threshold (0.0 to 1.0)"
-    )
-
-
-# ===== Response Models =====
-
-class CollectionResponse(BaseModel):
-    """Response model for collection operations"""
-    model_config = ConfigDict(from_attributes=True)
-    
-    collection_id: int
-    name: Optional[str] = None
-    created_at: str
-    image_count: int = 0
-    live_mussel_count: int = 0
-
-
-class CollectionListResponse(BaseModel):
-    """Simplified collection info for list view"""
-    model_config = ConfigDict(from_attributes=True)
-
-    collection_id: int
-    name: Optional[str] = None
-    created_at: str
-    image_count: int = 0
-    live_mussel_count: int = 0
-    first_image_path: Optional[str] = None
-    latest_run_status: Optional[str] = None
-    run_count: int = 0
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelResponse(BaseModel):
-    """Response model for model information"""
     model_config = ConfigDict(from_attributes=True)
-    
+
     model_id: int
     name: str
     type: str
@@ -66,38 +17,76 @@ class ModelResponse(BaseModel):
 
 
 class RunResponse(BaseModel):
-    """Response model for run operations"""
     model_config = ConfigDict(from_attributes=True)
-    
+
     run_id: int
-    collection_id: int
     model_id: int
+    model_name: str
+    model_type: str
     threshold: float
-    status: str
-    started_at: str
-    finished_at: Optional[str] = None
-    error_msg: Optional[str] = None
+    created_at: str
     total_images: int = 0
     processed_count: int = 0
     live_mussel_count: int = 0
+    error_msg: Optional[str] = None
+    first_image_path: Optional[str] = None
 
 
-class ImageResponse(BaseModel):
-    """Response model for image information"""
+class RunImageSummaryResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
-    image_id: int
+
+    run_image_id: int
     filename: str
     stored_path: str
-    file_hash: Optional[str] = None
-    processed_model_ids: List[int] = Field(default_factory=list)
+    live_mussel_count: int = 0
+    dead_mussel_count: int = 0
+    processed_at: Optional[str] = None
+    error_msg: Optional[str] = None
 
 
-class UploadResponse(BaseModel):
-    """Response model for image upload operations"""
-    collection_id: int
-    image_ids: List[int]
-    count: int
-    added_count: int
-    duplicate_count: int
-    duplicate_image_ids: List[int]
+class RunDetailResponse(BaseModel):
+    run: RunResponse
+    images: List[RunImageSummaryResponse]
+
+
+class RecalculateResponse(BaseModel):
+    run_id: int
+    threshold: float
+    live_mussel_count: int
+    dead_mussel_count: int
+    image_count: int
+    images: List[Dict[str, Any]]
+
+
+class UploadRunResponse(BaseModel):
+    run: RunResponse
+
+
+class DetectionResponse(BaseModel):
+    detection_id: int
+    bbox: List[float]
+    class_name: str = Field(alias="class")
+    confidence: float
+    manually_edited: bool
+
+
+class RunImageDetailResponse(BaseModel):
+    run_id: int
+    run_image_id: int
+    model_id: int
+    model_name: str
+    model_type: str
+    threshold: float
+    filename: str
+    stored_path: str
+    live_mussel_count: int
+    dead_mussel_count: int
+    total_mussel_count: int
+    processed_at: Optional[str] = None
+    error_msg: Optional[str] = None
+    polygons: List[Dict[str, Any]]
+    can_edit: bool
+
+
+class UpdateDetectionRequest(BaseModel):
+    new_class: str = Field(pattern="^(live|dead)$")

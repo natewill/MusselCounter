@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import BoundingBoxesOverlay from './BoundingBoxesOverlay';
 
 interface Polygon {
@@ -31,12 +32,18 @@ export default function ImageDisplay({
   onPolygonClick,
   onPolygonHover,
 }: ImageDisplayProps) {
+  const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    setNaturalSize({ width: 0, height: 0 });
+  }, [imageUrl]);
+
   return (
     <div className="lg:col-span-2">
       <div className="bg-white dark:bg-zinc-900 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
         {imageUrl && (
-          <div className="overflow-auto max-h-[75vh]">
-            <div className="relative inline-block">
+          <div className="max-h-[75vh] flex justify-center">
+            <div className="relative inline-block max-w-full">
               <button
                 onClick={onFullscreen}
                 className="absolute top-2 right-2 p-2 bg-white/90 dark:bg-zinc-800/90 backdrop-blur-sm rounded text-zinc-700 dark:text-zinc-300 hover:bg-white dark:hover:bg-zinc-700 z-10 shadow-lg"
@@ -50,12 +57,20 @@ export default function ImageDisplay({
               <img
                 src={imageUrl}
                 alt={filename}
-                className="block h-auto max-w-none rounded"
+                className="block h-auto max-h-[75vh] max-w-full rounded"
+                onLoad={(e) =>
+                  setNaturalSize({
+                    width: e.currentTarget.naturalWidth || 0,
+                    height: e.currentTarget.naturalHeight || 0,
+                  })
+                }
               />
 
               {visiblePolygons && (
                 <BoundingBoxesOverlay
                   polygons={polygons}
+                  imageWidth={naturalSize.width}
+                  imageHeight={naturalSize.height}
                   isEditMode={isEditMode}
                   editingPolygonIndex={editingPolygonIndex}
                   onPolygonClick={onPolygonClick}

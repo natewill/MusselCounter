@@ -8,6 +8,8 @@ interface Polygon {
 
 interface BoundingBoxesOverlayProps {
   polygons: Polygon[];
+  imageWidth: number;
+  imageHeight: number;
   isEditMode: boolean;
   editingPolygonIndex: number | null;
   onPolygonClick: (index: number) => void;
@@ -45,16 +47,21 @@ function convertBboxToCoords(bbox: number[]) {
 
 export default function BoundingBoxesOverlay({
   polygons,
+  imageWidth,
+  imageHeight,
   isEditMode,
   editingPolygonIndex,
   onPolygonClick,
   onPolygonHover,
 }: BoundingBoxesOverlayProps) {
   if (!polygons || polygons.length === 0) return null;
+  if (!imageWidth || !imageHeight) return null;
 
   return (
     <svg
       className="absolute top-0 left-0 w-full h-full pointer-events-none rounded"
+      viewBox={`0 0 ${imageWidth} ${imageHeight}`}
+      preserveAspectRatio="none"
     >
       {polygons.map((polygon: Polygon, index: number) => {
         const coords = convertBboxToCoords(polygon.bbox);

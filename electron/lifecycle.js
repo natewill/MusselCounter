@@ -69,7 +69,10 @@ async function createWindow({ host, frontendPort, backendPort, log, logFile }) {
   });
 
   try {
-    await win.loadURL(`http://${host}:${frontendPort}`);
+    const frontendUrl = new URL(`http://${host}:${frontendPort}`);
+    frontendUrl.searchParams.set('backendHost', host);
+    frontendUrl.searchParams.set('backendPort', String(backendPort));
+    await win.loadURL(frontendUrl.toString());
   } catch (err) {
     log(`[lifecycle] failed to load frontend URL: ${err.message}`);
     dialog.showErrorBox('Failed to load UI', `${err.message}\n\nSee log at ${logFile}`);

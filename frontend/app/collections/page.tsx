@@ -1,246 +1,153 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { useMemo, useState } from 'react';
-import CollectionCard from '@/components/collections/CollectionCard';
-import { useCollections } from '@/hooks/useCollections';
-import { createCollection, deleteCollection, updateCollection } from '@/lib/api';
+import { useEffect, useMemo, useState } from 'react';
+import { deleteRunById, listRuns } from '@/lib/api';
 
-export default function CollectionsPage() {
-  const router = useRouter();
-  const { collections, isLoading, isError, error, refetch } = useCollections();
-  const [searchTerm, setSearchTerm] = useState('');
-  const [deletingId, setDeletingId] = useState<number | null>(null);
-  const [renamingId, setRenamingId] = useState<number | null>(null);
-  const [renameValue, setRenameValue] = useState<string>('');
-  const [sortBy, setSortBy] = useState<string>('last_opened');
-  const [lastOpenedMap, setLastOpenedMap] = useState<Record<number, number>>(() => {
-    if (typeof window === 'undefined') return {};
+interface RunRow {
+  run_id: number;
+  model_id: number;
+  model_name: string;
+  model_type: string;
+  threshold: number;
+  created_at: string;
+  total_images: number;
+  processed_count: number;
+  live_mussel_count: number;
+  error_msg?: string | null;
+}
+
+function deriveStatus(run: RunRow): 'pending' | 'running' | 'completed' | 'failed' {
+  if (run.error_msg) return 'failed';
+  if (!run.total_images) return 'pending';
+  if (run.processed_count < run.total_images) return 'running';
+  return 'completed';
+}
+
+export default function HistoryPage() {
+  const [runs, setRuns] = useState<RunRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [deletingRunId, setDeletingRunId] = useState<number | null>(null);
+
+  const loadRuns = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const stored = localStorage.getItem('collections-last-opened');
-      return stored ? JSON.parse(stored) : {};
-    } catch {
-      return {};
+      const result = await listRuns();
+      setRuns(result || []);
+    } catch (err) {
+      setError((err as Error).message || 'Failed to load history');
+    } finally {
+      setLoading(false);
     }
-  });
+  };
 
-  const visibleCollections = useMemo(
-    () => collections.filter((collection) => collection.image_count > 0),
-    [collections],
-  );
+  useEffect(() => {
+    loadRuns();
+  }, []);
 
-  const filteredCollections = useMemo(() => {
-    if (!searchTerm.trim()) return visibleCollections;
-    const q = searchTerm.trim().toLowerCase();
-    const fuzzyMatch = (text: string, query: string) => {
-      const t = text.toLowerCase();
-      if (t.includes(query)) return true;
-      let ti = 0;
-      for (const char of query) {
-        ti = t.indexOf(char, ti);
-        if (ti === -1) return false;
-        ti += 1;
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (runs.some((run) => deriveStatus(run) === 'running' || deriveStatus(run) === 'pending')) {
+        loadRuns();
       }
-      return true;
-    };
-    return visibleCollections.filter((c) => fuzzyMatch(c.name || 'untitled collection', q));
-  }, [visibleCollections, searchTerm]);
+    }, 1200);
+    return () => window.clearInterval(timer);
+  }, [runs]);
 
-  const sortedCollections = useMemo(() => {
-    const withSort = [...filteredCollections];
-    if (sortBy === 'last_opened') {
-      withSort.sort((a, b) => {
-        const aTime = lastOpenedMap[a.collection_id];
-        const bTime = lastOpenedMap[b.collection_id];
-        // If both have timestamps, sort by last opened desc
-        if (aTime && bTime) {
-          return bTime - aTime;
-        }
-        // If only one has a timestamp, it goes first
-        if (aTime && !bTime) return -1;
-        if (!aTime && bTime) return 1;
-        // Neither opened yet: fall back to created_at (newest first)
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
-    } else if (sortBy === 'created_at') {
-      // Newest first (created_at desc)
-      withSort.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    }
-    return withSort;
-  }, [filteredCollections, sortBy, lastOpenedMap]);
+  const sortedRuns = useMemo(() => {
+    return [...runs].sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  }, [runs]);
 
-  const handleCreate = async () => {
-    try {
-      const name = `Quick Process - ${new Date().toLocaleString()}`;
-      const response = await createCollection(name);
-      const collectionId = response.collection_id;
-      router.push(`/collection/${collectionId}`);
-    } catch (err) {
-      console.error('Failed to create collection', err);
-    }
-  };
-
-  const handleDelete = async (id: number) => {
-    if (deletingId) return;
-    const confirmed = window.confirm('Are you sure you want to delete this collection?');
+  const onDelete = async (runId: number) => {
+    const confirmed = window.confirm('Delete this run and its uploaded files?');
     if (!confirmed) return;
-    setDeletingId(id);
+
+    setDeletingRunId(runId);
+    setError(null);
     try {
-      await deleteCollection(id);
-      await refetch();
+      await deleteRunById(runId);
+      await loadRuns();
     } catch (err) {
-      console.error('Failed to delete collection', err);
+      setError((err as Error).message || 'Failed to delete run');
     } finally {
-      setDeletingId(null);
-    }
-  };
-
-  const handleStartRename = (id: number) => {
-    if (deletingId) return;
-    const current = collections.find((c) => c.collection_id === id);
-    setRenameValue(current?.name || '');
-    setRenamingId(id);
-  };
-
-  const handleRenameSave = async () => {
-    if (renamingId === null) return;
-    const trimmed = renameValue.trim();
-    if (!trimmed) return;
-    try {
-      await updateCollection(renamingId, { name: trimmed });
-      await refetch();
-    } catch (err) {
-      console.error('Failed to rename collection', err);
-    } finally {
-      setRenamingId(null);
-      setRenameValue('');
-    }
-  };
-
-  const handleRenameCancel = () => {
-    setRenamingId(null);
-    setRenameValue('');
-  };
-
-  const handleCardOpen = (id: number) => {
-    const updated = { ...lastOpenedMap, [id]: Date.now() };
-    setLastOpenedMap(updated);
-    try {
-      localStorage.setItem('collections-last-opened', JSON.stringify(updated));
-    } catch {
-      // ignore
+      setDeletingRunId(null);
     }
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-black">
-      <div className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
-        <div className="max-w-6xl mx-auto px-8 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-zinc-50 dark:bg-black text-zinc-900 dark:text-zinc-100">
+      <header className="border-b border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
+        <div className="max-w-5xl mx-auto px-6 py-4 flex items-center gap-3">
           <Link
             href="/"
-            className="px-3 py-2 text-sm rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-900 dark:text-zinc-100 hover:bg-zinc-300 dark:hover:bg-zinc-600"
+            className="px-3 py-2 text-sm rounded bg-zinc-200 dark:bg-zinc-700 hover:bg-zinc-300 dark:hover:bg-zinc-600"
           >
             Home
           </Link>
-          <button
-            type="button"
-            onClick={handleCreate}
-            className="px-3 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
-          >
-            Start New Run
-          </button>
+          <h1 className="text-2xl font-bold">History</h1>
         </div>
-      </div>
-      <main className="max-w-6xl mx-auto px-8 pt-12 pb-10 space-y-7">
-        <div className="space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-            <div>
-              <h1 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 leading-tight">
-                Collections
-              </h1>
-              <p className="text-base text-zinc-600 dark:text-zinc-400">
-                Pick a collection to view its images and past model runs.
-              </p>
-            </div>
-            <div className="w-full sm:w-auto flex flex-col sm:flex-row gap-2 sm:items-center">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Sort by</span>
-                <select
-                  id="collection-sort"
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="w-40 sm:w-44 px-3 py-1.5 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      </header>
+
+      <main className="max-w-5xl mx-auto px-6 py-8 space-y-4">
+        {error && (
+          <div className="rounded border border-red-300 bg-red-50 dark:bg-red-900/20 px-3 py-2 text-sm text-red-700 dark:text-red-300">
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">Loading run history...</p>
+        ) : sortedRuns.length === 0 ? (
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">No runs yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {sortedRuns.map((run) => {
+              const status = deriveStatus(run);
+              return (
+                <div
+                  key={run.run_id}
+                  className="rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 px-4 py-3"
                 >
-                  <option value="last_opened">Last Opened</option>
-                  <option value="created_at">Date Created</option>
-                </select>
-              </div>
-              <div className="w-full sm:w-80">
-                <label className="sr-only" htmlFor="collection-search">Search collections</label>
-                <div className="relative">
-                  <span className="absolute inset-y-0 left-3 flex items-center text-zinc-400">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </span>
-                  <input
-                    id="collection-search"
-                    type="search"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    placeholder="Search by name"
-                    className="w-full pl-9 pr-3 py-2 text-sm rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">
+                        Run #{run.run_id} · {new Date(run.created_at).toLocaleString()}
+                      </p>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                        {run.model_name} ({run.model_type}) · threshold {Number(run.threshold).toFixed(2)}
+                      </p>
+                      <p className="text-sm text-zinc-600 dark:text-zinc-400">
+                        {run.processed_count}/{run.total_images} processed · live {run.live_mussel_count} · {status}
+                      </p>
+                      {run.error_msg && (
+                        <p className="text-sm text-red-600 dark:text-red-400">{run.error_msg}</p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Link
+                        href={`/runs/${run.run_id}`}
+                        className="px-3 py-2 text-sm rounded bg-blue-600 text-white hover:bg-blue-700"
+                      >
+                        Open
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => onDelete(run.run_id)}
+                        disabled={deletingRunId === run.run_id || status === 'running' || status === 'pending'}
+                        className="px-3 py-2 text-sm rounded bg-red-600 text-white hover:bg-red-700 disabled:opacity-50"
+                      >
+                        {deletingRunId === run.run_id ? 'Deleting...' : 'Delete'}
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {isLoading && (
-          <div className="grid gap-5 sm:grid-cols-2">
-            {[1, 2, 3, 4].map((key) => (
-              <div
-                key={key}
-                className="h-24 rounded-lg bg-zinc-200 dark:bg-zinc-800 animate-pulse"
-              />
-            ))}
-          </div>
-        )}
-
-        {isError && (
-          <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 p-4">
-            Failed to load collections: {error?.message || 'Unknown error'}
-          </div>
-        )}
-
-        {!isLoading && !isError && filteredCollections.length === 0 && (
-          <div className="rounded-lg p-8 text-center text-zinc-600 dark:text-zinc-400">
-            <p className="text-lg font-medium">No collections with images yet.</p>
-            <p className="text-sm mt-1">
-              Start a run and add images to see collections here.
-            </p>
-          </div>
-        )}
-
-        {!isLoading && !isError && sortedCollections.length > 0 && (
-          <div className="grid gap-5 sm:grid-cols-2">
-            {sortedCollections.map((collection) => (
-              <CollectionCard
-                key={collection.collection_id}
-                collection={collection}
-                onDelete={handleDelete}
-                deleting={deletingId === collection.collection_id}
-                onEditName={handleStartRename}
-                renaming={renamingId === collection.collection_id}
-                renameValue={renamingId === collection.collection_id ? renameValue : ''}
-                onRenameChange={setRenameValue}
-                onRenameSave={handleRenameSave}
-                onRenameCancel={handleRenameCancel}
-                onOpen={handleCardOpen}
-              />
-            ))}
+              );
+            })}
           </div>
         )}
       </main>

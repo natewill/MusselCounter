@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { CollectionSummary } from '@/hooks/useCollections';
+import { getUploadUrl } from '@/lib/api/base';
 
 interface Props {
   collection: CollectionSummary;
@@ -15,10 +16,7 @@ interface Props {
 }
 
 function getImageUrl(storedPath?: string | null) {
-  if (!storedPath) return null;
-  const filename = storedPath.split('/').pop();
-  if (!filename) return null;
-  return `http://127.0.0.1:8000/uploads/${filename}`;
+  return getUploadUrl(storedPath);
 }
 
 function formatDate(dateString: string) {

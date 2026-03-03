@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import BoundingBoxesOverlay from './BoundingBoxesOverlay';
 
 interface Polygon {
@@ -34,6 +34,8 @@ export default function FullscreenImageModal({
   onPolygonClick,
   onPolygonHover,
 }: FullscreenImageModalProps) {
+  const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
+
   // Add ESC key handler to close fullscreen
   useEffect(() => {
     if (!isOpen) return;
@@ -47,6 +49,11 @@ export default function FullscreenImageModal({
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setNaturalSize({ width: 0, height: 0 });
+  }, [isOpen, imageUrl]);
 
   if (!isOpen || !imageUrl) return null;
 
@@ -76,11 +83,19 @@ export default function FullscreenImageModal({
             src={imageUrl}
             alt={filename}
             className="block max-w-none max-h-none rounded"
+            onLoad={(e) =>
+              setNaturalSize({
+                width: e.currentTarget.naturalWidth || 0,
+                height: e.currentTarget.naturalHeight || 0,
+              })
+            }
           />
 
           {visiblePolygons && (
             <BoundingBoxesOverlay
               polygons={polygons}
+              imageWidth={naturalSize.width}
+              imageHeight={naturalSize.height}
               isEditMode={isEditMode}
               editingPolygonIndex={editingPolygonIndex}
               onPolygonClick={onPolygonClick}
